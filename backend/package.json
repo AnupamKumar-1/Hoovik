@@ -1,7 +1,7 @@
 {
   "name": "backend",
   "version": "1.0.0",
-  "description": "SkyMeet backend API",
+  "description": "SkyMeetAI backend API",
   "main": "src/app.js",
   "type": "module",
   "scripts": {
