@@ -9,8 +9,8 @@
 An end-to-end AI-powered system that converts meeting audio into
 **structured, emotion-aware transcripts**.
 
-Built with a **microservices architecture**, combining: - 🎙 Speech
-Recognition (Whisper) - Emotion Intelligence (Transformers) - ⚙️
+Built with a **microservices architecture**, combining: - Speech
+Recognition (Whisper) - Emotion Intelligence (Transformers) -
 Scalable Backend (Node.js) -  Modern Frontend (React)
 
 ------------------------------------------------------------------------
