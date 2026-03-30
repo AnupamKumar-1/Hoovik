@@ -43,13 +43,13 @@ Scalable Backend (Node.js) -  Modern Frontend (React)
 
 ## Tech Stack
 
-  Layer        Technology
-  ------------ --------------------------------
-  AI Service   Flask + Whisper + Transformers
-  Backend      Node.js + Express
-  Database     MongoDB
-  Frontend     React
-  Audio        FFmpeg
+| Layer        | Technology                          |
+|-------------|------------------------------------|
+| AI Service   | Flask + Whisper + Transformers     |
+| Backend      | Node.js + Express                  |
+| Database     | MongoDB                            |
+| Frontend     | React                              |
+| Audio        | FFmpeg                             |
 
 ------------------------------------------------------------------------
 
