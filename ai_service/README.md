@@ -4,7 +4,7 @@
 
 ------------------------------------------------------------------------
 
-## 🧠 Overview
+## Overview
 
 An end-to-end AI-powered system that converts meeting audio into
 **structured, emotion-aware transcripts**.
@@ -29,7 +29,7 @@ Scalable Backend (Node.js) -  Modern Frontend (React)
 
 ## System Architecture
 
-    🎥 Meeting Audio 
+      Meeting Audio
        →  FFmpeg Processing
        →  Whisper ASR
        →  Emotion Detection
@@ -120,10 +120,10 @@ Upload audio → get transcript + emotions
 
 ## Future Enhancements
 
--   📊 Emotion Timeline Graph
--   🧠 LLM Meeting Summary
--   ⚡ Real-time streaming transcription
--   🎯 Key insight extraction
+-    Emotion Timeline Graph
+-    LLM Meeting Summary
+-    Real-time streaming transcription
+-    Key insight extraction
 
 ------------------------------------------------------------------------
 
