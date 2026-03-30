@@ -121,7 +121,9 @@ export function connectToSocket(
 
     const name = sanitizeHtml(String(meta.name || "Guest")).slice(0, 200);
 
-    const userId = meta.userId ? String(meta.userId) : socket.id;
+    const userId = meta.userId
+  ? String(meta.userId)
+  : socket.handshake.auth?.userId || socket.id;
     const cleanMeta = { ...(meta || {}), name };
 
     if (!meetingParticipants[code]) meetingParticipants[code] = new Map();
@@ -129,13 +131,37 @@ export function connectToSocket(
     let politeRole = false;
 
     if (meetingParticipants[code].has(userId)) {
-      const existing = meetingParticipants[code].get(userId);
-      existing.socketId = socket.id;
-      existing.meta = cleanMeta;
-      politeRole = meetingState[code]?.indexOf(existing.socketId) !== 0;
+  const existing = meetingParticipants[code].get(userId);
 
-      await meeting.restoreParticipant(socket.id, { userId, name }, cleanMeta);
-    } else {
+  const oldSocketId = existing.socketId;
+
+  // 🔥 remove old socket from meetingState
+  if (meetingState[code]) {
+    meetingState[code] = meetingState[code].filter(
+      (id) => id !== oldSocketId
+    );
+  }
+
+  // 🔥 disconnect old socket (IMPORTANT)
+  const oldSocket = io.sockets.sockets.get(oldSocketId);
+  if (oldSocket) {
+  oldSocket.data.replaced = true;
+  oldSocket.leave(`meeting:${code}`);
+  oldSocket.removeAllListeners();
+  oldSocket.emit = () => {};
+}
+  existing.socketId = socket.id;
+  existing.meta = cleanMeta;
+  if (!meetingState[code]) meetingState[code] = [];
+  if (!meetingState[code].includes(socket.id)) {
+    meetingState[code].push(socket.id);
+  }
+
+  politeRole = meetingState[code].indexOf(socket.id) !== 0;
+
+  await meeting.restoreParticipant(socket.id, { userId, name }, cleanMeta);
+}
+     else {
       meetingParticipants[code].set(userId, {
         socketId: socket.id,
         userId,
@@ -143,7 +169,9 @@ export function connectToSocket(
       });
 
       if (!meetingState[code]) meetingState[code] = [];
-      meetingState[code].push(socket.id);
+      if (!meetingState[code].includes(socket.id)) {
+  meetingState[code].push(socket.id);
+}
       politeRole = meetingState[code].indexOf(socket.id) !== 0;
 
       await meeting.addParticipant({
@@ -799,15 +827,19 @@ socket.on("chat-message", async (meetingCodeRaw, msg = {}) => {
     });
 
     socket.on("disconnect", async () => {
-      try {
-        const code = socket.data?.meetingCode;
-        const { userId } = socket.data || {};
-        if (!code || !userId) return;
-        await handleLeave(socket, code, io, userId);
-      } catch (err) {
-        console.error("[socket][disconnect] error:", err);
-      }
-    });
+  try {
+    // 🔥 skip if replaced (IMPORTANT)
+    if (socket.data?.replaced) return;
+
+    const code = socket.data?.meetingCode;
+    const { userId } = socket.data || {};
+    if (!code || !userId) return;
+
+    await handleLeave(socket, code, io, userId);
+  } catch (err) {
+    console.error("[socket][disconnect] error:", err);
+  }
+});
   });
 
   if (typeof process !== "undefined" && process && process.on) {

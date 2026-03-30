@@ -1,6 +1,8 @@
 // backend/src/controllers/user.controller.js
 import httpStatus from "http-status";
+import crypto from "crypto";
 import { User } from "../models/user.model.js";
+import mongoose from "mongoose";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { Meeting } from "../models/meeting.model.js";
@@ -84,13 +86,18 @@ const login = async (req, res) => {
     if (!user) {
       return sendError(res, httpStatus.NOT_FOUND, "User not found.");
     }
-
+    console.log("LOGIN SECRET:", process.env.JWT_SECRET);
     const isPasswordCorrect = await bcrypt.compare(password, user.password);
     if (!isPasswordCorrect) {
       return sendError(res, httpStatus.UNAUTHORIZED, "Invalid username or password.");
     }
 
-    const payload = { sub: user._id, username: user.username, name: user.name };
+    const payload = {
+  _id: user._id.toString(),
+  sub: user._id.toString(),
+  username: user.username,
+  name: user.name,
+};
     const expiresIn = "1h";
     const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn });
 
@@ -139,14 +146,16 @@ const register = async (req, res) => {
 const getUserHistory = async (req, res) => {
   try {
     const userId = getUserId(req.user);
+const objectUserId = userId ? new mongoose.Types.ObjectId(userId) : null;
+
     if (!userId) {
       return sendError(res, httpStatus.UNAUTHORIZED, "Unauthorized. Missing user id.");
     }
 
     const query = {
       $or: [
-        { host: userId },
-        { "host.userId": userId },
+        { host: objectUserId },
+         { ownerId: objectUserId },
         { "participants.meta.userId": String(userId) },
         { "participants.userId": String(userId) },
       ],
@@ -210,6 +219,8 @@ const addToHistory = async (req, res) => {
 
   try {
     const userId = getUserId(req.user);
+const objectUserId = userId ? new mongoose.Types.ObjectId(userId) : null;
+
     if (!userId) return sendError(res, httpStatus.UNAUTHORIZED, "Unauthorized. Missing user id.");
 
     const existing = await Meeting.findOne({ meetingCode: meeting_code }).lean().exec();
@@ -226,7 +237,14 @@ const addToHistory = async (req, res) => {
       joinedAt: new Date(),
     };
 
-    const newMeeting = new Meeting({ meetingCode: meeting_code, link, host: userId, participants: [participantEntry] });
+    const newMeeting = new Meeting({
+  meetingCode: meeting_code,
+  link,
+  host: new mongoose.Types.ObjectId(userId),
+ownerId: new mongoose.Types.ObjectId(userId),
+
+  participants: [participantEntry]
+});
     await newMeeting.save();
 
     res.status(httpStatus.CREATED).json({ success: true, message: "Meeting created and saved to history.", meeting: newMeeting });
@@ -242,6 +260,7 @@ const addToHistory = async (req, res) => {
 const addParticipant = async (req, res) => {
   try {
     const userId = getUserId(req.user);
+const objectUserId = userId ? new mongoose.Types.ObjectId(userId) : null;
     if (!userId) return sendError(res, httpStatus.UNAUTHORIZED, "Unauthorized. Missing user id.");
 
     const codeParam = (req.params?.code || req.body?.meeting_code || req.body?.meetingCode || "").toString().trim();
@@ -277,9 +296,14 @@ const addParticipant = async (req, res) => {
     }
 
     if (!meeting.host) {
-      meeting.host = userId;
-      await meeting.save();
-    }
+  meeting.host = new mongoose.Types.ObjectId(userId);
+}
+
+if (!meeting.ownerId) {
+  meeting.ownerId = new mongoose.Types.ObjectId(userId);
+}
+
+await meeting.save();
 
     res.status(httpStatus.OK).json({ success: true, meeting });
   } catch (error) {
@@ -294,23 +318,28 @@ const addParticipant = async (req, res) => {
 const getMeetings = async (req, res) => {
   try {
     const userId = getUserId(req.user);
+const objectUserId = userId ? new mongoose.Types.ObjectId(userId) : null;
     const mineOnly = String(req.query?.mine || "false").toLowerCase() === "true";
 
     let filter = {};
     if (userId && mineOnly) {
       filter = {
         $or: [
-          { host: userId },
-          { "host.userId": userId },
-          { "participants.userId": userId },
-          { "participants.meta.userId": String(userId) },
-        ],
+      { ownerId: objectUserId },
+      { host: objectUserId },
+      { "participants.meta.userId": String(userId) },
+    ],
       };
     } else if (userId) {
-      filter = {
-        $or: [{ host: userId }, { "participants.userId": userId }, { active: true }],
-      };
-    } else {
+  filter = {
+    $or: [
+      { host: objectUserId },
+      { ownerId: objectUserId },
+      { "participants.meta.userId": String(userId) },
+      { active: true }
+    ],
+  };
+} else {
       filter = { active: true };
     }
 
@@ -331,54 +360,85 @@ const getMeetings = async (req, res) => {
 /**
  * POST /meetings
  */
+
 const upsertMeeting = async (req, res) => {
   try {
     const body = req.body || {};
-    const meetingCodeRaw = body.meetingCode || body.meeting_code || body.code || body.meeting;
-    if (!meetingCodeRaw || !String(meetingCodeRaw).trim()) {
-      return res.status(httpStatus.BAD_REQUEST).json({ success: false, message: "meetingCode is required" });
+
+    const meetingCodeRaw =
+      body.meetingCode || body.meeting_code || body.code || body.meeting;
+
+    if (!meetingCodeRaw) {
+      return res.status(400).json({
+        success: false,
+        message: "meetingCode is required",
+      });
     }
-    const meetingCode = String(meetingCodeRaw).toUpperCase().trim();
+
+    const meetingCode = String(meetingCodeRaw).toUpperCase();
 
     const payload = {};
 
-    if (req.user && req.user._id) payload.host = req.user._id;
+    // ✅ USER
+    const userId = getUserId(req.user);
+    const objectUserId = userId
+      ? new mongoose.Types.ObjectId(userId)
+      : null;
 
-    if (body.hostName || body.host_name || body.host) {
-      payload.hostInfo = {
-        name: body.hostName || body.host_name || (typeof body.host === "string" ? body.host : null) || null,
-        userId: req.user && req.user._id ? req.user._id : null,
-      };
+    if (objectUserId) {
+      payload.host = objectUserId;
+      payload.ownerId = objectUserId;
     }
 
-    if (Array.isArray(body.participants) && body.participants.length > 0) {
-      payload.participants = body.participants.map((p) => {
-        if (!p) return null;
-        if (typeof p === "string") {
-          return { socketId: null, userId: null, name: p, meta: {}, joinedAt: new Date() };
-        }
-        return {
-          socketId: p.socketId || p.id || null,
-          userId: p.userId || p.user_id || p.user || null,
-          name: p.name || p.display || "Guest",
-          meta: p.meta || p.info || {},
-          joinedAt: p.joinedAt ? new Date(p.joinedAt) : new Date(),
-          leftAt: p.leftAt ? new Date(p.leftAt) : null,
-        };
-      }).filter(Boolean);
-    }
+    // =========================================================
+    // 🔥 ALWAYS GENERATE NEW RAW SECRET
+    // =========================================================
+    const rawSecret = crypto.randomBytes(32).toString("hex");
 
-    if (body.analytics) payload.analytics = body.analytics;
-    if (body.createdAt || body.created_at) payload.createdAt = new Date(body.createdAt || body.created_at);
-    if (body.link) payload.link = body.link;
+    const hostSecretHash = crypto
+      .createHash("sha256")
+      .update(rawSecret)
+      .digest("hex");
 
-    const saved = await Meeting.upsertByMeetingCode(meetingCode, payload);
-    return res.status(httpStatus.OK).json(saved);
+    // =========================================================
+    // ✅ STORE HASH AT ROOT (CRITICAL FIX)
+    // =========================================================
+    payload.hostSecretHash = hostSecretHash;
+
+    // =========================================================
+    // ✅ HOST INFO (NO SECRET HERE)
+    // =========================================================
+    payload.hostInfo = {
+      name: body.hostName || body.host_name || null,
+      userId: userId || null,
+    };
+
+    // =========================================================
+    // ✅ SAVE
+    // =========================================================
+    const saved = await Meeting.upsertByMeetingCode(
+      meetingCode,
+      payload
+    );
+
+    // =========================================================
+    // ✅ RETURN RAW SECRET
+    // =========================================================
+    return res.json({
+      success: true,
+      meeting: saved,
+      hostSecret: rawSecret, // ✅ IMPORTANT
+    });
+
   } catch (err) {
-    console.error("upsertMeeting error:", err.stack || err);
-    return res.status(httpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: "Failed to upsert meeting", detail: err.message });
+    console.error("upsertMeeting error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to upsert meeting",
+    });
   }
 };
+
 
 export {
   login,
@@ -388,5 +448,5 @@ export {
   addParticipant,
   getMeetings,
   upsertMeeting,
-  logout, // <-- exported
-};
+  logout,
+}

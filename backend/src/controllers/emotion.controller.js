@@ -318,7 +318,7 @@ export async function uploadEmotionFileHandler(req, res) {
   };
   if (nameFromCache) payload.name = nameFromCache;
 
-  // log when we attach a name to help debug
+  
   if (nameFromCache) {
     console.info(`[Emotion] emitting update for ${participantId} name=${nameFromCache} meeting=${meetingId}`);
   }

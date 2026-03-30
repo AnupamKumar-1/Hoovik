@@ -1,9 +1,10 @@
 
-import React, { useEffect, useState, useContext } from "react";
+import React, { useEffect, useState, useContext, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import "../styles/home.css";
 import { Snackbar, Alert } from "@mui/material";
 import { AuthContext } from "../contexts/AuthContext";
+import { apiClient } from "../contexts/AuthContext";
 import { TRANSCRIPTS_ENABLED } from "../environment";
 
 const SERVER_BASE = process.env.REACT_APP_SERVER_URL || "http://localhost:8000";
@@ -33,7 +34,6 @@ async function copyToClipboard(text) {
   }
 }
 
-// --- Helpers for unique keys & dedupe ---
 function getTranscriptKey(item, index) {
   const id = item._id || item.id || "";
   const code = (item.meeting_code || item.meetingCode || "local").toString();
@@ -45,7 +45,7 @@ function dedupeByCodeKeepNewest(arr) {
   const map = new Map();
   for (const it of arr) {
     const codeRaw = (it.meeting_code || it.meetingCode || "").toString();
-    const code = codeRaw ? codeRaw.toUpperCase() : `__NO_CODE__:${Math.random().toString(36).slice(2,8)}`;
+    const code = codeRaw ? codeRaw.toUpperCase() : `__NO_CODE__:${Math.random().toString(36).slice(2, 8)}`;
     const existing = map.get(code);
     if (!existing) {
       map.set(code, it);
@@ -60,23 +60,28 @@ function dedupeByCodeKeepNewest(arr) {
 
 export default function Home() {
   const navigate = useNavigate();
-  const { logout } = useContext(AuthContext); // expects AuthProvider to expose logout
+  const { logout } = useContext(AuthContext);
 
   const [name, setName] = useState(localStorage.getItem("displayName") || "");
   const [room, setRoom] = useState("");
   const [recentLocal, setRecentLocal] = useState([]);
   const [expandedTranscripts, setExpandedTranscripts] = useState({});
 
-  // Snackbar state
+
   const [snackOpen, setSnackOpen] = useState(false);
   const [snackMsg, setSnackMsg] = useState("");
   const [snackSeverity, setSnackSeverity] = useState("success");
 
-  // Info flag when server has transcripts but none match local host keys
   const [serverHadTranscripts, setServerHadTranscripts] = useState(false);
 
+
+
+  const didFetch = useRef(false);
+
   useEffect(() => {
-    // If transcripts are disabled (production Render free), skip network calls and show message only.
+    if (didFetch.current) return;
+    didFetch.current = true;
+
     if (!TRANSCRIPTS_ENABLED) {
       setRecentLocal([]);
       setServerHadTranscripts(false);
@@ -87,125 +92,201 @@ export default function Home() {
       try {
         const token = localStorage.getItem("token");
 
-        // 1) Attempt authenticated fetch (cross-device owner-based)
-        let authItems = [];
-        let authHad = false;
-        if (token) {
-          try {
-            const resp = await fetch(`${API_BASE}/transcript?mine=true&limit=200`, {
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-              },
-            });
-            if (resp.ok) {
-              const body = await resp.json();
-              if (body && body.success && Array.isArray(body.transcripts)) {
-                authHad = body.transcripts.length > 0;
-                authItems = body.transcripts.map((t) => ({
-                  _id: t._id || t.id || null,
-                  meeting_code: (t.meetingCode || t.meeting_code || "").toString().toUpperCase(),
-                  transcript: t.transcriptText || t.transcript || "",
-                  createdAt: t.createdAt || null,
-                  fileName: t.fileName || null,
-                  fromServer: true,
-                }));
-              }
-            } else {
-              // not authorized or server error — fall through to legacy hostSecret method
-              console.warn("Auth transcript request failed:", resp.status);
-            }
-          } catch (err) {
-            console.warn("Auth transcript fetch error:", err);
-          }
-        }
 
-        // Collect locally-known host entries (keys like `host:ROOMCODE`) for legacy flow
-        const hostKeys = Object.keys(localStorage).filter((k) => k.startsWith("host:"));
-        const hostEntries = hostKeys
+        const hostKeys = Object.keys(localStorage).filter((k) =>
+          k.startsWith("host:")
+        );
+
+        const hostSecrets = hostKeys
           .map((k) => {
             try {
-              const raw = localStorage.getItem(k);
-              if (!raw) return null;
-              const parsed = JSON.parse(raw);
-              const parts = k.split(":");
-              const roomCode = (parts[1] || "").toString().toUpperCase();
-              return { storageKey: k, roomCode, ...parsed };
-            } catch (e) {
+              const parsed = JSON.parse(localStorage.getItem(k));
+
+              const createdAt = new Date(parsed?.createdAt || 0).getTime();
+              const isRecent =
+                Date.now() - createdAt < 1000 * 60 * 60 * 24 * 2; // 2 days
+
+              if (!isRecent) return null;
+
+              return parsed?.hostSecret;
+            } catch {
               return null;
             }
           })
-          .filter(Boolean);
+          .filter(Boolean)
 
-        const hostSecrets = hostEntries
-          .map((e) => ({ roomCode: e.roomCode, hostSecret: e.hostSecret || null, hostName: e.hostName || null }))
-          .filter((x) => x.hostSecret && typeof x.hostSecret === "string");
+        if (!token && hostSecrets.length === 0) {
+          console.log("🚫 No auth, no hostSecret → skipping transcript fetch");
+          return;
+        }
 
-        // 2) Legacy hostSecret fetches (only for secrets present locally)
-        const allResults = await Promise.all(
-          hostSecrets.map(async ({ hostSecret }) => {
-            try {
-              const resp = await fetch(`${API_BASE}/transcript?limit=200`, {
-                headers: {
-                  "Content-Type": "application/json",
-                  "x-host-secret": hostSecret,
-                },
-              });
-              if (!resp.ok) {
-                return { transcripts: [], ok: false, status: resp.status };
-              }
-              const body = await resp.json();
-              if (body && body.success && Array.isArray(body.transcripts)) {
-                return { transcripts: body.transcripts, ok: true, status: resp.status };
-              }
-              return { transcripts: [], ok: true, status: resp.status };
-            } catch (err) {
-              console.warn("transcript fetch error for hostSecret:", err);
-              return { transcripts: [], ok: false, status: 0 };
+
+        let authItems = [];
+        let authHad = false;
+
+        if (token) {
+          try {
+            console.log("🔥 FETCH AUTH TRANSCRIPTS");
+
+            const resp = await apiClient.get(`/transcript?limit=200`);
+
+            const body = resp.data;
+
+            console.log("🔥 AUTH RAW:", body);
+
+            if (body?.success) {
+              const list = Array.isArray(body.transcripts)
+                ? body.transcripts
+                : body.transcript
+                  ? [body.transcript]
+                  : [];
+
+              authHad = list.length > 0;
+
+              authItems = list
+                .map((t) => {
+                  const code = (t.meetingCode || t.meeting_code || "")
+                    .toString()
+                    .toUpperCase();
+
+                  if (!code) {
+                    console.warn("⚠️ Skipping invalid auth transcript:", t);
+                    return null;
+                  }
+
+                  return {
+                    _id: t._id || t.id || null,
+
+                    meeting_code: code,
+
+                    transcript:
+                      t.transcriptText ||
+                      t.transcript ||
+                      t.metadata?.transcriptText || // 🔥 fallback (important)
+                      "",
+
+                    createdAt: t.createdAt ? new Date(t.createdAt) : null,
+
+                    fileName: t.fileName || null,
+
+                    fromServer: true,
+                  };
+                })
+                .filter(Boolean);
+
+              console.log("✅ AUTH ITEMS:", authItems);
             }
-          })
-        );
-
-        // Flatten hostSecret results into serverItems
-        const hostServerItems = [];
-        let anyHostServerHad = false;
-        for (const r of allResults) {
-          if (r.ok && r.transcripts.length > 0) anyHostServerHad = true;
-          for (const t of r.transcripts || []) {
-            hostServerItems.push({
-              _id: t._id || t.id || null,
-              meeting_code: (t.meetingCode || t.meeting_code || "").toString().toUpperCase(),
-              transcript: t.transcriptText || t.transcript || "",
-              createdAt: t.createdAt || null,
-              fileName: t.fileName || null,
-              fromServer: true,
-            });
+          } catch (err) {
+            console.warn(
+              "❌ Auth transcript failed:",
+              err?.response?.status,
+              err?.response?.data
+            );
           }
         }
 
-        // Merge authItems + hostServerItems
+        // ================= HOST SECRET FETCH (OPTIMIZED) =================
+        let hostServerItems = [];
+
+        if (hostSecrets.length > 0) {
+          console.log("✅ Using filtered hostSecrets:", hostSecrets);
+
+          for (const hostSecret of hostSecrets) {
+            try {
+              console.log("🔥 TRY HOST SECRET:", hostSecret);
+
+              const resp = await apiClient.get(`/transcript?limit=200`, {
+                headers: {
+                  "x-host-secret": hostSecret,
+                },
+              });
+
+              const body = resp.data;
+
+              console.log("🔥 RAW RESPONSE:", body);
+
+              // ✅ HANDLE BOTH ARRAY + SINGLE OBJECT
+              const list = Array.isArray(body?.transcripts)
+                ? body.transcripts
+                : body?.transcript
+                  ? [body.transcript]
+                  : [];
+
+              if (list.length === 0) {
+                console.log("⚠️ No transcripts for this hostSecret");
+                continue;
+              }
+
+              // ✅ FIX: PROPER MAP
+              const mapped = list
+                .map((t) => {
+                  const code = (t.meetingCode || t.meeting_code || "")
+                    .toString()
+                    .toUpperCase();
+
+                  if (!code) {
+                    console.warn("⚠️ Skipping invalid transcript:", t);
+                    return null;
+                  }
+
+                  return {
+                    _id: t._id || t.id || null,
+
+                    meeting_code: code,
+
+                    transcript:
+                      t.transcriptText ||
+                      t.transcript ||
+                      t.metadata?.transcriptText || // 🔥 IMPORTANT
+                      "",
+
+                    createdAt: t.createdAt ? new Date(t.createdAt) : null,
+
+                    fileName: t.fileName || null,
+
+                    fromServer: true,
+                  };
+                })
+                .filter(Boolean);
+
+              console.log("✅ MAPPED:", mapped);
+
+              // ✅ APPEND (NOT OVERWRITE)
+              hostServerItems = [...hostServerItems, ...mapped];
+
+            } catch (err) {
+              console.warn(
+                "❌ Host transcript failed:",
+                err?.response?.status,
+                err?.response?.data
+              );
+              continue;
+            }
+          }
+        }
+
+        console.log("🔥 FINAL hostServerItems:", hostServerItems);
+        // ================= MERGE =================
         const mergedRaw = [...authItems, ...hostServerItems];
 
-        const anyServerHad = authHad || anyHostServerHad;
+        const anyServerHad =
+          authHad || hostServerItems.length > 0;
+
         setServerHadTranscripts(anyServerHad);
 
-        // If no server items and no host secrets, show empty
         if (mergedRaw.length === 0) {
           setRecentLocal([]);
           return;
         }
 
-        // Dedupe and keep newest per meeting code
         const merged = dedupeByCodeKeepNewest(mergedRaw);
         setRecentLocal(merged);
       } catch (err) {
-        console.warn("Could not load server transcripts:", err);
+        console.warn("Transcript load failed:", err);
         setRecentLocal([]);
         setServerHadTranscripts(false);
       }
     })();
-
-    return () => {};
   }, []);
 
   function showSnack(message, severity = "success") {
@@ -220,7 +301,7 @@ export default function Home() {
       const url = new URL(roomId);
       const segs = url.pathname.split("/").filter(Boolean);
       if (segs.length) roomId = segs.pop();
-    } catch {}
+    } catch { }
     return roomId;
   }
 
@@ -253,7 +334,12 @@ export default function Home() {
       // store hostSecret so this browser can prove it's the host later
       localStorage.setItem(
         `host:${roomCode.toUpperCase()}`,
-        JSON.stringify({ hostName: name.trim(), hostSecret: hostSecret || null, createdAt: new Date().toISOString() })
+        JSON.stringify({
+          hostName: name.trim(),
+          hostSecret: hostSecret || null,
+          meetingCode: roomCode.toUpperCase(),
+          createdAt: new Date().toISOString(),
+        })
       );
       navigate(`/room/${roomCode.toUpperCase()}`);
     } catch (err) {
@@ -342,7 +428,7 @@ export default function Home() {
     } catch (err) {
       console.warn("logout encountered an error:", err);
     } finally {
-      // Keep host:* keys so device-local host sessions still work as a fallback.
+
       try {
         localStorage.removeItem("displayName");
       } catch (e) {
@@ -353,7 +439,6 @@ export default function Home() {
 
   return (
     <div className="home-container">
-      {/* Floating history + logout buttons (top-right) */}
       <div style={{ position: "fixed", top: 14, right: 14, display: "flex", gap: 8, zIndex: 50 }}>
         <button
           type="button"
@@ -457,7 +542,17 @@ export default function Home() {
                 <div className="recent-date">{t.createdAt ? new Date(t.createdAt).toLocaleString() : "Unknown date"}</div>
               </div>
 
-              <div className={`transcript-preview ${isExpanded ? "expanded" : ""}`}>{t.transcript || "(empty transcript)"}</div>
+              <div className={`transcript-preview ${isExpanded ? "expanded" : ""}`}>
+                {t.metadata?.segments?.length ? (
+                  t.metadata.segments.map((s, idx) => (
+                    <div key={idx} style={{ marginBottom: 4 }}>
+                      <b>{s.speaker}</b> {s.emoji} ({s.emotion}) : {s.text}
+                    </div>
+                  ))
+                ) : (
+                  t.transcript?.trim() || "(empty transcript)"
+                )}
+              </div>
 
               <div className="recent-controls">
                 <button className="load-more" onClick={() => setExpandedTranscripts((prev) => ({ ...prev, [key]: !prev[key] }))}>

@@ -1,62 +1,25 @@
-// mediaController.js (updated — robust toggles, better placeholder handling, explicit transceiver restores)
-
-/**
- * Public surface:
- * - initMediaController(stream, socket, peerConnections, videoElement)
- * - setLocalStream(stream)
- * - setVideoElement(el)
- * - setPeerConnections(pcMap)
- * - setSocketRef(socket)
- * - toggleVideo(currentVideoOff) -> returns updated boolean (true if video is OFF)
- * - toggleAudio(currentMuted) -> returns updated boolean (true if muted)
- * - stopAllVideoAndCleanup()
- * - forceReleaseEverything()
- * - setPreferPeerPlaceholder(enabled)
- * - setExternalCleaners(refs)
- * - registerRemoteVideoElement(peerId, el)
- * - unregisterRemoteVideoElement(peerId)
- * - attachRemoteStream(peerId, stream)
- * - replaceTrackInPeers(track, kind)
- * - replaceLocalTrack(newTrack, kind)
- * - stopAndRemoveTracks(kind)
- * - restoreOutgoingVideoToPeers(realTrack)
- */
 
 let localStream = null;
 let socketRef = null;
-let pcsRef = {}; // peerId -> RTCPeerConnection
-let localVideoEl = null; // optional local preview element (Safari needs this)
-
+let pcsRef = {};
+let localVideoEl = null;
 let togglingAudio = false;
 let togglingVideo = false;
 
-let localMirrorEnabled = false; // default: NO mirror (match Meet/Teams remote behavior)
+let localMirrorEnabled = false;
 
-const remoteVideoEls = new Map(); // peerId -> HTMLVideoElement
+const remoteVideoEls = new Map();
 
-// placeholder track currently in use (if any)
 let _placeholderTrack = null;
-// placeholder stream (for local preview only)
+
 let _placeholderStream = null;
 
-/**
- * Controls whether controller injects placeholder track into peers.
- * Default: false (do NOT inject into peers). Use setPreferPeerPlaceholder(true) to opt in.
- */
+
 let preferPeerPlaceholder = false;
 export function setPreferPeerPlaceholder(enabled = false) {
   preferPeerPlaceholder = !!enabled;
 }
 
-/**
- * External cleaners:
- * - recordersRef: expected shape { current: { [key]: { recorder } } } (best-effort)
- * - audioContextRef: expected shape { current: AudioContext }
- * - removeAnalyzerFn: expected function(kind) to remove/disconnect analyzers
- * - prevLocalStreamRef: expected shape { current: MediaStream } (optional)
- *
- * Register from your app (VideoMeet.jsx) with setExternalCleaners(...)
- */
 let externalCleaners = {
   recordersRef: null,
   audioContextRef: null,
@@ -71,7 +34,6 @@ export function setExternalCleaners(refs = {}) {
   externalCleaners.prevLocalStreamRef = refs.prevLocalStreamRef ?? null;
 }
 
-/* ---------------- utility helpers ---------------- */
 
 function isSafari() {
   return typeof navigator === "object" && /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
@@ -109,36 +71,23 @@ function safePlay(videoEl) {
   try {
     const p = videoEl.play?.();
     if (p && typeof p.then === "function") {
-      p.catch(() => { /* ignore autoplay block */ });
+      p.catch(() => { });
     }
-  } catch (e) { /* ignore */ }
+  } catch (e) { }
 }
 
-/* ---------------- Helpers: placeholder & cleanup ---------------- */
-
-/**
- * Create a very small, low-FPS canvas-capture video track to use as a placeholder.
- * Mark track with __isPlaceholder so we can identify and stop it later.
- *
- * NOTE: the returned track will have a __placeholderStream reference to the underlying stream,
- * so callers can use that stream for local preview without adding the placeholder to the canonical localStream.
- */
 function createPlaceholderVideoTrack({ width = 16, height = 12, fps = 1 } = {}) {
   try {
     const canvas = Object.assign(document.createElement("canvas"), { width, height });
     const ctx = canvas.getContext("2d");
-    // draw a single black frame (you can draw branding / blur etc)
     ctx.fillStyle = "#000";
     ctx.fillRect(0, 0, width, height);
-
-    // capture a very low-framerate stream
     const stream = canvas.captureStream(fps);
     const [track] = stream.getVideoTracks();
     if (!track) return null;
     track.__isPlaceholder = true;
     track.__placeholderCanvas = canvas;
-    // keep a reference to the stream for local preview usage
-    try { track.__placeholderStream = stream; } catch (e) { /* ignore */ }
+    try { track.__placeholderStream = stream; } catch (e) { }
     return track;
   } catch (e) {
     console.warn("[mediaController] createPlaceholderVideoTrack failed:", e);
@@ -149,7 +98,7 @@ function createPlaceholderVideoTrack({ width = 16, height = 12, fps = 1 } = {}) 
 function stopAndCleanupPlaceholder(track) {
   if (!track) return;
   try {
-    // stop track (this will stop the underlying captureStream)
+
     try { track.stop(); } catch (e) { console.warn("[mediaController] stopAndCleanupPlaceholder: track.stop failed", e); }
     if (track.__placeholderCanvas) {
       // allow GC
@@ -158,7 +107,7 @@ function stopAndCleanupPlaceholder(track) {
     }
     if (track.__placeholderStream) {
       try {
-        // stop all tracks of the preview stream and clear reference
+
         (track.__placeholderStream.getTracks() || []).forEach(t => { try { t.stop(); } catch(e){} });
       } catch(e) {}
       track.__placeholderStream = null;
@@ -168,10 +117,7 @@ function stopAndCleanupPlaceholder(track) {
   }
 }
 
-/* ---------------- Robust cleanup helper ---------------- */
 
-// Defensive _runExternalCleaners: only stop tracks of `kind`, and DO NOT stop tracks
-// if the prevLocalStreamRef points at the active localStream (safety guard for Chrome).
 function _runExternalCleaners(kind = "video") {
   try {
     // 1) stop recorders kept by component-level ref (e.g. recordersRef.current)
@@ -316,7 +262,9 @@ function _stopAllVideoAndCleanup() {
     }
 
     // 5) Run external cleaners (recorders, analyzers, etc.)
-    try { _runExternalCleaners("video"); } catch (e) {}
+    try {
+  externalCleaners.removeAnalyzerFn?.("video");
+} catch {}
 
     if (stopped.length) {
       console.info("[mediaController] stopped video tracks:", stopped);
@@ -701,10 +649,12 @@ export async function toggleVideo(currentVideoOff) {
               try {
                 await replaceTrackInPeers(__micSwapTrack, "audio");
                 replaceLocalTrack(__micSwapTrack, "audio");
+
               } catch (e) {
                 console.warn("[mediaController] mic-swap replace failed:", e);
                 // if replace fails we'll clean up below and proceed
               }
+
             }
           } catch (e) {
             console.warn("[mediaController] mic-swap getUserMedia(audio) failed, proceeding without swap:", e);
@@ -1381,11 +1331,6 @@ function refreshSafariPreview() {
   }
 }
 
-/* ---------------- Exported wrappers for convenience ---------------- */
-
-/**
- * Public wrappers so consumers can explicitly call controller cleanup flows.
- */
 export function stopAllVideoAndCleanup() {
   _stopAllVideoAndCleanup();
 }

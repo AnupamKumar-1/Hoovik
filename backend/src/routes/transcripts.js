@@ -1,76 +1,44 @@
-// backend/src/routes/transcripts.js
 import express from "express";
+import passport from "passport";
+import "../../config/passport.js";
 import * as ctrl from "../controllers/transcript.controller.js";
 
 const router = express.Router();
 
-function pickHandler(...names) {
-  for (const n of names) {
-    if (typeof ctrl[n] === "function") return ctrl[n];
-  }
-  return null;
-}
+const optionalAuth = (req, res, next) => {
+  passport.authenticate("jwt", { session: false }, (err, user) => {
+    if (err) {
+      console.warn("passport error:", err);
+    }
 
-const available = Object.keys(ctrl || {});
+    if (user) {
+      req.user = user;
+      console.log(" USER:", user._id || user.id || user.sub);
+    } else {
+      console.warn("⚠️ JWT failed or missing");
+    }
 
-const createHandler =
-  pickHandler(
-    "createTranscript",
-    "saveTranscript",
-    "upsertTranscript",
-    "create",
-    "save"
-  ) ||
-  ((req, res) =>
-    res
-      .status(501)
-      .json({
-        success: false,
-        message:
-          "Transcript create handler not implemented on server. Available exports: " +
-          available.join(", "),
-      }));
+    next();
+  })(req, res, next);
+};
 
-const listHandler =
-  pickHandler("listTranscripts", "getTranscripts", "list", "listAll") ||
-  ((req, res) =>
-    res
-      .status(501)
-      .json({
-        success: false,
-        message:
-          "Transcript list handler not implemented on server. Available exports: " +
-          available.join(", "),
-      }));
 
-const getHandler =
-  pickHandler(
-    "getTranscript",
-    "getTranscriptByCode",
-    "getById",
-    "fetchTranscript",
-    "findTranscript"
-  ) ||
-  ((req, res) =>
-    res
-      .status(501)
-      .json({
-        success: false,
-        message:
-          "Transcript get handler not implemented on server. Available exports: " +
-          available.join(", "),
-      }));
+router.post(
+  "/",
+  optionalAuth,
+  ctrl.createTranscript
+);
 
-if (available.length === 0) {
-  console.warn(
-    "[transcripts route] controller exported nothing (empty). Check ../controllers/transcript.controller.js"
-  );
-} else {
-  console.log("[transcripts route] controller exports:", available);
-}
+router.get(
+  "/",
+  optionalAuth,
+  ctrl.listTranscripts 
+);
 
-router.post("/", createHandler);       // create & save transcript (.txt + DB)
-router.get("/", listHandler);          // list transcripts (optionally filter by ?meeting_code=)
-router.get("/:id", getHandler);        // download transcript by DB id (or fetch by code)
+router.get(
+  "/:id",
+  optionalAuth,
+  ctrl.getTranscript // ✅ direct use
+);
 
 export default router;

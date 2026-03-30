@@ -1,5 +1,5 @@
-
 // backend/src/controllers/transcript.controller.js
+
 import crypto from "crypto";
 import Transcript from "../models/transcript.model.js";
 import { Meeting } from "../models/meeting.model.js";
@@ -16,238 +16,286 @@ function getHostSecretFromReq(req) {
   );
 }
 
+function isSha256(str) {
+  return /^[a-f0-9]{64}$/i.test(str);
+}
+
 /**
- * Helper: compute sha256 hex of provided secret
+ * Helper: compute sha256 hex
  */
 function sha256Hex(input) {
   return crypto.createHash("sha256").update(String(input)).digest("hex");
 }
 
 /**
- * Normalize user id from req.user, supporting both .id and ._id
+ * Normalize user id
  */
 function getUserIdFromReq(req) {
   if (!req?.user) return null;
+
   if (req.user.id) return String(req.user.id);
   if (req.user._id) return String(req.user._id);
+  if (req.user.sub) return String(req.user.sub);
+
   return null;
 }
 
 /**
- * Verify that provided hostSecret is valid for meetingCode.
- * Returns the meeting doc (lean) when valid, otherwise null.
- * Uses Meeting.verifyHostSecret if available; otherwise falls back to manual hash compare.
+ * Verify hostSecret for meeting
  */
 async function verifyHostSecretForMeeting(meetingCode, providedSecret) {
   if (!meetingCode || !providedSecret) return null;
 
-  if (typeof Meeting.verifyHostSecret === "function") {
-    try {
-      const meeting = await Meeting.verifyHostSecret(meetingCode, providedSecret);
-      return meeting || null;
-    } catch (e) {
-      console.warn("verifyHostSecret error, falling back to manual check:", e?.message || e);
-      // fall-through to manual check
-    }
-  }
-
   const providedHash = sha256Hex(providedSecret);
-  const meeting = await Meeting.findOne({
-    meetingCode: String(meetingCode).toUpperCase(),
-    hostSecretHash: providedHash,
-  }).lean();
 
+  const meeting = await Meeting.findOne({
+  meetingCode: String(meetingCode).toUpperCase(),
+  hostSecretHash: providedHash,
+}).lean();
+console.log("🔥 VERIFY SECRET FOR:", meetingCode);
+console.log("🔥 PROVIDED HASH:", providedHash);
   return meeting || null;
 }
 
 /**
- * Find meetings that match the provided hostSecret (returns array of meetings)
+ * Find meetings by hostSecret
  */
 async function findMeetingsByHostSecret(providedSecret) {
   if (!providedSecret) return [];
+
   const providedHash = sha256Hex(providedSecret);
-  const meetings = await Meeting.find({ hostSecretHash: providedHash }).lean();
-  return meetings || [];
+
+  return await Meeting.find({
+  hostSecretHash: providedHash,
+}).lean();
 }
 
 /**
- * Find meetings by ownerId (returns array of meetings)
+ * Find meetings by owner
  */
 async function findMeetingsByOwnerId(ownerId) {
-  if (!ownerId) return [];
-  const meetings = await Meeting.find({ ownerId }).lean();
-  return meetings || [];
+  return await Meeting.find({
+    $or: [{ ownerId }, { host: ownerId }],
+  }).lean();
 }
 
 /**
- * Authorize access to a meeting given either:
- *  - a valid hostSecret for the meeting, or
- *  - an authenticated user who matches meeting.ownerId
- *
- * Returns the meeting doc (lean) if authorized, otherwise null.
- *
- * meetingCode: code string (required)
- * providedSecret: hostSecret string (optional)
- * reqUser: req.user object (optional)
+ * Authorize access
  */
 async function authorizeMeetingAccess(meetingCode, providedSecret, reqUser) {
   if (!meetingCode) return null;
+
   const code = String(meetingCode).toUpperCase();
 
-  // 1) If hostSecret provided, prefer that (backwards-compatible)
+  // ✅ hostSecret check
   if (providedSecret) {
     const meeting = await verifyHostSecretForMeeting(code, providedSecret);
     if (meeting) return meeting;
-    // if invalid secret, do not immediately return; we will still allow owner check below
   }
 
-  // 2) If authenticated user, check ownership
+  // ✅ user ownership check
   if (reqUser) {
-    const userId = reqUser.id ? String(reqUser.id) : reqUser._id ? String(reqUser._id) : null;
+    const userId = getUserIdFromReq({ user: reqUser });
+
     if (userId) {
-      const meeting = await Meeting.findOne({ meetingCode: code, ownerId: userId }).lean();
+      const meeting = await Meeting.findOne({
+        meetingCode: code,
+        $or: [{ ownerId: userId }, { host: userId }],
+      }).lean();
+
       if (meeting) return meeting;
     }
   }
 
-  // no access
   return null;
 }
 
 /**
- * POST /api/v1/transcript
- * Body: { meetingCode, transcriptText, fileName?, createdAt?, metadata?, hostSecret? }
- * Upserts the transcript by meetingCode and returns the saved doc.
- *
- * Authorization: Accepts either hostSecret (legacy) OR authenticated owner (req.user).
+ * CREATE / UPDATE transcript
  */
 export async function createTranscript(req, res) {
   try {
-    const { meetingCode, transcriptText, fileName, createdAt, metadata } = req.body;
+    // ✅ ACCEPT ALL POSSIBLE FIELD NAMES
+    const meetingCodeInput =
+      req.body.meetingCode ||
+      req.body.meeting_code ||
+      req.body.code;
+
+    const { transcriptText, fileName, createdAt, metadata } = req.body;
+
     const hostSecret = getHostSecretFromReq(req);
     const reqUser = req.user;
 
-    if (!meetingCode) {
-      return res.status(400).json({ success: false, message: "meetingCode is required" });
+    console.log("🔥 CREATE TRANSCRIPT");
+    console.log("👉 RAW BODY:", req.body);
+    console.log("👉 meetingCodeInput:", meetingCodeInput);
+    console.log("👉 hostSecret:", hostSecret);
+    console.log("👉 user:", reqUser?._id || reqUser?.id);
+
+    // ❌ VALIDATION
+    if (!meetingCodeInput) {
+      console.error("❌ meetingCode missing");
+      return res.status(400).json({
+        success: false,
+        message: "meetingCode is required",
+      });
     }
 
-    const code = String(meetingCode).toUpperCase();
+    const code = String(meetingCodeInput).toUpperCase();
 
-    // Authorize either by hostSecret or by owner (authenticated user)
+    // ✅ AUTH CHECK
     const meeting = await authorizeMeetingAccess(code, hostSecret, reqUser);
+
     if (!meeting) {
-      return res.status(403).json({ success: false, message: "not authorized to create/update transcript for this meeting" });
+      console.error("❌ AUTH FAILED for:", code);
+      return res.status(403).json({
+        success: false,
+        message: "not authorized",
+      });
     }
 
+    console.log("✅ AUTH SUCCESS for:", code);
+
+    // ✅ PREPARE UPDATE
     const update = {
       meetingCode: code,
-      transcriptText: transcriptText || "",
+      transcriptText:
+        transcriptText ||
+        req.body.transcript || // fallback
+        metadata?.transcriptText || // fallback
+        "",
       fileName: fileName || null,
       metadata: metadata || {},
       updatedAt: new Date(),
     };
-    if (createdAt) update.createdAt = new Date(createdAt);
 
+    if (createdAt) {
+      update.createdAt = new Date(createdAt);
+    }
+
+    // ✅ UPSERT TRANSCRIPT
     const doc = await Transcript.findOneAndUpdate(
       { meetingCode: code },
       { $set: update },
-      { new: true, upsert: true, setDefaultsOnInsert: true }
+      {
+        new: true,
+        upsert: true,
+        setDefaultsOnInsert: true,
+      }
     ).lean();
 
-    return res.json({ success: true, transcript: doc });
+    console.log("✅ TRANSCRIPT SAVED:", doc?._id);
+
+    return res.json({
+      success: true,
+      transcript: doc,
+    });
+
   } catch (err) {
-    console.error("createTranscript error:", err);
-    return res.status(500).json({ success: false, message: "Server error", error: err.message });
+    console.error("❌ createTranscript error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
   }
 }
 
-// Backwards-compatible alias
 export const saveTranscript = createTranscript;
 
 /**
- * GET /api/v1/transcript/:id
- * Accepts either a MongoDB _id or a meetingCode (case-insensitive)
- *
- * Authorization: Either hostSecret that matches the transcript's meeting OR authenticated owner (req.user).
+ * GET transcript by id or meetingCode
  */
 export async function getTranscript(req, res) {
   try {
     const idOrCode = String(req.params.id || "").trim();
-    if (!idOrCode) return res.status(400).json({ success: false, message: "Missing id/code" });
+
+    if (!idOrCode) {
+      return res.status(400).json({ success: false });
+    }
 
     const hostSecret = getHostSecretFromReq(req);
     const reqUser = req.user;
 
     let doc = null;
-    let meetingCode = null;
 
-    // Try as ObjectId (findById). If found, extract meetingCode for verification.
+    // try by _id
     try {
       doc = await Transcript.findById(idOrCode).lean();
-    } catch (e) {
-      // not a valid ObjectId; ignore and try by meetingCode
-    }
+    } catch {}
 
     if (doc) {
-      meetingCode = doc.meetingCode;
-      if (!meetingCode) {
-        return res.status(404).json({ success: false, message: "Transcript missing meetingCode" });
-      }
-      const meeting = await authorizeMeetingAccess(meetingCode, hostSecret, reqUser);
+      const meeting = await authorizeMeetingAccess(
+        doc.meetingCode,
+        hostSecret,
+        reqUser
+      );
+
       if (!meeting) {
-        return res.status(403).json({ success: false, message: "not authorized to access this transcript" });
+        return res.status(403).json({ success: false });
       }
+
       return res.json({ success: true, transcript: doc });
     }
 
-    // If not found by id, treat idOrCode as a meetingCode
+    // try by meetingCode
     const code = idOrCode.toUpperCase();
-    const meeting = await authorizeMeetingAccess(code, hostSecret, reqUser);
+
+    const meeting = await authorizeMeetingAccess(
+      code,
+      hostSecret,
+      reqUser
+    );
+
     if (!meeting) {
-      return res.status(403).json({ success: false, message: "not authorized to access transcript for this meeting code" });
+      return res.status(403).json({ success: false });
     }
 
     doc = await Transcript.findOne({ meetingCode: code }).lean();
-    if (!doc) return res.status(404).json({ success: false, message: "Not found" });
+
+    if (!doc) {
+      return res.status(404).json({ success: false });
+    }
 
     return res.json({ success: true, transcript: doc });
   } catch (err) {
     console.error("getTranscript error:", err);
-    return res.status(500).json({ success: false, message: "Server error", error: err.message });
+    return res.status(500).json({ success: false });
   }
 }
 
-// Backwards-compatible alias
 export const getTranscriptByCode = getTranscript;
 
 /**
- * GET /api/v1/transcript
- * Query:
- *   - ?meeting_code=CODE  (optional)
- *   - ?limit=50
- *   - ?mine=true          (optional, when authenticated)
- * Authorization:
- *   - If meeting_code provided: either hostSecret or authenticated owner for that meeting.
- *   - If meeting_code NOT provided:
- *       - If ?mine=true and authenticated: return transcripts for meetings owned by user.
- *       - Else if hostSecret provided: return transcripts for all meetings matching that hostSecret.
- *       - Otherwise: 403
+ * LIST transcripts
  */
 export async function listTranscripts(req, res) {
   try {
     const { meeting_code, limit = 50, mine } = req.query;
+
     const hostSecret = getHostSecretFromReq(req);
     const reqUser = req.user;
-    const userId = getUserIdFromReq(req);
+    const userId = getUserIdFromReq({ user: reqUser });
 
-    // limit sanity
     const finalLimit = Math.min(parseInt(limit, 10) || 50, 200);
 
+    console.log("🔥 meeting_code:", meeting_code);
+    console.log("🔥 userId:", userId);
+    console.log("🔥 hostSecret:", hostSecret);
+
+    // =========================================================
+    // ✅ CASE 1: meeting_code
+    // =========================================================
     if (meeting_code) {
       const code = String(meeting_code).toUpperCase();
-      const meeting = await authorizeMeetingAccess(code, hostSecret, reqUser);
+
+      const meeting = await authorizeMeetingAccess(
+        code,
+        hostSecret,
+        reqUser
+      );
+
       if (!meeting) {
-        return res.status(403).json({ success: false, message: "not authorized for this meeting code" });
+        return res.status(403).json({ success: false });
       }
 
       const docs = await Transcript.find({ meetingCode: code })
@@ -258,57 +306,75 @@ export async function listTranscripts(req, res) {
       return res.json({ success: true, transcripts: docs });
     }
 
-    // If explicitly asked for transcripts for the authenticated user's meetings
+    // =========================================================
+    // ✅ CASE 2: hostSecret (FIXED PRIORITY)
+    // =========================================================
+    if (hostSecret) {
+      const meetings = await findMeetingsByHostSecret(hostSecret);
+
+      if (!meetings || meetings.length === 0) {
+        return res.json({ success: true, transcripts: [] });
+      }
+
+      const meetingCodes = meetings.map((m) => m.meetingCode);
+
+      const docs = await Transcript.find({
+        meetingCode: { $in: meetingCodes },
+      })
+        .sort({ createdAt: -1 })
+        .limit(finalLimit)
+        .lean();
+
+      return res.json({ success: true, transcripts: docs });
+    }
+
+    // =========================================================
+    // ✅ CASE 3: mine=true
+    // =========================================================
     if (String(mine) === "true") {
       if (!userId) {
-        return res.status(401).json({ success: false, message: "authentication required for mine=true" });
+        return res.status(401).json({ success: false });
       }
+
       const meetings = await findMeetingsByOwnerId(userId);
-      const meetingCodes = meetings.map((m) => m.meetingCode).filter(Boolean);
-      if (meetingCodes.length === 0) {
-        return res.json({ success: true, transcripts: [] });
-      }
-      const docs = await Transcript.find({ meetingCode: { $in: meetingCodes } })
+      const meetingCodes = meetings.map((m) => m.meetingCode);
+
+      const docs = await Transcript.find({
+        meetingCode: { $in: meetingCodes },
+      })
         .sort({ createdAt: -1 })
         .limit(finalLimit)
         .lean();
+
       return res.json({ success: true, transcripts: docs });
     }
 
-    // No meeting_code and not requesting mine=true:
-    // If authenticated user is present, return transcripts for user's meetings (conservative default)
+    // =========================================================
+    // ✅ CASE 4: user fallback
+    // =========================================================
     if (userId) {
       const meetings = await findMeetingsByOwnerId(userId);
-      const meetingCodes = meetings.map((m) => m.meetingCode).filter(Boolean);
-      if (meetingCodes.length === 0) {
-        return res.json({ success: true, transcripts: [] });
-      }
-      const docs = await Transcript.find({ meetingCode: { $in: meetingCodes } })
+      const meetingCodes = meetings.map((m) => m.meetingCode);
+
+      const docs = await Transcript.find({
+        meetingCode: { $in: meetingCodes },
+      })
         .sort({ createdAt: -1 })
         .limit(finalLimit)
         .lean();
+
       return res.json({ success: true, transcripts: docs });
     }
 
-    // Fallback: require hostSecret and return transcripts for meetings matching that secret
-    if (!hostSecret) {
-      return res.status(403).json({ success: false, message: "hostSecret required or authenticate to list transcripts" });
-    }
-
-    const meetings = await findMeetingsByHostSecret(hostSecret);
-    if (!meetings || meetings.length === 0) {
-      return res.status(403).json({ success: false, message: "no meetings found for provided host secret" });
-    }
-
-    const meetingCodes = meetings.map((m) => m.meetingCode).filter(Boolean);
-    const docs = await Transcript.find({ meetingCode: { $in: meetingCodes } })
-      .sort({ createdAt: -1 })
-      .limit(finalLimit)
-      .lean();
-
-    return res.json({ success: true, transcripts: docs });
+    // =========================================================
+    // ❌ NO AUTH
+    // =========================================================
+    return res.status(403).json({
+      success: false,
+      message: "Unauthorized",
+    });
   } catch (err) {
     console.error("listTranscripts error:", err);
-    return res.status(500).json({ success: false, message: "Server error", error: err.message });
+    return res.status(500).json({ success: false });
   }
 }
