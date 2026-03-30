@@ -1,4 +1,4 @@
-# 🚀 AI Meeting Transcription & Emotion Intelligence System
+# AI Meeting Transcription & Emotion Intelligence System
 
 ![Architecture](architecture.png)
 
@@ -10,12 +10,12 @@ An end-to-end AI-powered system that converts meeting audio into
 **structured, emotion-aware transcripts**.
 
 Built with a **microservices architecture**, combining: - 🎙 Speech
-Recognition (Whisper) - 😊 Emotion Intelligence (Transformers) - ⚙️
+Recognition (Whisper) - Emotion Intelligence (Transformers) - ⚙️
 Scalable Backend (Node.js) -  Modern Frontend (React)
 
 ------------------------------------------------------------------------
 
-## ✨ Key Highlights
+## Key Highlights
 
 -    **Accurate Transcription** using Whisper
 -    **Emotion Detection per Sentence**
@@ -27,7 +27,7 @@ Scalable Backend (Node.js) -  Modern Frontend (React)
 
 ------------------------------------------------------------------------
 
-## 🏗 System Architecture
+## System Architecture
 
     🎥 Meeting Audio 
        →  FFmpeg Processing
@@ -41,7 +41,7 @@ Scalable Backend (Node.js) -  Modern Frontend (React)
 
 ------------------------------------------------------------------------
 
-## 🧩 Tech Stack
+## Tech Stack
 
   Layer        Technology
   ------------ --------------------------------
@@ -53,7 +53,7 @@ Scalable Backend (Node.js) -  Modern Frontend (React)
 
 ------------------------------------------------------------------------
 
-## 📁 Project Structure
+## Project Structure
 
     ai_service/
     ├── app.py
@@ -64,7 +64,7 @@ Scalable Backend (Node.js) -  Modern Frontend (React)
 
 ------------------------------------------------------------------------
 
-## ⚙️ Setup
+## Setup
 
 ### Install dependencies
 
@@ -76,7 +76,7 @@ Scalable Backend (Node.js) -  Modern Frontend (React)
 
 ------------------------------------------------------------------------
 
-## 📡 API
+## API
 
 ### POST `/process_meeting`
 
@@ -84,7 +84,7 @@ Upload audio → get transcript + emotions
 
 ------------------------------------------------------------------------
 
-## 📤 Example Response
+## Example Response
 
     {
       "success": true,
@@ -100,7 +100,7 @@ Upload audio → get transcript + emotions
 
 ------------------------------------------------------------------------
 
-## 🧠 Real Output Example
+## Output Example
 
     Host 😄 (joy)
       Hello everyone
@@ -110,7 +110,7 @@ Upload audio → get transcript + emotions
 
 ------------------------------------------------------------------------
 
-## ⚡ Performance
+## Performance
 
 -   Models loaded once at startup
 -   GPU recommended for Whisper
@@ -118,7 +118,7 @@ Upload audio → get transcript + emotions
 
 ------------------------------------------------------------------------
 
-## 🚀 Future Enhancements
+## Future Enhancements
 
 -   📊 Emotion Timeline Graph
 -   🧠 LLM Meeting Summary
