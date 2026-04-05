@@ -38,7 +38,7 @@ router.get(
 router.get(
   "/:id",
   optionalAuth,
-  ctrl.getTranscript // ✅ direct use
+  ctrl.getTranscript 
 );
 
 export default router;

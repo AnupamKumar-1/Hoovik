@@ -6,7 +6,7 @@ import { Strategy as JwtStrategy, ExtractJwt } from "passport-jwt";
 import { User } from "../src/models/user.model.js";
 
 if (!process.env.JWT_SECRET) {
-  console.error("❌ ERROR: JWT_SECRET is not set.");
+  console.error("passport: JWT_SECRET is not set — authentication will fail");
 }
 
 const opts = {
@@ -17,11 +17,10 @@ const opts = {
 passport.use(
   new JwtStrategy(opts, async (payload, done) => {
     try {
-console.log("PASSPORT SECRET:", process.env.JWT_SECRET);
       const user = await User.findById(payload.sub).lean();
 
       if (!user) {
-        console.warn("❌ User not found for JWT:", payload.sub);
+        console.warn(`passport: no user found for token subject ${payload.sub}`);
         return done(null, false);
       }
 
@@ -32,11 +31,9 @@ console.log("PASSPORT SECRET:", process.env.JWT_SECRET);
         name: user.name,
       };
 
-      console.log("✅ USER AUTHENTICATED:", normalizedUser);
-
       return done(null, normalizedUser);
     } catch (err) {
-      console.error("❌ JWT Strategy Error:", err);
+      console.error("passport: JWT strategy error —", err.message);
       return done(err, false);
     }
   })

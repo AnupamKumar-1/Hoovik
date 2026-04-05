@@ -1,4 +1,4 @@
-// backend/src/controllers/user.controller.js
+
 import httpStatus from "http-status";
 import crypto from "crypto";
 import { User } from "../models/user.model.js";
@@ -7,55 +7,34 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { Meeting } from "../models/meeting.model.js";
 
-/**
- * Helper to send a JSON error response
- */
+
 const sendError = (res, status, message) =>
   res.status(status).json({ success: false, message });
 
-/**
- * Normalize req.user into a usable string id
- */
 const getUserId = (user) => {
   if (!user) return null;
   return user._id || user.id || user.sub || (typeof user === "string" ? user : null);
 };
 
-/**
- * POST /auth/logout
- *
- * Clears the refresh cookie (httpOnly). If you store refresh tokens
- * server-side (in the DB), invalidate/remove that token here.
- *
- * Notes:
- * - Ensure you have cookie-parser enabled in your app (app.use(cookieParser()))
- * - Ensure CORS allows credentials and frontend calls fetch(..., { credentials: "include" })
- */
+
 const logout = async (req, res) => {
   try {
-    // Optional: read refresh token from cookies (if you set it that way)
+    
     const refreshToken = req.cookies ? req.cookies.refreshToken : null;
 
-    // If you manage refresh tokens server-side (DB) and want to invalidate them,
-    // you can do it here. Example (pseudo):
-    // if (refreshToken) { await RefreshTokenModel.invalidate(refreshToken); }
-    //
-    // Or, if you stored a refreshToken on the user record:
-    // if (req.user && req.user._id) { await User.updateOne({ _id: req.user._id }, { $unset: { refreshToken: "" } }); }
 
-    // Clear the cookie that holds the refresh token.
     res.clearCookie("refreshToken", {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "Strict",
-      path: "/", // match the path that was used when setting the cookie
+      path: "/",
     });
 
     return res.status(httpStatus.OK).json({ success: true, message: "Logged out" });
   } catch (err) {
     console.error("logout error:", err.stack || err);
 
-    // Try to clear cookie even on error
+
     try {
       res.clearCookie("refreshToken", {
         httpOnly: true,
@@ -64,16 +43,13 @@ const logout = async (req, res) => {
         path: "/",
       });
     } catch (e) {
-      // ignore
+
     }
 
     return sendError(res, httpStatus.INTERNAL_SERVER_ERROR, "Failed to logout");
   }
 };
 
-/**
- * POST /login
- */
 const login = async (req, res) => {
   const { username, password } = req.body;
 
@@ -114,9 +90,7 @@ const login = async (req, res) => {
   }
 };
 
-/**
- * POST /register
- */
+
 const register = async (req, res) => {
   const { name, username, password } = req.body;
   if (!name?.trim() || !username?.trim() || !password?.trim()) {
@@ -140,9 +114,7 @@ const register = async (req, res) => {
   }
 };
 
-/**
- * GET /get_all_activity
- */
+
 const getUserHistory = async (req, res) => {
   try {
     const userId = getUserId(req.user);
@@ -209,9 +181,7 @@ const objectUserId = userId ? new mongoose.Types.ObjectId(userId) : null;
   }
 };
 
-/**
- * POST /add_to_activity
- */
+
 const addToHistory = async (req, res) => {
   const rawCode = (req.body.meeting_code || req.body.meetingCode || "").toString().trim();
   if (!rawCode) return sendError(res, httpStatus.BAD_REQUEST, "Meeting code is required.");
@@ -254,9 +224,7 @@ ownerId: new mongoose.Types.ObjectId(userId),
   }
 };
 
-/**
- * POST /meetings/:code/participants
- */
+
 const addParticipant = async (req, res) => {
   try {
     const userId = getUserId(req.user);
@@ -312,9 +280,7 @@ await meeting.save();
   }
 };
 
-/**
- * GET /meetings
- */
+
 const getMeetings = async (req, res) => {
   try {
     const userId = getUserId(req.user);
@@ -357,9 +323,6 @@ const objectUserId = userId ? new mongoose.Types.ObjectId(userId) : null;
   }
 };
 
-/**
- * POST /meetings
- */
 
 const upsertMeeting = async (req, res) => {
   try {
@@ -379,7 +342,6 @@ const upsertMeeting = async (req, res) => {
 
     const payload = {};
 
-    // ✅ USER
     const userId = getUserId(req.user);
     const objectUserId = userId
       ? new mongoose.Types.ObjectId(userId)
@@ -390,9 +352,6 @@ const upsertMeeting = async (req, res) => {
       payload.ownerId = objectUserId;
     }
 
-    // =========================================================
-    // 🔥 ALWAYS GENERATE NEW RAW SECRET
-    // =========================================================
     const rawSecret = crypto.randomBytes(32).toString("hex");
 
     const hostSecretHash = crypto
@@ -400,34 +359,25 @@ const upsertMeeting = async (req, res) => {
       .update(rawSecret)
       .digest("hex");
 
-    // =========================================================
-    // ✅ STORE HASH AT ROOT (CRITICAL FIX)
-    // =========================================================
+
     payload.hostSecretHash = hostSecretHash;
 
-    // =========================================================
-    // ✅ HOST INFO (NO SECRET HERE)
-    // =========================================================
+
     payload.hostInfo = {
       name: body.hostName || body.host_name || null,
       userId: userId || null,
     };
 
-    // =========================================================
-    // ✅ SAVE
-    // =========================================================
     const saved = await Meeting.upsertByMeetingCode(
       meetingCode,
       payload
     );
 
-    // =========================================================
-    // ✅ RETURN RAW SECRET
-    // =========================================================
+
     return res.json({
       success: true,
       meeting: saved,
-      hostSecret: rawSecret, // ✅ IMPORTANT
+      hostSecret: rawSecret,
     });
 
   } catch (err) {

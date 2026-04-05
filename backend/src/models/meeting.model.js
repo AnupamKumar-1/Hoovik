@@ -1,21 +1,9 @@
 
-
-// backend/src/models/meeting.model.js
 import mongoose from "mongoose";
 import crypto from "crypto";
 
 const { Schema, Types, model } = mongoose;
 
-/**
- * Meeting model
- *
- * - Accept participant.userId as Mixed so UUIDs or ObjectIds are accepted without casting errors.
- * - Uses model name "UserDb" (adjust if your user model differs).
- * - Stores only hostSecretHash (SHA256 of raw host secret).
- * - Provides verifyHostSecret static helper and instance helper to set the hash.
- */
-
-// --- Participant Schema ---
 const ParticipantSchema = new Schema(
   {
     socketId: { type: String, index: true, sparse: true },
@@ -28,7 +16,6 @@ const ParticipantSchema = new Schema(
   { _id: false }
 );
 
-// --- Chat Schema ---
 const ChatSchema = new Schema(
   {
     id: { type: String, required: true },
@@ -42,7 +29,6 @@ const ChatSchema = new Schema(
   { _id: false }
 );
 
-// --- Analytics Schema ---
 const AnalyticsSchema = new Schema(
   {
     transcription: { type: String, default: "" },
@@ -52,7 +38,6 @@ const AnalyticsSchema = new Schema(
   { _id: false }
 );
 
-// --- Main Meeting Schema ---
 const meetingSchema = new Schema(
   {
     meetingCode: {
@@ -64,17 +49,14 @@ const meetingSchema = new Schema(
       index: true,
     },
 
-    // Owner reference (if the creator was authenticated)
     ownerId: { type: Types.ObjectId, ref: "UserDb", default: null, index: true, sparse: true },
 
-    // Host references
     host: { type: Types.ObjectId, ref: "UserDb", default: null },
     hostInfo: {
       userId: { type: Types.ObjectId, ref: "UserDb", default: null },
       name: { type: String, trim: true, default: null },
     },
 
-    // Host secret hash (server-only)
     hostSecretHash: { type: String, default: null, index: true },
     hostSecretExpiresAt: { type: Date, default: null },
 
@@ -87,7 +69,6 @@ const meetingSchema = new Schema(
   { timestamps: true }
 );
 
-/* --- Instance & Static helpers --- */
 
 meetingSchema.methods.getHostName = function () {
   if (this.host && typeof this.host === "object") {
@@ -260,9 +241,6 @@ meetingSchema.methods.updateAnalytics = async function (data) {
   return this.save();
 };
 
-/**
- * Instance helper: setHostSecretHash(rawSecret)
- */
 meetingSchema.methods.setHostSecretHash = async function (rawSecret) {
   if (!rawSecret || typeof rawSecret !== "string") {
     throw new Error("rawSecret string required");
@@ -271,9 +249,7 @@ meetingSchema.methods.setHostSecretHash = async function (rawSecret) {
   return this.save();
 };
 
-/**
- * Static: verifyHostSecret(meetingCode, providedSecret)
- */
+
 meetingSchema.statics.verifyHostSecret = async function (meetingCode, providedSecret) {
   if (!meetingCode || !providedSecret) return null;
   const code = String(meetingCode).toUpperCase().trim();
@@ -311,13 +287,11 @@ meetingSchema.statics.cleanupOldMeetings = async function (maxAgeHours = 24) {
   }
 };
 
-// Indexes for quick lookups
 meetingSchema.index({ hostSecretHash: 1 });
 meetingSchema.index({ ownerId: 1, createdAt: -1 });
 
 const Meeting = model("Meeting", meetingSchema);
 
-// Periodic cleanup (runs every hour)
 setInterval(() => {
   Meeting.cleanupOldMeetings().catch((err) =>
     console.error("Cleanup error:", err)
