@@ -12,7 +12,7 @@ export default function useMediaBridge({
   stopPeriodicEmotionCapture,
 }) {
   useEffect(() => {
-    
+
     const setupVolumeAnalyzer = (stream) => {
       try {
         if (stream) {
@@ -32,7 +32,6 @@ export default function useMediaBridge({
       }
     };
 
-    // --- Transcription ---
     const startTranscription = (stream) => {
       try {
         startRecordingForStream("local", stream || localStreamRef.current);
@@ -53,7 +52,6 @@ export default function useMediaBridge({
       }
     };
 
-    // --- Recording ---
     const startRecording = (stream) => {
       try {
         startRecordingForStream("local", stream || localStreamRef.current);
@@ -70,7 +68,6 @@ export default function useMediaBridge({
       }
     };
 
-    // --- Emotion Capture ---
     const startEmotion = (opts = {}) => {
       try {
         startPeriodicEmotionCapture(opts);
@@ -87,10 +84,7 @@ export default function useMediaBridge({
       }
     };
 
-    /**
-     * OPTIONAL:
-     * expose for debugging (safe namespace instead of polluting window)
-     */
+
     const bridge = {
       setupVolumeAnalyzer,
       stopVolumeAnalyzer,
@@ -102,7 +96,6 @@ export default function useMediaBridge({
       stopEmotion,
     };
 
-    // attach safely (NOT polluting global root)
     window.__MEDIA_BRIDGE__ = bridge;
 
     return () => {

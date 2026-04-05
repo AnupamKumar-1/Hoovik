@@ -20,21 +20,23 @@ export default function useSocket({
   navigate,
   cleanupAll,
   persistHistorySnapshot,
+  handleIncomingMessage,
+  handleAck,
 }) {
   useEffect(() => {
     const socket = socketRef.current;
     if (!socket) return;
 
-    // ================= CONNECT =================
+    
     const onConnect = () => {
       setMyId(socket.id);
       try {
         window.myId = socket.id;
-      } catch {}
+      } catch { }
     };
     socket.on("connect", onConnect);
 
-    // ================= CHAT HISTORY =================
+    // CHAT HISTORY
     const onChatHistory = (history = []) => {
       const seen = seenMsgIdsRef.current;
       const unique = [];
@@ -50,7 +52,7 @@ export default function useSocket({
     };
     socket.once("chat-history", onChatHistory);
 
-    // ================= PARTICIPANTS =================
+    // PARTICIPANTS
     const onParticipantsUpdated = (participants) => {
       if (!Array.isArray(participants)) return;
 
@@ -69,17 +71,14 @@ export default function useSocket({
     const setupPeer = (p) => {
       if (!p?.id || p.id === socket.id) return;
 
-      // ✅ assign polite role (perfect negotiation)
       politeRef.current[p.id] =
         typeof p.polite === "boolean"
           ? p.polite
           : !isInitiatorFor(p.id);
 
-      // ✅ init ICE queue
       pendingCandidatesRef.current[p.id] =
         pendingCandidatesRef.current[p.id] || [];
 
-      // ✅ create peer connection
       createPeerConnection(p.id);
     };
 
@@ -92,7 +91,6 @@ export default function useSocket({
         })
       );
 
-      // merge metadata safely
       setParticipantsMeta((prev) => {
         const map = {};
         prev.forEach((p) => (map[p.id] = p));
@@ -137,7 +135,7 @@ export default function useSocket({
     };
     socket.on("user-left", onUserLeft);
 
-    // ================= SIGNAL =================
+
     const onSignal = async (fromId, messageStr) => {
       if (!fromId || !messageStr) return;
 
@@ -149,34 +147,23 @@ export default function useSocket({
     };
     socket.on("signal", onSignal);
 
-    // ================= CHAT =================
+    // CHAT
     const onChatMessage = (m) => {
-      const id = m.id || `${m.userId}:${m.ts}`;
-      if (seenMsgIdsRef.current.has(id)) return;
-
-      seenMsgIdsRef.current.add(id);
-      setChatMessages((prev) => [...prev, m]);
+      handleIncomingMessage(m);
     };
     socket.on("chat-message", onChatMessage);
 
     const onChatAck = (msg) => {
-      seenMsgIdsRef.current.add(msg.id);
-
-      setChatMessages((prev) =>
-        prev.map((m) =>
-          m.id === msg.id
-            ? { ...m, ...msg, confirmed: true }
-            : m
-        )
-      );
+      if (!msg?.id) return;
+      handleAck(msg.id);
     };
     socket.on("chat-ack", onChatAck);
 
-    // ================= END / DISCONNECT =================
+    // END / DISCONNECT
     const onEndMeeting = async () => {
       try {
         await persistHistorySnapshot();
-      } catch {}
+      } catch { }
 
       cleanupAll();
       navigate("/home");
@@ -189,63 +176,70 @@ export default function useSocket({
     };
     socket.on("disconnect", onDisconnect);
 
-    // ================= EMOTION =================
-const emotionHandler = (payload) => {
-  console.log("🔥 EMOTION EVENT RECEIVED:", payload);
 
-  const participantId =
-    payload.participant_id ||
-    payload.participantId ||
-    payload.from ||
-    payload.userId;
+    const emotionHandler = (payload) => {
+      console.log("EMOTION EVENT RECEIVED:", payload);
 
-  if (!participantId) return;
+      const participantId =
+        payload.participant_id ||
+        payload.participantId ||
+        payload.from ||
+        payload.userId;
 
-  let probs = null;
+      if (!participantId) return;
 
-  // ✅ HANDLE YOUR BACKEND STRUCTURE
-  if (payload?.emotion?.result?.emotion_probs) {
-    probs = payload.emotion.result.emotion_probs;
-  }
-  // fallback cases
-  else if (payload?.emotion?.emotion_probs) {
-    probs = payload.emotion.emotion_probs;
-  }
-  else if (payload?.result?.emotion_probs) {
-    probs = payload.result.emotion_probs;
-  }
-  else if (payload?.emotion && typeof payload.emotion === "object") {
-    probs = payload.emotion;
-  }
+      const emotion = payload?.result?.result || payload?.result || payload?.emotion;
 
-  console.log("👉 FINAL PROBS:", probs);
+      if (!emotion) return;
 
-  if (!probs || typeof probs !== "object") {
-    console.warn("❌ Invalid emotion probs", payload);
-    return;
-  }
+      // direct label
+      if (emotion.label) {
+        setEmotionsMap((prev) => ({
+          ...prev,
+          [participantId]: {
+            label: emotion.label,
+            score: emotion.score ?? 1,
+          },
+        }));
+        return;
+      }
 
-  const [topLabel, topScore] = Object.entries(probs).reduce(
-    (max, curr) => (curr[1] > max[1] ? curr : max),
-    ["neutral", 0]
-  );
+      if (emotion.emotion) {
+        setEmotionsMap((prev) => ({
+          ...prev,
+          [participantId]: {
+            label: emotion.emotion,
+            score: emotion.confidence ?? 1,
+          },
+        }));
+        return;
+      }
 
-  setEmotionsMap((prev) => ({
-    ...prev,
-    [participantId]: {
-      label: topLabel,
-      score: topScore,
-    },
-  }));
-};
-socket.onAny((event, ...args) => {
-  console.log("📡 SOCKET EVENT:", event, args);
-});
+      if (emotion.probs) {
+        const [topLabel, topScore] = Object.entries(emotion.probs).reduce(
+          (max, curr) => (curr[1] > max[1] ? curr : max),
+          ["neutral/calm", 0]
+        );
 
-socket.on("emotion.update", emotionHandler);
-socket.on("emotion", emotionHandler);
+        setEmotionsMap((prev) => ({
+          ...prev,
+          [participantId]: {
+            label: topLabel,
+            score: topScore,
+          },
+        }));
+      }
+    };
 
-    // ================= CLEANUP =================
+    socket.onAny((event, ...args) => {
+      console.log("📡 SOCKET EVENT:", event, args);
+    });
+
+    socket.on("emotion.result", emotionHandler);
+    socket.on("emotion.update", emotionHandler);
+    socket.on("emotion", emotionHandler);
+
+    // CLEANUP
     return () => {
       socket.off("connect", onConnect);
       socket.off("chat-history", onChatHistory);
@@ -258,6 +252,7 @@ socket.on("emotion", emotionHandler);
       socket.off("chat-ack", onChatAck);
       socket.off("end-meeting", onEndMeeting);
       socket.off("disconnect", onDisconnect);
+      socket.off("emotion.result", emotionHandler);
       socket.off("emotion.update", emotionHandler);
       socket.off("emotion", emotionHandler);
     };

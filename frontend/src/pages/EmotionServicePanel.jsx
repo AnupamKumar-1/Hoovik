@@ -1,8 +1,6 @@
 import React from "react";
 import styles from "../styles/videoComponent.module.css";
 import { FaRegComments } from "react-icons/fa";
-
-// ✅ IMPORT FROM HELPERS (single source of truth)
 import { renderEmojiLabelForEmotion } from "./emotionHelpers";
 
 export default function EmotionServicePanel({
@@ -11,7 +9,7 @@ export default function EmotionServicePanel({
   isHost,
   DEBUG_SHOW_EMOTION_FOR_EVERYONE,
 }) {
-  // ❌ hide panel for non-host (unless debug)
+  // hide panel for non-host
   if (!isHost && !DEBUG_SHOW_EMOTION_FOR_EVERYONE) return null;
 
   const rows = Object.entries(emotionsMap || {});
@@ -28,7 +26,7 @@ export default function EmotionServicePanel({
         </div>
       ) : (
         rows.map(([pid, em]) => {
-          // ✅ name resolution
+          // name resolution
           const nameFromEmotion =
             em?.__name ||
             em?.name ||
@@ -46,11 +44,11 @@ export default function EmotionServicePanel({
             (pid ? pid.slice(0, 6) : "Unknown");
 
           const emojiLabel =
-  renderEmojiLabelForEmotion(
-    em?.label ? { [em.label]: em.score } : em
-  ) || "—";
+            renderEmojiLabelForEmotion(em) || "—";
 
-const textLabel = em?.label || "";
+          const textLabel = em?.label || "";
+
+          console.log("EM PANEL RAW:", em);
 
           return (
             <div key={pid} className={styles.emotionRow}>
@@ -59,13 +57,13 @@ const textLabel = em?.label || "";
               </div>
 
               <div className={styles.emotionEmoji}>
-  {textLabel && (
-    <span style={{ marginRight: 6, fontWeight: 500 }}>
-      {textLabel}
-    </span>
-  )}
-  {emojiLabel}
-</div>
+                {textLabel && (
+                  <span style={{ marginRight: 6, fontWeight: 500 }}>
+                    {textLabel}
+                  </span>
+                )}
+                {emojiLabel}
+              </div>
             </div>
           );
         })

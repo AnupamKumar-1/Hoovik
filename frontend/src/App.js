@@ -7,7 +7,7 @@ import VideoMeetComponent from './pages/VideoMeet';
 import HomeComponent from './pages/home';
 import History from './pages/history';
 
-// 🔐 Protected Route
+
 const ProtectedRoute = ({ children }) => {
   const token = localStorage.getItem("token");
 
@@ -25,13 +25,10 @@ function App() {
         <AuthProvider>
           <Routes>
 
-            {/* ✅ Landing */}
-            <Route path="/" element={<LandingPage />} />
 
-            {/* ✅ Auth */}
+            <Route path="/" element={<LandingPage />} />
             <Route path="/auth" element={<Authentication />} />
 
-            {/* 🔥 PROTECTED ROUTES */}
             <Route
               path="/home"
               element={
@@ -58,8 +55,6 @@ function App() {
                 </ProtectedRoute>
               }
             />
-
-            {/* ✅ Catch-all (IMPORTANT) */}
             <Route path="*" element={<Navigate to="/" replace />} />
 
           </Routes>

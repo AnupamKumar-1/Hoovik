@@ -34,7 +34,7 @@ function SpotlightCard({
 
   const showVideo = hasVideoTrack && videoActive;
 
-  // ✅ Attach stream to video element
+  // Attach stream to video element
   useEffect(() => {
     const el = videoRef.current;
     if (!el) return;
@@ -58,7 +58,7 @@ function SpotlightCard({
     }
   }, [stream, hasVideoTrack, videoActive]);
 
-  // 🔥 Track-based detection (robust)
+  // Track-based detection (robust)
   useEffect(() => {
     if (!videoTrack) {
       setVideoActive(false);

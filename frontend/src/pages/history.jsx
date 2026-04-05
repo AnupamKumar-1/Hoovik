@@ -38,17 +38,16 @@ export default function History() {
   const [snackMsg, setSnackMsg] = useState('');
   const [snackSeverity, setSnackSeverity] = useState('success');
 
-  // UI state to expand a meeting's participant list beyond collapse for very large lists
   const [showAllParticipantsFor, setShowAllParticipantsFor] = useState({});
 
-  // helper: safe parse date to millis (invalid -> 0)
+
   const toMillis = (s) => {
     if (!s) return 0;
     const t = new Date(s).getTime();
     return Number.isFinite(t) ? t : 0;
   };
 
-  // helper: consider names trivial/generic — moved to component scope so both useEffect and render can use it
+
   const isTrivialName = (n) => {
     if (!n) return true;
     const s = String(n).trim().toLowerCase();
@@ -232,7 +231,7 @@ export default function History() {
 
         if (mounted) setMeetings(mapped);
 
-        // small debug hint if nothing found while userData exists
+
         if (mounted && userData && mapped.length === 0) {
           console.debug('History: no meetings matched current user after filtering. Normalized items:', normalized.length, 'Server+Local merged count:', merged.length);
         }
@@ -255,7 +254,6 @@ export default function History() {
       }
     };
 
-    // custom event hook: other parts of the app can dispatch `window.dispatchEvent(new Event('meeting_history_updated'))`
     const onCustomUpdate = () => {
       if (mounted) fetchHistory();
     };
@@ -471,7 +469,7 @@ export default function History() {
                 if (rawHost.email && userData.email && String(rawHost.email).toLowerCase() === String(userData.email).toLowerCase()) return true;
               }
 
-              // last resort: exact display-name match but only if both names are non-trivial length (>2) and not generic
+              // exact display-name match but only if both names are non-trivial length (>2) and not generic
               if (m.hostName && userData.name && !isTrivialName(m.hostName) && !isTrivialName(userData.name)) {
                 const hn = String(m.hostName).trim().toLowerCase();
                 const un = String(userData.name).trim().toLowerCase();
@@ -620,7 +618,7 @@ export default function History() {
                             if (pUsername && m.raw && typeof m.raw.host === 'object' && m.raw.host.username && String(pUsername).toLowerCase() === String(m.raw.host.username).toLowerCase()) return true;
                             if (pEmail && m.raw && typeof m.raw.host === 'object' && m.raw.host.email && String(pEmail).toLowerCase() === String(m.raw.host.email).toLowerCase()) return true;
 
-                            // last resort: exact display-name match (only if hostName present and not trivial)
+                            // exact display-name match (only if hostName present and not trivial)
                             const pName = pRaw && (typeof pRaw === 'string' ? pRaw : (pRaw.name || pRaw.display));
                             if (pName && m.hostName && !isTrivialName(pName) && !isTrivialName(m.hostName)) {
                               const pn = String(pName).trim().toLowerCase();
@@ -644,7 +642,7 @@ export default function History() {
                             const pEmail = pRaw?.email || null;
                             if (pEmail && userData.email && String(pEmail).toLowerCase() === String(userData.email).toLowerCase()) return true;
 
-                            // Name-only match: very last resort and require that both names are not trivial
+                            // Name-only match
                             const pName = pRaw?.name || pRaw?.display || (typeof pRaw === 'string' ? pRaw : null);
                             if (pName && userData.name && !isTrivialName(pName) && !isTrivialName(userData.name)) {
                               const pn = String(pName).trim().toLowerCase();

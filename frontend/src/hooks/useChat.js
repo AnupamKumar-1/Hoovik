@@ -1,113 +1,117 @@
 import { useState, useRef, useCallback } from "react";
 
-export default function useChat({ socketRef, roomId }) {
+const MAX_TEXT_LENGTH = 2000;
+const ACK_TIMEOUT_MS = 5000;
+
+function resolveIdentity(userId, displayName) {
+  return {
+    resolvedUserId: userId ?? localStorage.getItem("userId") ?? "",
+    resolvedName: displayName ?? localStorage.getItem("displayName") ?? "Guest",
+  };
+}
+
+function insertSorted(prev, msg) {
+  const ts = msg.ts ?? 0;
+  if (prev.length === 0 || ts >= (prev[prev.length - 1].ts ?? 0)) {
+    return [...prev, msg];
+  }
+  const idx = prev.findLastIndex((m) => (m.ts ?? 0) <= ts);
+  const result = [...prev];
+  result.splice(idx + 1, 0, msg);
+  return result;
+}
+
+export default function useChat({ socketRef, roomId, userId, displayName }) {
   const [chatMessages, setChatMessages] = useState([]);
   const seenMsgIdsRef = useRef(new Set());
+  const pendingAcksRef = useRef(new Map());
 
-  const addMessage = useCallback((msg) => {
-    if (!msg || !msg.id) return;
-
-    if (seenMsgIdsRef.current.has(msg.id)) return;
-    seenMsgIdsRef.current.add(msg.id);
-
-    setChatMessages((prev) => {
-      const updated = [...prev, msg];
-
-      updated.sort((a, b) => (a.ts || 0) - (b.ts || 0));
-
-      return updated;
-    });
-  }, []);
-
-  const sendChatMessage = useCallback(
-    (text) => {
-      if (!text || !socketRef.current) return;
-
-      const userId = localStorage.getItem("userId");
-      const name = localStorage.getItem("displayName") || "Guest";
-
-      const id = crypto.randomUUID();
-
-      const msg = {
-        id,
-        userId,
-        fromSocketId: socketRef.current.id,
-        name,
-        text: String(text).slice(0, 2000),
-        meta: { name, userId },
-        ts: Date.now(),
-        status: "pending",
-      };
-
-      addMessage(msg);
-
-      try {
-        socketRef.current.emit("chat-message", roomId, msg);
-        setTimeout(() => {
-          setChatMessages((prev) =>
-            prev.map((m) =>
-              m.id === id ? { ...m, status: "sent" } : m
-            )
-          );
-        }, 300);
-      } catch (e) {
-        console.warn("chat emit failed", e);
-
-        setChatMessages((prev) =>
-          prev.map((m) =>
-            m.id === id ? { ...m, status: "failed" } : m
-          )
-        );
-      }
-    },
-    [socketRef, roomId, addMessage]
-  );
-
-
-  const handleIncomingMessage = useCallback(
-    (msg) => {
-      if (!msg || !msg.id) return;
-
-      addMessage({
-        ...msg,
-        status: "sent",
-      });
-    },
-    [addMessage]
-  );
-
-  const handleAck = useCallback((msgId) => {
-    if (!msgId) return;
-
+  const _setStatus = useCallback((msgId, status) => {
     setChatMessages((prev) =>
-      prev.map((m) =>
-        m.id === msgId ? { ...m, status: "sent" } : m
-      )
+      prev.map((m) => (m.id === msgId ? { ...m, status } : m))
     );
   }, []);
 
-  const retryMessage = useCallback(
-    (msg) => {
-      if (!msg || !socketRef.current) return;
+  const _clearAckTimer = useCallback((msgId) => {
+    const timer = pendingAcksRef.current.get(msgId);
+    if (timer !== undefined) {
+      clearTimeout(timer);
+      pendingAcksRef.current.delete(msgId);
+    }
+  }, []);
 
-      try {
-        socketRef.current.emit("chat-message", roomId, msg);
+  const _armAckTimer = useCallback((msgId) => {
+    _clearAckTimer(msgId);
+    const timer = setTimeout(() => {
+      pendingAcksRef.current.delete(msgId);
+      _setStatus(msgId, "failed");
+    }, ACK_TIMEOUT_MS);
+    pendingAcksRef.current.set(msgId, timer);
+  }, [_clearAckTimer, _setStatus]);
 
-        setChatMessages((prev) =>
-          prev.map((m) =>
-            m.id === msg.id ? { ...m, status: "pending" } : m
-          )
-        );
-      } catch (e) {
-        console.warn("retry failed", e);
-      }
-    },
-    [socketRef, roomId]
-  );
+  const _addMessage = useCallback((msg) => {
+    if (!msg?.id) return;
+    if (seenMsgIdsRef.current.has(msg.id)) return;
+    seenMsgIdsRef.current.add(msg.id);
+    setChatMessages((prev) => insertSorted(prev, msg));
+  }, []);
+
+  const sendChatMessage = useCallback((text) => {
+    const socket = socketRef.current;
+    if (!text?.trim() || !socket?.connected) return;
+
+    const { resolvedUserId, resolvedName } = resolveIdentity(userId, displayName);
+    const id = crypto.randomUUID();
+
+    const msg = {
+      id,
+      userId: resolvedUserId,
+      fromSocketId: socket.id,
+      name: resolvedName,
+      text: String(text).trim().slice(0, MAX_TEXT_LENGTH),
+      meta: { name: resolvedName, userId: resolvedUserId },
+      ts: Date.now(),
+      status: "pending",
+    };
+
+    _addMessage(msg);
+    _armAckTimer(id);
+
+    socket.emit("chat-message", roomId, msg, (ack) => {
+      _clearAckTimer(id);
+      _setStatus(id, ack?.ok ? "sent" : "failed");
+    });
+  }, [socketRef, roomId, userId, displayName, _addMessage, _armAckTimer, _clearAckTimer, _setStatus]);
+
+  const handleIncomingMessage = useCallback((msg) => {
+    if (!msg?.id) return;
+    _addMessage({ ...msg, status: "sent" });
+  }, [_addMessage]);
+
+  const handleAck = useCallback((msgId) => {
+    if (!msgId) return;
+    _clearAckTimer(msgId);
+    _setStatus(msgId, "sent");
+  }, [_clearAckTimer, _setStatus]);
+
+  const retryMessage = useCallback((msg) => {
+    const socket = socketRef.current;
+    if (!msg?.id || !socket?.connected) return;
+
+    _setStatus(msg.id, "pending");
+    _armAckTimer(msg.id);
+
+    socket.emit("chat-message", roomId, msg, (ack) => {
+      _clearAckTimer(msg.id);
+      _setStatus(msg.id, ack?.ok ? "sent" : "failed");
+    });
+  }, [socketRef, roomId, _setStatus, _armAckTimer, _clearAckTimer]);
 
   const clearChat = useCallback(() => {
-    setChatMessages([]);
+    pendingAcksRef.current.forEach(clearTimeout);
+    pendingAcksRef.current.clear();
     seenMsgIdsRef.current.clear();
+    setChatMessages([]);
   }, []);
 
   return {

@@ -19,24 +19,20 @@ function ParticipantCard({
   const [videoActive, setVideoActive] = useState(true);
 
   const name =
-    (emotion &&
-      (emotion.__name ||
-        emotion.name ||
-        emotion.displayName ||
-        emotion.display_name)) ||
     meta?.name ||
-    (peerId ? peerId.slice(0, 6) : "Unknown");
+    emotion?.name ||
+    emotion?.displayName ||
+    emotion?.display_name ||
+    peerId?.slice(0, 6) ||
+    "Unknown";
 
-  const isSpeaking = isActive;
-
-  const videoTrack =
-    stream?.getVideoTracks?.().find((t) => t.readyState === "live");
-
+  const videoTrack = stream?.getVideoTracks?.().find(
+    (t) => t.readyState === "live"
+  );
   const hasVideoTrack = !!videoTrack;
-
   const showVideo = hasVideoTrack && videoActive;
 
-
+  // clear srcObject when stream or video state changes
   useEffect(() => {
     const el = videoRef.current;
     if (!el) return;
@@ -46,7 +42,7 @@ function ParticipantCard({
         try {
           el.srcObject = stream;
         } catch (err) {
-          console.warn("failed to assign srcObject on participant video", err);
+          console.warn("Failed to assign srcObject on participant video", err);
         }
       }
     } else {
@@ -54,33 +50,24 @@ function ParticipantCard({
         try {
           el.srcObject = null;
         } catch (err) {
-          console.warn("failed to clear srcObject on participant video", err);
+          console.warn("Failed to clear srcObject on participant video", err);
         }
       }
     }
   }, [stream, hasVideoTrack, videoActive]);
 
-  // 🔥 Track-based detection (robust)
+  // Track mute - unmute - ended events to toggle videoActive
   useEffect(() => {
     if (!videoTrack) {
       setVideoActive(false);
       return;
     }
 
-    // when track exists → assume active initially
     setVideoActive(true);
 
-    const handleMute = () => {
-      setVideoActive(false);
-    };
-
-    const handleUnmute = () => {
-      setVideoActive(true);
-    };
-
-    const handleEnded = () => {
-      setVideoActive(false);
-    };
+    const handleMute = () => setVideoActive(false);
+    const handleUnmute = () => setVideoActive(true);
+    const handleEnded = () => setVideoActive(false);
 
     videoTrack.onmute = handleMute;
     videoTrack.onunmute = handleUnmute;
@@ -99,15 +86,14 @@ function ParticipantCard({
       initial={{ opacity: 0, scale: 0.96 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.96 }}
-      className={`${styles.participantCard} ${
-        compact ? styles.participantCardCompact : ""
-      } ${isSpeaking ? styles.participantCardSpeaking : ""}`}
+      className={`${styles.participantCard} ${compact ? styles.participantCardCompact : ""
+        } ${isActive ? styles.participantCardSpeaking : ""}`}
       title={name}
       style={{
         width: compact ? 160 : "100%",
         height: compact ? 90 : "100%",
         aspectRatio: compact ? "16/9" : undefined,
-        outline: isSpeaking ? "3px solid #2ecc71" : "none",
+        outline: isActive ? "3px solid #2ecc71" : "none",
         boxSizing: "border-box",
         transition: "outline 160ms ease",
         ...style,
@@ -115,22 +101,23 @@ function ParticipantCard({
     >
       {showVideo ? (
         <video
-          autoPlay
-          playsInline
           ref={videoRef}
-          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          autoPlay
+          style={{ width: "100%", height: "100%", objectFit: "cover"  }}
         />
       ) : (
         <div className={styles.cameraOffPlaceholder}>
           <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: compact ? 18 : 36 }}>
-              {name && name[0]
-                ? name[0].toUpperCase()
-                : <FaUserAlt />}
-            </div>
+            {name?.[0] ? (
+              <span style={{ fontSize: compact ? 18 : 36 }}>
+                {name[0].toUpperCase()}
+              </span>
+            ) : (
+              <FaUserAlt size={compact ? 14 : 28} />
+            )}
             {!compact && (
               <div style={{ marginTop: 6, fontSize: 13 }}>
-                {name} • Camera off
+                {name} · Camera off
               </div>
             )}
           </div>
@@ -139,7 +126,8 @@ function ParticipantCard({
 
       <div className={styles.participantOverlay}>
         <div className={styles.namePill}>
-          <FaUserAlt /> <span>{name}</span>
+          <FaUserAlt />
+          <span>{name}</span>
         </div>
       </div>
 
@@ -151,10 +139,12 @@ function ParticipantCard({
 
 function areEqual(prev, next) {
   return (
+    prev.peerId === next.peerId &&
     prev.stream === next.stream &&
     prev.meta === next.meta &&
     prev.emotion === next.emotion &&
     prev.isActive === next.isActive &&
+    prev.isHost === next.isHost &&
     prev.compact === next.compact
   );
 }

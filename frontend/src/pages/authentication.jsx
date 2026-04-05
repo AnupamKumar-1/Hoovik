@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { useNavigate } from "react-router-dom"; 
+import { useNavigate } from "react-router-dom";
 import Avatar from '@mui/material/Avatar';
 import Button from '@mui/material/Button';
 import CssBaseline from '@mui/material/CssBaseline';
@@ -25,7 +25,7 @@ const defaultTheme = createTheme({
 });
 
 export default function Authentication() {
-  const navigate = useNavigate(); // ✅ added
+  const navigate = useNavigate();
 
   const [username, setUsername] = React.useState("");
   const [password, setPassword] = React.useState("");
@@ -42,14 +42,14 @@ export default function Authentication() {
 
     try {
       if (formState === 0) {
-        // 🔥 LOGIN
+
         await handleLogin(username, password);
 
-        // ✅ SAFE NAVIGATION (NO reload)
+
         navigate("/home", { replace: true });
 
       } else {
-        // 🔥 REGISTER
+
         const result = await handleRegister(name, username, password);
 
         setUsername("");
@@ -71,7 +71,7 @@ export default function Authentication() {
       <Grid container component="main" className="auth-root">
         <CssBaseline />
 
-        {/* Left hero image */}
+
         <Grid
           item xs={false} sm={4} md={5}
           className="auth-hero"
@@ -81,7 +81,6 @@ export default function Authentication() {
           }}
         />
 
-        {/* Right form */}
         <Grid
           item xs={12}
           sm={8}

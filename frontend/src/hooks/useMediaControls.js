@@ -19,7 +19,7 @@ export default function useMediaControls({
 }) {
   const videoOffRef = useRef(false);
 
-  // ✅ CENTRALIZED ANALYZER RESET (IMPORTANT)
+  // CENTRALIZED ANALYZER RESET
   function resetLocalAnalyzer() {
     try {
       removeAnalyzer("local");
@@ -29,7 +29,7 @@ export default function useMediaControls({
     } catch {}
   }
 
-  // ================= MUTE =================
+
   async function toggleMute(
     muted,
     setMuted,
@@ -44,7 +44,7 @@ export default function useMediaControls({
       if (mutedRef) mutedRef.current = newMuted;
 
       if (newMuted) {
-        // 🔴 MUTED
+
         if (TRANSCRIPTS_ENABLED) {
           try { window.stopTranscription?.(); } catch {}
         }
@@ -57,7 +57,7 @@ export default function useMediaControls({
           delete recordersRef.current?.["local"];
         } catch {}
       } else {
-        // 🟢 UNMUTED
+        // UNMUTED
         if (TRANSCRIPTS_ENABLED) {
           try {
             window.startTranscription?.(localStreamRef.current);
@@ -74,7 +74,7 @@ export default function useMediaControls({
     }
   }
 
-  // ================= VIDEO =================
+
   async function toggleVideo(videoOff, setVideoOff) {
     try {
       const newVideoOff = await mediaToggleVideo(videoOff);
@@ -83,12 +83,12 @@ export default function useMediaControls({
       videoOffRef.current = newVideoOff;
 
       if (newVideoOff) {
-        // 🔴 VIDEO OFF (CLEAN)
+
         try { stopPeriodicEmotionCapture(); } catch {}
         try { removeAnalyzer("local"); } catch {}
         try { window.stopRecording?.("video"); } catch {}
       } else {
-        // 🟢 VIDEO ON
+
         resetLocalAnalyzer();
 
         try {
@@ -103,17 +103,17 @@ export default function useMediaControls({
     }
   }
 
-  // ================= SCREEN SHARE =================
+  // SCREEN SHARE
   async function startScreenShare(prevLocalStreamRef) {
     try {
       const screenStream = await navigator.mediaDevices.getDisplayMedia({
         video: true,
-        audio: true, // ✅ IMPORTANT
+        audio: true,
       });
 
       const screenTrack = screenStream.getVideoTracks()[0];
 
-      // ✅ PRESERVE MIC
+      // PRESERVE MIC
       const audioTracks =
         localStreamRef.current?.getAudioTracks?.() || [];
 
@@ -126,13 +126,13 @@ export default function useMediaControls({
       localStreamRef.current = mergedStream;
       setLocalStream(mergedStream);
 
-      // ✅ LOCAL PREVIEW
+      // LOCAL PREVIEW
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = mergedStream;
         setVideoElement(localVideoRef.current);
       }
 
-      // ✅ REPLACE TRACK IN PEERS
+      // REPLACE TRACK IN PEERS
       Object.values(pcsRef.current).forEach((pc) => {
         const sender = pc
           .getSenders()
@@ -143,7 +143,7 @@ export default function useMediaControls({
         }
       });
 
-      // ✅ FORCE NEGOTIATION (IMPORTANT)
+      // FORCE NEGOTIATION
       Object.values(pcsRef.current).forEach((pc) => {
         try {
           pc.dispatchEvent(new Event("negotiationneeded"));
@@ -154,7 +154,7 @@ export default function useMediaControls({
         screen: true,
       });
 
-      // ================= END SCREEN SHARE =================
+
       screenTrack.onended = async () => {
         try {
           let camStream = prevLocalStreamRef.current;
@@ -187,11 +187,11 @@ export default function useMediaControls({
               });
             }
 
-            // ✅ RESET ANALYZER + RECORDING
+            // RESET ANALYZER + RECORDING
             resetLocalAnalyzer();
             startRecordingForStream("local", camStream);
 
-            // ✅ LOCAL PREVIEW
+            // LOCAL PREVIEW
             if (localVideoRef.current) {
               localVideoRef.current.srcObject = camStream;
               setVideoElement(localVideoRef.current);

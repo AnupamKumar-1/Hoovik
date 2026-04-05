@@ -225,33 +225,27 @@ export default function useMeetingLifecycle({
       if (isHost) {
 
         if (TRANSCRIPTS_ENABLED) {
-          try {
-            const code = roomId.toUpperCase();
+          const code = roomId.toUpperCase();
+          const hostDataRaw = localStorage.getItem(`host:${code}`);
+          const hostData = hostDataRaw ? JSON.parse(hostDataRaw) : null;
 
-// 🔥 get hostSecret
-const hostDataRaw = localStorage.getItem(`host:${code}`);
-const hostData = hostDataRaw ? JSON.parse(hostDataRaw) : null;
+          console.log("🔥 HOST DATA (END MEETING):", hostData);
 
-console.log("🔥 HOST DATA (END MEETING):", hostData);
-
-// ❌ if not host → skip
-if (!hostData || !hostData.hostSecret) {
-  console.error("❌ HOST SECRET MISSING — cannot upload transcript");
-} else {
-  try {
-    await uploadRecordingsAndStoreTranscript({
-      hostSecret: hostData.hostSecret   // 🔥 inject
-    });
-  } catch (e) {
-    console.warn("uploadRecordingsAndStoreTranscript failed", e);
-  }
-}
-          } catch (e) {
-            console.warn("uploadRecordingsAndStoreTranscript failed", e);
+          if (!hostData?.hostSecret) {
+            console.error("HOST SECRET MISSING — cannot upload transcript");
+          } else {
+            try {
+              await uploadRecordingsAndStoreTranscript({
+                hostSecret: hostData.hostSecret,
+                meetingCode: code,
+              });
+            } catch (e) {
+              console.warn("uploadRecordingsAndStoreTranscript failed", e);
+            }
           }
         } else {
-          try { stopAllRecorders(); } catch {}
-          try { recordersRef.current = {}; } catch {}
+          try { stopAllRecorders(); } catch { }
+          try { recordersRef.current = {}; } catch { }
         }
 
         if (socketRef.current?.connected) {

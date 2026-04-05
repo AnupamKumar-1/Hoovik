@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useContext, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import "../styles/home.css";
@@ -41,21 +40,39 @@ function getTranscriptKey(item, index) {
   return `${code}__${id || ts}`;
 }
 
+// compare timestamps as numbers, not Date objects or strings
 function dedupeByCodeKeepNewest(arr) {
   const map = new Map();
   for (const it of arr) {
     const codeRaw = (it.meeting_code || it.meetingCode || "").toString();
-    const code = codeRaw ? codeRaw.toUpperCase() : `__NO_CODE__:${Math.random().toString(36).slice(2, 8)}`;
+    const code = codeRaw
+      ? codeRaw.toUpperCase()
+      : `__NO_CODE__:${Math.random().toString(36).slice(2, 8)}`;
     const existing = map.get(code);
     if (!existing) {
       map.set(code, it);
     } else {
-      const existingTs = existing.createdAt || "";
-      const itTs = it.createdAt || "";
+      const existingTs = existing.createdAt ? new Date(existing.createdAt).getTime() : 0;
+      const itTs = it.createdAt ? new Date(it.createdAt).getTime() : 0;
       if (itTs > existingTs) map.set(code, it);
     }
   }
   return Array.from(map.values());
+}
+
+//  canonical transcript field mapper, used in both auth and hostSecret paths
+function mapTranscript(t) {
+  const code = (t.meetingCode || t.meeting_code || "").toString().toUpperCase();
+  if (!code) return null;
+
+  return {
+    _id: t._id || t.id || null,
+    meeting_code: code,
+    transcript: t.transcriptText ?? t.metadata?.transcriptText ?? "",
+    createdAt: t.createdAt ? new Date(t.createdAt) : null,
+    fileName: t.fileName || null,
+    fromServer: true,
+  };
 }
 
 export default function Home() {
@@ -67,14 +84,11 @@ export default function Home() {
   const [recentLocal, setRecentLocal] = useState([]);
   const [expandedTranscripts, setExpandedTranscripts] = useState({});
 
-
   const [snackOpen, setSnackOpen] = useState(false);
   const [snackMsg, setSnackMsg] = useState("");
   const [snackSeverity, setSnackSeverity] = useState("success");
 
   const [serverHadTranscripts, setServerHadTranscripts] = useState(false);
-
-
 
   const didFetch = useRef(false);
 
@@ -92,47 +106,38 @@ export default function Home() {
       try {
         const token = localStorage.getItem("token");
 
-
         const hostKeys = Object.keys(localStorage).filter((k) =>
           k.startsWith("host:")
         );
 
+        //  removed the 2-day filter, all stored host secrets are used
         const hostSecrets = hostKeys
           .map((k) => {
             try {
               const parsed = JSON.parse(localStorage.getItem(k));
-
-              const createdAt = new Date(parsed?.createdAt || 0).getTime();
-              const isRecent =
-                Date.now() - createdAt < 1000 * 60 * 60 * 24 * 2; // 2 days
-
-              if (!isRecent) return null;
-
-              return parsed?.hostSecret;
+              return parsed?.hostSecret ?? null;
             } catch {
               return null;
             }
           })
-          .filter(Boolean)
+          .filter(Boolean);
 
         if (!token && hostSecrets.length === 0) {
-          console.log("🚫 No auth, no hostSecret → skipping transcript fetch");
+          console.log("No auth, no hostSecret → skipping transcript fetch");
           return;
         }
-
 
         let authItems = [];
         let authHad = false;
 
         if (token) {
           try {
-            console.log("🔥 FETCH AUTH TRANSCRIPTS");
+            console.log("FETCH AUTH TRANSCRIPTS");
 
             const resp = await apiClient.get(`/transcript?limit=200`);
-
             const body = resp.data;
 
-            console.log("🔥 AUTH RAW:", body);
+            console.log("AUTH RAW:", body);
 
             if (body?.success) {
               const list = Array.isArray(body.transcripts)
@@ -143,69 +148,36 @@ export default function Home() {
 
               authHad = list.length > 0;
 
-              authItems = list
-                .map((t) => {
-                  const code = (t.meetingCode || t.meeting_code || "")
-                    .toString()
-                    .toUpperCase();
+              // use shared mapTranscript()
+              authItems = list.map(mapTranscript).filter(Boolean);
 
-                  if (!code) {
-                    console.warn("⚠️ Skipping invalid auth transcript:", t);
-                    return null;
-                  }
-
-                  return {
-                    _id: t._id || t.id || null,
-
-                    meeting_code: code,
-
-                    transcript:
-                      t.transcriptText ||
-                      t.transcript ||
-                      t.metadata?.transcriptText || // 🔥 fallback (important)
-                      "",
-
-                    createdAt: t.createdAt ? new Date(t.createdAt) : null,
-
-                    fileName: t.fileName || null,
-
-                    fromServer: true,
-                  };
-                })
-                .filter(Boolean);
-
-              console.log("✅ AUTH ITEMS:", authItems);
+              console.log("AUTH ITEMS:", authItems);
             }
           } catch (err) {
             console.warn(
-              "❌ Auth transcript failed:",
+              "Auth transcript failed:",
               err?.response?.status,
               err?.response?.data
             );
           }
         }
 
-        // ================= HOST SECRET FETCH (OPTIMIZED) =================
+        // HOST SECRET FETCH
         let hostServerItems = [];
 
         if (hostSecrets.length > 0) {
-          console.log("✅ Using filtered hostSecrets:", hostSecrets);
+          console.log("Using hostSecrets:", hostSecrets.length);
 
           for (const hostSecret of hostSecrets) {
             try {
-              console.log("🔥 TRY HOST SECRET:", hostSecret);
 
               const resp = await apiClient.get(`/transcript?limit=200`, {
-                headers: {
-                  "x-host-secret": hostSecret,
-                },
+                headers: { "x-host-secret": hostSecret },
               });
 
               const body = resp.data;
+              console.log("RAW RESPONSE:", body);
 
-              console.log("🔥 RAW RESPONSE:", body);
-
-              // ✅ HANDLE BOTH ARRAY + SINGLE OBJECT
               const list = Array.isArray(body?.transcripts)
                 ? body.transcripts
                 : body?.transcript
@@ -213,50 +185,19 @@ export default function Home() {
                   : [];
 
               if (list.length === 0) {
-                console.log("⚠️ No transcripts for this hostSecret");
+                console.log("No transcripts for this hostSecret");
                 continue;
               }
 
-              // ✅ FIX: PROPER MAP
-              const mapped = list
-                .map((t) => {
-                  const code = (t.meetingCode || t.meeting_code || "")
-                    .toString()
-                    .toUpperCase();
+              //  use shared mapTranscript()
+              const mapped = list.map(mapTranscript).filter(Boolean);
 
-                  if (!code) {
-                    console.warn("⚠️ Skipping invalid transcript:", t);
-                    return null;
-                  }
+              console.log("MAPPED:", mapped);
 
-                  return {
-                    _id: t._id || t.id || null,
-
-                    meeting_code: code,
-
-                    transcript:
-                      t.transcriptText ||
-                      t.transcript ||
-                      t.metadata?.transcriptText || // 🔥 IMPORTANT
-                      "",
-
-                    createdAt: t.createdAt ? new Date(t.createdAt) : null,
-
-                    fileName: t.fileName || null,
-
-                    fromServer: true,
-                  };
-                })
-                .filter(Boolean);
-
-              console.log("✅ MAPPED:", mapped);
-
-              // ✅ APPEND (NOT OVERWRITE)
               hostServerItems = [...hostServerItems, ...mapped];
-
             } catch (err) {
               console.warn(
-                "❌ Host transcript failed:",
+                "Host transcript failed:",
                 err?.response?.status,
                 err?.response?.data
               );
@@ -265,12 +206,9 @@ export default function Home() {
           }
         }
 
-        console.log("🔥 FINAL hostServerItems:", hostServerItems);
-        // ================= MERGE =================
+        //  MERGE
         const mergedRaw = [...authItems, ...hostServerItems];
-
-        const anyServerHad =
-          authHad || hostServerItems.length > 0;
+        const anyServerHad = authHad || hostServerItems.length > 0;
 
         setServerHadTranscripts(anyServerHad);
 
@@ -279,6 +217,7 @@ export default function Home() {
           return;
         }
 
+        // dedupeByCodeKeepNewest now uses numeric timestamp comparison
         const merged = dedupeByCodeKeepNewest(mergedRaw);
         setRecentLocal(merged);
       } catch (err) {
@@ -329,9 +268,7 @@ export default function Home() {
       const link = `${window.location.origin}/room/${roomCode.toUpperCase()}`;
 
       setRoom(link);
-
       localStorage.setItem("displayName", name.trim());
-      // store hostSecret so this browser can prove it's the host later
       localStorage.setItem(
         `host:${roomCode.toUpperCase()}`,
         JSON.stringify({
@@ -372,11 +309,14 @@ export default function Home() {
       const link = `${window.location.origin}/room/${roomCode.toUpperCase()}`;
 
       setRoom(link);
-
       localStorage.setItem("displayName", name.trim());
       localStorage.setItem(
         `host:${roomCode.toUpperCase()}`,
-        JSON.stringify({ hostName: name.trim(), hostSecret: hostSecret || null, createdAt: new Date().toISOString() })
+        JSON.stringify({
+          hostName: name.trim(),
+          hostSecret: hostSecret || null,
+          createdAt: new Date().toISOString(),
+        })
       );
 
       const copied = await copyToClipboard(link);
@@ -412,11 +352,10 @@ export default function Home() {
     }
   }
 
-  // --- Logout handler that uses AuthContext.logout and clears only displayName (preserves host:* local secrets as fallback) ---
   async function handleLogout() {
     try {
       if (logout) {
-        await logout(true); // redirect = true
+        await logout(true);
       } else {
         localStorage.removeItem("token");
         try {
@@ -428,7 +367,6 @@ export default function Home() {
     } catch (err) {
       console.warn("logout encountered an error:", err);
     } finally {
-
       try {
         localStorage.removeItem("displayName");
       } catch (e) {

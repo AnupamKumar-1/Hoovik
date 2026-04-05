@@ -1,4 +1,11 @@
-import React, { useEffect, useRef, useState, useContext, useCallback } from "react";
+import React, {
+  useEffect,
+  useRef,
+  useState,
+  useContext,
+  useCallback,
+  useMemo,
+} from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { AuthContext } from "../contexts/AuthContext";
 import useMediaBridge from "../hooks/useMediaBridge";
@@ -34,60 +41,214 @@ import useAudioAnalyzer from "../hooks/useAudioAnalyzer";
 import useEmotionCapture from "../hooks/useEmotionCapture";
 
 
+const DEBUG_SHOW_EMOTION_FOR_EVERYONE = false;
+const SPEAKER_DEBOUNCE_MS = 700;
+
+
+// Grid layout helper
+
+function getGridStyle(count) {
+  if (count === 0) return {};
+  if (count === 1) {
+    return {
+      gridTemplateColumns: "1fr",
+      gridTemplateRows: "1fr",
+    };
+  }
+  if (count <= 4) {
+    return { gridTemplateColumns: "repeat(2, 1fr)" };
+  }
+  return { gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))" };
+}
+
+// ChatPanel
+
+function ChatPanel({
+  chatMessages,
+  participantsMeta,
+  myUserId,
+  retryMessage,
+  sendChatMessage,
+  chatContainerRef,
+  chatEndRef,
+}) {
+  return (
+    <motion.aside
+      className={styles.chatRoom}
+      initial={{ opacity: 0, x: 60 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 60 }}
+      transition={{ duration: 0.2 }}
+    >
+      <div className={styles.chatHeader}>
+        <FaRegComments />
+        <strong>Chat</strong>
+        <div style={{ marginLeft: "auto", fontSize: 13, opacity: 0.7 }}>
+          {participantsMeta.length} in call
+        </div>
+      </div>
+
+      <div
+        ref={chatContainerRef}
+        className={styles.chatMessages}
+        role="log"
+        aria-live="polite"
+      >
+        {chatMessages.map((m) => {
+          const isOwn = m.from === myUserId || m.userId === myUserId;
+
+          return (
+            <motion.div
+              key={m.id}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.15 }}
+              style={{
+                display: "flex",
+                justifyContent: isOwn ? "flex-end" : "flex-start",
+                padding: "2px 6px",
+              }}
+            >
+              <div
+                style={{
+                  background: isOwn ? "#DCF8C6" : "#fff",
+                  color: "#111",
+                  padding: "8px 12px",
+                  borderRadius: 14,
+                  maxWidth: "72%",
+                  wordBreak: "break-word",
+                  boxShadow: "0 1px 2px rgba(0,0,0,0.12)",
+                }}
+              >
+                <div style={{ fontSize: 14 }}>{m.text}</div>
+
+                <div
+                  style={{
+                    marginTop: 4,
+                    fontSize: 11,
+                    opacity: 0.7,
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <span style={{ fontWeight: 600 }}>
+                    {isOwn ? "You" : m.meta?.name || "User"}
+                  </span>
+
+                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    <span>
+                      {new Date(m.ts).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+
+                    {isOwn && (
+                      <>
+                        {m.status === "pending" && (
+                          <span style={{ opacity: 0.5 }}>●</span>
+                        )}
+                        {m.status === "sent" && (
+                          <span style={{ color: "#4caf50" }}>✓</span>
+                        )}
+                        {m.status === "failed" && (
+                          <span
+                            onClick={() => retryMessage(m)}
+                            style={{ color: "red", cursor: "pointer", fontWeight: 700 }}
+                            title="Retry"
+                          >
+                            !
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          );
+        })}
+        <div ref={chatEndRef} />
+      </div>
+
+      <div className={styles.chattingArea}>
+        <ChatInput onSend={sendChatMessage} />
+      </div>
+    </motion.aside>
+  );
+}
+
+
 export default function VideoMeet() {
   const { roomId } = useParams();
   const navigate = useNavigate();
 
-  const DEBUG_SHOW_EMOTION_FOR_EVERYONE = false;
-
+  // ── Refs ──
   const localVideoRef = useRef(null);
   const socketRef = useRef(null);
   const localStreamRef = useRef(null);
   const prevLocalStreamRef = useRef(null);
   const pcsRef = useRef({});
+  const remoteStreamsRef = useRef({});
+  const chatEndRef = useRef(null);
+  const chatContainerRef = useRef(null);
+  const lastSwitchRef = useRef(0);
+  const cleanupRef = useRef(null);
 
+  // ── State ──
   const [remoteStreams, setRemoteStreams] = useState({});
-  const remoteStreamsRef = useRef(remoteStreams);
-
   const [connecting, setConnecting] = useState(true);
   const [muted, setMuted] = useState(false);
   const [videoOff, setVideoOff] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
-
   const [participantsMeta, setParticipantsMeta] = useState([]);
   const [myId, setMyId] = useState(null);
+  const [shareEmotion, setShareEmotion] = useState(false);
+  const [emotionsMap, setEmotionsMap] = useState({});
+  const [stableSpeakerId, setStableSpeakerId] = useState(null);
 
-  const {addToUserHistory } = useContext(AuthContext);
+  // ── Auth ──
+  const { addToUserHistory } = useContext(AuthContext);
 
-  const isHost = !!localStorage.getItem(`host:${(roomId || "").toUpperCase()}`);
+  // ── Derived — stable across renders ──
+  const isHost = useMemo(
+    () => !!localStorage.getItem(`host:${(roomId || "").toUpperCase()}`),
+    [roomId]
+  );
 
+  const myUserId = useMemo(
+    () => localStorage.getItem("userId") || myId || "",
+    [myId]
+  );
+
+  // ── Ref mirrors for muted / videoOff (stable refs for callbacks) ──
   const mutedRef = useRef(muted);
-  useEffect(() => { mutedRef.current = muted; }, [muted]);
-
   const videoOffRef = useRef(videoOff);
+  useEffect(() => { mutedRef.current = muted; }, [muted]);
   useEffect(() => { videoOffRef.current = videoOff; }, [videoOff]);
 
-  const chatEndRef = useRef(null);
-  const chatContainerRef = useRef(null);
+  // Keep remoteStreamsRef in sync
+  useEffect(() => { remoteStreamsRef.current = remoteStreams; }, [remoteStreams]);
 
-const {
-  chatMessages,
-  setChatMessages,
-  sendChatMessage,
-  retryMessage,
-  seenMsgIdsRef,
-} = useChat({ socketRef, roomId });
+  // Hooks
+
+
   const {
-  activeSpeakerId,
-  createAnalyzerForStream,
-  removeAnalyzer,
-} = useAudioAnalyzer({
-  remoteStreams,
-  localStreamRef,
-  mutedRef,
-  pcsRef,
-});
+    chatMessages,
+    setChatMessages,
+    sendChatMessage,
+    handleIncomingMessage,
+    handleAck,
+    retryMessage,
+    seenMsgIdsRef,
+  } = useChat({ socketRef, roomId, userId: myUserId, displayName: localStorage.getItem("displayName") ?? undefined });
 
+  const {
+    activeSpeakerId,
+    createAnalyzerForStream,
+    removeAnalyzer,
+  } = useAudioAnalyzer({ remoteStreams, localStreamRef, mutedRef, pcsRef });
 
   const {
     recordersRef,
@@ -102,21 +263,6 @@ const {
     TRANSCRIPT_ENDPOINT,
     API_BASE,
   });
-
-const [stableSpeakerId, setStableSpeakerId] = useState(null);
-const lastSwitchRef = useRef(0);
-
-useEffect(() => {
-  if (!activeSpeakerId) return;
-
-  const now = Date.now();
-
-
-  if (now - lastSwitchRef.current < 700) return;
-
-  lastSwitchRef.current = now;
-  setStableSpeakerId(activeSpeakerId);
-}, [activeSpeakerId]);
 
   const {
     createPeerConnection,
@@ -134,9 +280,6 @@ useEffect(() => {
     recordersRef,
     ICE_CONFIG,
   });
-
-  const [shareEmotion, setShareEmotion] = useState(false);
-  const [emotionsMap, setEmotionsMap] = useState({});
 
   const {
     startPeriodicEmotionCapture,
@@ -167,205 +310,235 @@ useEffect(() => {
   });
 
   const {
-  start,
-  leaveCall,
-  endMeeting,
-  cleanupAll,
-  persistHistorySnapshot,
-} = useMeetingLifecycle({
-  roomId,
-  navigate,
-  socketRef,
-  localStreamRef,
-  localVideoRef,
-  prevLocalStreamRef,
-  pcsRef,
-  participantsMeta,
-  isHost,
-  addToUserHistory,
-  TRANSCRIPTS_ENABLED,
-  TRANSCRIPT_ENDPOINT,
-  API_BASE,
-  createAnalyzerForStream,
-  removeAnalyzer,
-  startRecordingForStream,
-  stopAllRecorders,
-  uploadRecordingsAndStoreTranscript,
-  stopPeriodicEmotionCapture,
-  setConnecting,
-  setParticipantsMeta,
-  setRemoteStreams,
-  recordersRef,
-  SOCKET_SERVER_URL,
-});
+    leaveCall,
+    endMeeting,
+    cleanupAll,
+    persistHistorySnapshot,
+  } = useMeetingLifecycle({
+    roomId,
+    navigate,
+    socketRef,
+    localStreamRef,
+    localVideoRef,
+    prevLocalStreamRef,
+    pcsRef,
+    participantsMeta,
+    isHost,
+    addToUserHistory,
+    TRANSCRIPTS_ENABLED,
+    TRANSCRIPT_ENDPOINT,
+    API_BASE,
+    createAnalyzerForStream,
+    removeAnalyzer,
+    startRecordingForStream,
+    stopAllRecorders,
+    uploadRecordingsAndStoreTranscript,
+    stopPeriodicEmotionCapture,
+    setConnecting,
+    setParticipantsMeta,
+    setRemoteStreams,
+    recordersRef,
+    SOCKET_SERVER_URL,
+  });
 
-const cleanupRef = useRef(cleanupAll);
+  // Keep cleanupAll ref fresh so useSocket always calls the latest version
+  useEffect(() => { cleanupRef.current = cleanupAll; }, [cleanupAll]);
 
-useEffect(() => {
-  cleanupRef.current = cleanupAll;
-}, [cleanupAll]);
-
-useEffect(() => {
-    remoteStreamsRef.current = remoteStreams;
-  }, [remoteStreams]);
-
-useMediaBridge({
-  localStreamRef,
-  createAnalyzerForStream,
-  removeAnalyzer,
-  startRecordingForStream,
-  stopAllRecorders,
-  recordersRef,
-  startPeriodicEmotionCapture,
-  stopPeriodicEmotionCapture,
-});
-
-const isInitiatorFor = useCallback((peerId) => {
-  try {
-    const me = socketRef.current?.id;
-    if (!me || !peerId) return false;
-    return String(me) < String(peerId);
-  } catch {
-    return false;
-  }
-}, []);
+  useMediaBridge({
+    localStreamRef,
+    createAnalyzerForStream,
+    removeAnalyzer,
+    startRecordingForStream,
+    stopAllRecorders,
+    recordersRef,
+    startPeriodicEmotionCapture,
+    stopPeriodicEmotionCapture,
+  });
 
 
+  // Callbacks
 
-  useEffect(() => {
-  if (shareEmotion && isHost) {
-    startPeriodicEmotionCapture({});
-  } else {
-    stopPeriodicEmotionCapture();
-  }
-}, [shareEmotion, myId, isHost]);
-
-
-const closePeer = useCallback((peerId) => {
-  const pc = pcsRef.current[peerId];
-
-  if (pc) {
+  const isInitiatorFor = useCallback((peerId) => {
     try {
-      pc.close();
-    } catch {}
-    delete pcsRef.current[peerId];
-  }
-
-  setRemoteStreams((prev) => {
-    if (!prev[peerId]) return prev;
-    const copy = { ...prev };
-    delete copy[peerId];
-    return copy;
-  });
-}, []);
-
-useSocket({
-  socketRef,
-  roomId,
-  setMyId,
-  setParticipantsMeta,
-  setChatMessages,
-  seenMsgIdsRef,
-  createPeerConnection,
-  safeNegotiateOffer,
-  isInitiatorFor,
-  politeRef,
-  pendingCandidatesRef,
-  pcsRef,
-  closePeer,
-  removeAnalyzer,
-  recordersRef,
-  setEmotionsMap,
-  handleSignal,
-  navigate,
-  cleanupAll: () => cleanupRef.current?.(),
-  persistHistorySnapshot,
-});
-
-
- const remoteEntries = Object.entries(remoteStreams)
-  .filter(
-    ([peerId, stream]) =>
-      peerId && peerId !== myId && stream && stream.getTracks().length
-  )
-  .sort(([a], [b]) => a.localeCompare(b));
-
-
-const socketEmotionMap = React.useMemo(() => {
-  const map = {};
-  participantsMeta.forEach((p) => {
-    const userId = p.meta?.userId;
-    if (userId && emotionsMap[userId]) {
-      map[p.id] = emotionsMap[userId];
+      const me = socketRef.current?.id;
+      if (!me || !peerId) return false;
+      return String(me) < String(peerId);
+    } catch {
+      return false;
     }
-  });
-  return map;
-}, [participantsMeta, emotionsMap]);
+  }, []);
+
+  // closePeer delegates to useWebRTC teardown if available,
+  // falls back to manual cleanup for safety
+  const closePeer = useCallback((peerId) => {
+    const pc = pcsRef.current[peerId];
+    if (pc) {
+      try { pc.close(); } catch { }
+      delete pcsRef.current[peerId];
+    }
+    setRemoteStreams((prev) => {
+      if (!prev[peerId]) return prev;
+      const copy = { ...prev };
+      delete copy[peerId];
+      return copy;
+    });
+  }, []);
+
+
+  // Effects
+
+
+  // Stable speaker debounce
+  useEffect(() => {
+    if (!activeSpeakerId) return;
+    const now = Date.now();
+    if (now - lastSwitchRef.current < SPEAKER_DEBOUNCE_MS) return;
+    lastSwitchRef.current = now;
+    setStableSpeakerId(activeSpeakerId);
+  }, [activeSpeakerId]);
+
+  // Emotion capture toggle
+  useEffect(() => {
+    if (shareEmotion && isHost) {
+      startPeriodicEmotionCapture({});
+    } else {
+      stopPeriodicEmotionCapture();
+    }
+  }, [shareEmotion, isHost, startPeriodicEmotionCapture, stopPeriodicEmotionCapture]);
+
+  // Chat auto-scroll
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [chatMessages, chatOpen]);
 
+  // Keyboard shortcuts — registered once, uses refs to avoid stale closures
   useEffect(() => {
-  const onKeyDown = (e) => {
-    const tag = (e.target && e.target.tagName) || "";
-    if (["INPUT", "TEXTAREA"].includes(tag)) return;
+    const onKeyDown = (e) => {
+      const tag = e.target?.tagName || "";
+      if (["INPUT", "TEXTAREA"].includes(tag)) return;
 
-    if (e.key === "m" || e.key === "M")
-      toggleMute(muted, setMuted, mutedRef, TRANSCRIPTS_ENABLED, recordersRef);
+      if (e.key === "m" || e.key === "M")
+        toggleMute(mutedRef.current, setMuted, mutedRef, TRANSCRIPTS_ENABLED, recordersRef);
 
-    if (e.key === "v" || e.key === "V")
-      toggleVideo(videoOff, setVideoOff);
+      if (e.key === "v" || e.key === "V")
+        toggleVideo(videoOffRef.current, setVideoOff);
 
-    if (e.key === "c" || e.key === "C")
-      setChatOpen((v) => !v);
-  };
+      if (e.key === "c" || e.key === "C")
+        setChatOpen((v) => !v);
+    };
 
-  window.addEventListener("keydown", onKeyDown);
-  return () => window.removeEventListener("keydown", onKeyDown);
-}, [muted, videoOff, chatOpen, toggleMute, toggleVideo]);
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [toggleMute, toggleVideo]); // stable hook references only — no state in deps
 
+
+  useSocket({
+    socketRef,
+    roomId,
+    setMyId,
+    setParticipantsMeta,
+    setChatMessages,
+    seenMsgIdsRef,
+    createPeerConnection,
+    safeNegotiateOffer,
+    isInitiatorFor,
+    politeRef,
+    pendingCandidatesRef,
+    pcsRef,
+    closePeer,
+    removeAnalyzer,
+    recordersRef,
+    setEmotionsMap,
+    handleSignal,
+    navigate,
+    cleanupAll: () => cleanupRef.current?.(),
+    persistHistorySnapshot,
+    handleIncomingMessage,
+    handleAck,
+  });
+
+
+  // Derived render values
+
+  const remoteEntries = useMemo(() =>
+    Object.entries(remoteStreams)
+      .filter(([peerId, stream]) =>
+        peerId && peerId !== myId && stream && stream.getTracks().length
+      )
+      .sort(([a], [b]) => a.localeCompare(b)),
+    [remoteStreams, myId]
+  );
+
+  const socketEmotionMap = useMemo(() => {
+    const map = {};
+    participantsMeta.forEach((p) => {
+      const userId = p.meta?.userId;
+      if (userId && emotionsMap[userId]) map[p.id] = emotionsMap[userId];
+      if (!map[p.id] && emotionsMap[p.id]) map[p.id] = emotionsMap[p.id];
+    });
+    return map;
+  }, [participantsMeta, emotionsMap]);
+
+  const gridStyle = useMemo(
+    () => getGridStyle(remoteEntries.length),
+    [remoteEntries.length]
+  );
+
+
+  // Render
 
   return (
     <div className={`${styles.meetVideoContainer} ${chatOpen ? styles.chatOpen : ""}`}>
       <div className={styles.bgSparkles} aria-hidden />
 
-      {connecting && <div className={styles.connecting}>Connecting...</div>}
+      {connecting && (
+        <div className={styles.connecting}>Connecting...</div>
+      )}
 
+      {/* ── Conference grid ── */}
       <div className={styles.conferenceWrap}>
         <div className={styles.conferenceView} aria-live="polite">
 
-  {/* 🧍 Empty state */}
-  {remoteEntries.length === 0 && !connecting && (
-    <div className={styles.emptyState}>
-      You're the only one here
-    </div>
-  )}
+          {remoteEntries.length === 0 && !connecting && (
+            <div className={styles.emptyState}>
+              You're the only one here
+            </div>
+          )}
 
-  <div
-  style={{
-    display: "grid",
-    gap: 12,
-    gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-    width: "100%",
-  }}
->
-  {remoteEntries.map(([peerId, stream]) => (
-  <ParticipantCard
-    key={peerId}
-    peerId={peerId}
-    stream={stream}
-    meta={participantsMeta.find(p => p.id === peerId)?.meta}
-    emotion={socketEmotionMap[peerId]}   // 🔥 use this
-    isActive={stableSpeakerId === peerId}
-    isHost={isHost}
-    DEBUG_SHOW_EMOTION_FOR_EVERYONE={DEBUG_SHOW_EMOTION_FOR_EVERYONE}
-  />
-))}
-</div>
+          <div
+            style={{
+              display: "grid",
+              gap: 12,
+              width: "100%",
+              height: "100%",
+              alignItems: "center",
+              justifyItems: "center",
+              ...gridStyle,
+            }}
+          >
+            {remoteEntries.map(([peerId, stream]) => (
+              <ParticipantCard
+                key={peerId}
+                peerId={peerId}
+                stream={stream}
+                meta={participantsMeta.find((p) => p.id === peerId)?.meta}
+                emotion={socketEmotionMap[peerId]}
+                isActive={stableSpeakerId === peerId}
+                isHost={isHost}
+                DEBUG_SHOW_EMOTION_FOR_EVERYONE={DEBUG_SHOW_EMOTION_FOR_EVERYONE}
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  minHeight: remoteEntries.length === 1 ? "60vh" : 280,
+                }}
+              />
+            ))}
+          </div>
 
-</div>
+        </div>
       </div>
 
+      {/* Local preview (draggable) */}
       <motion.div
         className={styles.localPreview}
         initial={{ opacity: 0, y: 8 }}
@@ -394,15 +567,24 @@ const socketEmotionMap = React.useMemo(() => {
           playsInline
           style={{ width: "100%", height: "100%", objectFit: "cover" }}
         />
-        <div className={styles.youBadge} style={stableSpeakerId === "local" ? { boxShadow: "0 0 14px rgba(0,150,255,0.9)" } : {}}>
+
+        <div
+          className={styles.youBadge}
+          style={
+            stableSpeakerId === "local"
+              ? { boxShadow: "0 0 14px rgba(0,150,255,0.9)" }
+              : {}
+          }
+        >
           You
         </div>
+
         <div className={styles.previewControls}>
           <button
             className={`${styles.iconButton} ${muted ? styles.active : ""}`}
             onClick={() =>
-  toggleMute(muted, setMuted, mutedRef, TRANSCRIPTS_ENABLED, recordersRef)
-}
+              toggleMute(muted, setMuted, mutedRef, TRANSCRIPTS_ENABLED, recordersRef)
+            }
             aria-label={muted ? "Unmute" : "Mute"}
             title={muted ? "Unmute" : "Mute"}
             style={{ minWidth: 40, minHeight: 40 }}
@@ -412,9 +594,7 @@ const socketEmotionMap = React.useMemo(() => {
 
           <button
             className={`${styles.iconButton} ${videoOff ? styles.active : ""}`}
-            onClick={() =>
-  toggleVideo(videoOff, setVideoOff)
-}
+            onClick={() => toggleVideo(videoOff, setVideoOff)}
             aria-label={videoOff ? "Turn camera on" : "Turn camera off"}
             title={videoOff ? "Turn camera on" : "Turn camera off"}
             style={{ minWidth: 40, minHeight: 40 }}
@@ -422,212 +602,103 @@ const socketEmotionMap = React.useMemo(() => {
             {videoOff ? <FaVideoSlash /> : <FaVideo />}
           </button>
 
-{(isHost || DEBUG_SHOW_EMOTION_FOR_EVERYONE) && (
-  <button
-    className={`${styles.iconButton} ${shareEmotion ? styles.active : ""}`}
-    onClick={() => {
-      const next = !shareEmotion;
-      setShareEmotion(next);
-    }}
-    aria-pressed={shareEmotion}
-    aria-label={shareEmotion ? "Stop sending remote emotion clips" : "Send remote emotion clips to host"}
-    title={shareEmotion ? "Stop sending remote emotion clips" : "Send remote emotion clips to host"}
-    style={{ minWidth: 40, minHeight: 40, fontSize: 16 }}
-  >
-    😊
-  </button>
-)}
-
+          {(isHost || DEBUG_SHOW_EMOTION_FOR_EVERYONE) && (
+            <button
+              className={`${styles.iconButton} ${shareEmotion ? styles.active : ""}`}
+              onClick={() => setShareEmotion((v) => !v)}
+              aria-pressed={shareEmotion}
+              aria-label={
+                shareEmotion
+                  ? "Stop sending emotion clips"
+                  : "Send emotion clips to host"
+              }
+              title={
+                shareEmotion
+                  ? "Stop sending emotion clips"
+                  : "Send emotion clips to host"
+              }
+              style={{ minWidth: 40, minHeight: 40, fontSize: 16 }}
+            >
+              😊
+            </button>
+          )}
         </div>
       </motion.div>
 
+      {/* Chat panel */}
       <AnimatePresence>
-  {chatOpen && (
-    <motion.aside
-      className={styles.chatRoom}
-      initial={{ opacity: 0, x: 60 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 60 }}
-      transition={{ duration: 0.2 }}
-    >
-      {/* HEADER */}
-      <div className={styles.chatHeader}>
-        <FaRegComments />
-        <strong>Chat</strong>
+        {chatOpen && (
+          <ChatPanel
+            chatMessages={chatMessages}
+            participantsMeta={participantsMeta}
+            myUserId={myUserId}
+            retryMessage={retryMessage}
+            sendChatMessage={sendChatMessage}
+            chatContainerRef={chatContainerRef}
+            chatEndRef={chatEndRef}
+          />
+        )}
+      </AnimatePresence>
 
-        <div
-          style={{
-            marginLeft: "auto",
-            fontSize: 13,
-            opacity: 0.7,
-          }}
+      {/* Control bar */}
+      <div className={styles.buttonContainers} role="toolbar" aria-label="Meeting controls">
+
+        <button
+          className={`${styles.iconButton} ${muted ? styles.active : ""}`}
+          onClick={() =>
+            toggleMute(muted, setMuted, mutedRef, TRANSCRIPTS_ENABLED, recordersRef)
+          }
+          aria-label={muted ? "Unmute" : "Mute"}
+          title={muted ? "Unmute (M)" : "Mute (M)"}
         >
-          {participantsMeta.length} in call
-        </div>
+          {muted ? <FaMicrophoneSlash /> : <FaMicrophone />}
+        </button>
+
+        <button
+          className={`${styles.iconButton} ${videoOff ? styles.active : ""}`}
+          onClick={() => toggleVideo(videoOff, setVideoOff)}
+          aria-label={videoOff ? "Turn camera on" : "Turn camera off"}
+          title={videoOff ? "Camera on (V)" : "Camera off (V)"}
+        >
+          {videoOff ? <FaVideoSlash /> : <FaVideo />}
+        </button>
+
+        <button
+          className={styles.iconButton}
+          onClick={() => startScreenShare(prevLocalStreamRef)}
+          aria-label="Share screen"
+          title="Share screen"
+        >
+          <FaDesktop />
+        </button>
+
+        <button
+          className={styles.iconButton}
+          onClick={() => setChatOpen((v) => !v)}
+          aria-label="Toggle chat"
+          title="Toggle chat (C)"
+        >
+          <FaComments />
+        </button>
+
+        <button
+          className={`${styles.iconButton} ${styles.leaveButton}`}
+          onClick={isHost ? endMeeting : leaveCall}
+          aria-label={isHost ? "End meeting" : "Leave call"}
+          title={isHost ? "End meeting" : "Leave call"}
+        >
+          <FaPhoneSlash />
+        </button>
+
       </div>
 
-      {/* MESSAGES */}
-      <div
-        ref={chatContainerRef}
-        className={styles.chatMessages}
-        role="log"
-        aria-live="polite"
-      >
-        {chatMessages.map((m) => {
-          const socketId = socketRef.current?.id;
-          const myUserId = localStorage.getItem("userId") || socketId;
-
-          const isOwn =
-            m.from === myUserId || m.userId === myUserId;
-
-          return (
-            <motion.div
-              key={m.id}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.15 }}
-              style={{
-                display: "flex",
-                justifyContent: isOwn ? "flex-end" : "flex-start",
-                padding: "2px 6px",
-              }}
-            >
-              <div
-                style={{
-                  background: isOwn ? "#DCF8C6" : "#fff",
-                  color: "#111",
-                  padding: "8px 12px",
-                  borderRadius: 14,
-                  maxWidth: "72%",
-                  wordBreak: "break-word",
-                  boxShadow: "0 1px 2px rgba(0,0,0,0.12)",
-                }}
-              >
-                {/* MESSAGE TEXT */}
-                <div style={{ fontSize: 14 }}>{m.text}</div>
-
-                {/* META (name + time + status) */}
-                <div
-                  style={{
-                    marginTop: 4,
-                    fontSize: 11,
-                    opacity: 0.7,
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
-                >
-                  {/* NAME */}
-                  <span style={{ fontWeight: 600 }}>
-                    {isOwn ? "You" : m.meta?.name || "User"}
-                  </span>
-
-                  {/* TIME + STATUS */}
-                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                    <span>
-                      {new Date(m.ts).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </span>
-
-                    {/* ✅ STATUS */}
-                    {isOwn && (
-                      <>
-                        {m.status === "pending" && (
-                          <span style={{ opacity: 0.5 }}>●</span>
-                        )}
-                        {m.status === "sent" && (
-                          <span style={{ color: "#4caf50" }}>✓</span>
-                        )}
-                        {m.status === "failed" && (
-                          <span
-                            onClick={() => retryMessage(m)}
-                            style={{
-                              color: "red",
-                              cursor: "pointer",
-                              fontWeight: 700,
-                            }}
-                            title="Retry"
-                          >
-                            !
-                          </span>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          );
-        })}
-
-        <div ref={chatEndRef} />
-      </div>
-
-      {/* INPUT */}
-      <div className={styles.chattingArea}>
-        <ChatInput onSend={(t) => sendChatMessage(t)} />
-      </div>
-    </motion.aside>
-  )}
-</AnimatePresence>
-
-
-<div className={styles.buttonContainers} role="toolbar">
-
-  <button
-    onClick={() =>
-      toggleMute(muted, setMuted, mutedRef, TRANSCRIPTS_ENABLED, recordersRef)
-    }
-    className={`${styles.iconButton} ${muted ? styles.active : ""}`}
-  >
-    {muted ? <FaMicrophoneSlash /> : <FaMicrophone />}
-  </button>
-
-  <button
-    onClick={() =>
-      toggleVideo(videoOff, setVideoOff)
-    }
-    className={`${styles.iconButton} ${videoOff ? styles.active : ""}`}
-  >
-    {videoOff ? <FaVideoSlash /> : <FaVideo />}
-  </button>
-
-  <button
-    onClick={() =>
-      startScreenShare(prevLocalStreamRef)
-    }
-    className={styles.iconButton}
-  >
-    <FaDesktop />
-  </button>
-
-  <button
-    onClick={() => setChatOpen((v) => !v)}
-    className={styles.iconButton}
-  >
-    <FaComments />
-  </button>
-
-  {isHost ? (
-    <button onClick={endMeeting} className={`${styles.iconButton} ${styles.leaveButton}`}>
-      <FaPhoneSlash />
-    </button>
-  ) : (
-    <button onClick={leaveCall} className={`${styles.iconButton} ${styles.leaveButton}`}>
-      <FaPhoneSlash />
-    </button>
-  )}
-
-</div>
-
+      {/* Emotion panel */}
       <EmotionServicePanel
-  emotionsMap={emotionsMap}
-  participantsMeta={participantsMeta}
-  isHost={isHost}
-  DEBUG_SHOW_EMOTION_FOR_EVERYONE={DEBUG_SHOW_EMOTION_FOR_EVERYONE}
-/>
+        emotionsMap={emotionsMap}
+        participantsMeta={participantsMeta}
+        isHost={isHost}
+        DEBUG_SHOW_EMOTION_FOR_EVERYONE={DEBUG_SHOW_EMOTION_FOR_EVERYONE}
+      />
     </div>
   );
 }

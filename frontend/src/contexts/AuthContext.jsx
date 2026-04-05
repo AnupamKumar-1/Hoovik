@@ -8,7 +8,6 @@ export const AuthContext = createContext({});
 
 const client = axios.create({
   baseURL: `${server}/api/v1/users`,
-  // do not force credentials here globally — set per-request where needed.
 });
 
 const apiClient = axios.create({
@@ -16,272 +15,213 @@ const apiClient = axios.create({
   timeout: 10_000,
 });
 
-// ✅ ADD THIS BLOCK (IMPORTANT)
-apiClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token")?.trim();
+const SUPPORTS_GLOBAL_MEETINGS =
+  process.env.REACT_APP_SUPPORTS_GLOBAL_MEETINGS === "false" ? false : true;
 
-  if (token && token !== "undefined" && token !== "null") {
+// Auth token helpers
+
+function readToken() {
+  const t = localStorage.getItem("token")?.trim();
+  return t && t !== "undefined" && t !== "null" ? t : null;
+}
+
+function authHeader() {
+  const t = readToken();
+  return t ? { Authorization: `Bearer ${t}` } : {};
+}
+
+
+apiClient.interceptors.request.use((config) => {
+  const token = readToken();
+  if (token) {
     config.headers = config.headers || {};
     config.headers.Authorization = `Bearer ${token}`;
   }
-
-  console.log("🔥 AUTH HEADER:", config.headers?.Authorization);
-
   return config;
 });
 
-// feature flag
-const SUPPORTS_GLOBAL_MEETINGS =
-  process.env.REACT_APP_SUPPORTS_GLOBAL_MEETINGS === "false" ? false : true;
+
+function extractArray(body) {
+  if (!body) return null;
+  if (Array.isArray(body)) return body;
+  if (Array.isArray(body.meetings)) return body.meetings;
+  if (Array.isArray(body.data)) return body.data;
+  const found = Object.values(body).find((v) => Array.isArray(v));
+  return found ?? null;
+}
 
 export const AuthProvider = ({ children }) => {
   const [userData, setUserData] = useState(null);
   const router = useNavigate();
 
-  /**
-   * logout: calls server endpoint (best-effort) to clear cookies,
-   * then clears client-side auth state and optionally redirects.
-   *
-   * Usage: logout(redirect = true, callServer = true)
-   */
   const logout = useCallback(
     async (redirect = true, callServer = true) => {
-      // Attempt server-side logout first (if requested). Best-effort: ignore errors.
       if (callServer) {
         try {
-          // We use apiClient (base /api/v1) which exposes /auth/logout
           await apiClient.post(
             "/auth/logout",
             {},
-            {
-              withCredentials: true, // important so cookie (httpOnly) is sent/cleared
-              headers: { "Content-Type": "application/json" },
-            }
+            { withCredentials: true, headers: { "Content-Type": "application/json" } }
           );
         } catch (err) {
-          // swallow: still clear client-side state below
-          console.warn("server logout attempt failed (continuing to clear client):", err?.response?.status ?? err);
+          console.warn("logout: server-side logout failed, clearing client anyway", err?.response?.status ?? err.message);
         }
       }
 
-      // Clear client-side tokens/state
       try {
         localStorage.removeItem("token");
-      } catch (e) {
-        console.warn("localStorage removeItem(token) failed", e);
+      } catch (err) {
+        console.warn("logout: failed to remove token from localStorage", err.message);
       }
+
       setUserData(null);
 
-      
-
-      // Redirect to login if requested
       if (redirect) {
         try {
           router("/auth");
-        } catch (e) {
-          // fallback: attempt location change
-          try {
-            window.location.href = "/auth";
-          } catch (_) {}
+        } catch {
+          window.location.href = "/auth";
         }
       }
     },
     [router]
   );
 
-  // Utility to read token and produce headers object
-  const getAuthHeaders = useCallback(() => {
-    const token = localStorage.getItem("token");
-    return token ? { Authorization: `Bearer ${token}` } : {};
-  }, []);
 
   useEffect(() => {
-    // --- client interceptors (users-scoped axios) ---
-    const reqInterceptor = client.interceptors.request.use(
+    const clientReqId = client.interceptors.request.use(
       (config) => {
-        const token = localStorage.getItem("token");
+        const token = readToken();
         config.headers = config.headers || {};
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
-          // keep apiClient defaults in sync (helpful when apiClient is used directly)
           apiClient.defaults.headers.common["Authorization"] = `Bearer ${token}`;
         }
-        console.debug(
-          `[Axios Request - client] ${String(config.method || "").toUpperCase()} ${config.url}`,
-          { Authorization: config.headers.Authorization }
-        );
         return config;
       },
       (err) => Promise.reject(err)
     );
 
-    const resInterceptor = client.interceptors.response.use(
+    const clientResId = client.interceptors.response.use(
       (resp) => resp,
       (err) => {
-        const status = err?.response?.status;
-        if (status === 401) {
-          console.warn("Received 401 from client axios — performing logout");
-          // don't await here to avoid blocking interceptor chain
-          logout(true, false /* we already will clear client-side since token likely invalid */);
-        }
-        return Promise.reject(err);
-      }
-    );
-
-    // --- apiClient interceptors (global api) ---
-
-
-    const apiResInterceptor = apiClient.interceptors.response.use(
-      (resp) => resp,
-      (err) => {
-        const status = err?.response?.status;
-        if (status === 401) {
-          console.warn("Received 401 from apiClient — performing logout");
+        if (err?.response?.status === 401) {
+          console.warn("logout: 401 received on client axios, logging out");
           logout(true, false);
         }
         return Promise.reject(err);
       }
     );
 
-    // Cleanup on unmount
+    const apiResId = apiClient.interceptors.response.use(
+      (resp) => resp,
+      (err) => {
+        if (err?.response?.status === 401) {
+          console.warn("logout: 401 received on apiClient, logging out");
+          logout(true, false);
+        }
+        return Promise.reject(err);
+      }
+    );
+
     return () => {
-      client.interceptors.request.eject(reqInterceptor);
-      client.interceptors.response.eject(resInterceptor);
-      apiClient.interceptors.response.eject(apiResInterceptor);
+      client.interceptors.request.eject(clientReqId);
+      client.interceptors.response.eject(clientResId);
+      apiClient.interceptors.response.eject(apiResId);
     };
   }, [logout]);
 
-  // Register
+
   const handleRegister = async (name, username, password) => {
-    try {
-      const request = await client.post("/register", { name, username, password });
-      if (request.status === httpStatus.CREATED) return request.data.message;
-      return null;
-    } catch (err) {
-      throw err;
-    }
+    const resp = await client.post("/register", { name, username, password });
+    if (resp.status === httpStatus.CREATED) return resp.data.message;
+    return null;
   };
 
-  // Login: include withCredentials to allow server to set refresh cookie (if applicable)
   const handleLogin = async (username, password) => {
-    try {
-      const request = await client.post(
-        "/login",
-        { username, password },
-        { withCredentials: true } // allow server-set cookies like refresh tokens
-      );
-      console.log("login response:", request.data);
+    const resp = await client.post(
+      "/login",
+      { username, password },
+      { withCredentials: true }
+    );
 
-      if (request.status === httpStatus.OK) {
-        const token =
-          request.data?.accessToken ??
-          request.data?.token ??
-          request.data?.data?.token ??
-          request.data?.access_token;
+    if (resp.status === httpStatus.OK) {
+      const token =
+        resp.data?.accessToken ??
+        resp.data?.token ??
+        resp.data?.data?.token ??
+        resp.data?.access_token ??
+        null;
 
-        if (token) {
-          localStorage.setItem("token", token);
-
-        } else {
-          console.warn("Login response did not include a token:", request.data);
-        }
-
-        if (request.data.user) {
-          setUserData(request.data.user);
-        }
-
-        // navigate home
-        router("/home");
-        return request.data;
+      if (token) {
+        localStorage.setItem("token", token);
+      } else {
+        console.warn("handleLogin: response did not include a token");
       }
-      return null;
-    } catch (err) {
-      throw err;
+
+      if (resp.data?.user) {
+        setUserData(resp.data.user);
+      }
+
+      router("/home");
+      return resp.data;
     }
+
+    return null;
   };
 
-  // Fetch history (multi-fallback)
+
   const getHistoryOfUser = async () => {
+    const isAuth = !!readToken();
+    const headers = { "Content-Type": "application/json", ...authHeader() };
+
+    if (SUPPORTS_GLOBAL_MEETINGS) {
+      try {
+        const resp = await apiClient.get(
+          isAuth ? "/meetings?mine=true" : "/meetings",
+          { headers }
+        );
+        const items = extractArray(resp?.data);
+        if (items) return items;
+      } catch (err) {
+        const status = err?.response?.status;
+        if (status !== 404) {
+          console.warn("getHistoryOfUser: /meetings failed", status ?? err.message);
+        }
+      }
+    }
+
     try {
-      const isAuth = !!localStorage.getItem("token");
+      const resp = await apiClient.get(
+        isAuth ? "/users/meetings?mine=true" : "/users/meetings",
+        { headers }
+      );
+      const items = extractArray(resp?.data);
+      if (items) return items;
+    } catch (err) {
+      console.warn("getHistoryOfUser: /users/meetings failed", err?.response?.status ?? err.message);
+    }
 
-      if (SUPPORTS_GLOBAL_MEETINGS) {
-        try {
-          const query = isAuth ? "/meetings?mine=true" : "/meetings";
-          const resp = await apiClient.get(query, {
-            headers: { "Content-Type": "application/json", ...(isAuth ? getAuthHeaders() : {}) },
-          });
-          if (resp && resp.data) {
-            const body = resp.data;
-            if (Array.isArray(body)) return body;
-            if (Array.isArray(body.meetings)) return body.meetings;
-            if (Array.isArray(body.data)) return body.data;
-            const foundArray = Object.values(body).find((v) => Array.isArray(v));
-            if (foundArray) return foundArray;
-            return [];
-          }
-        } catch (err) {
-          const status = err?.response?.status;
-          if (status === 404) {
-            console.debug("/meetings not found (404) — will try users-scoped endpoints");
-          } else {
-            console.debug("/meetings attempt failed or empty:", err?.response?.status ?? err);
-          }
-        }
-      } else {
-        console.debug("SUPPORTS_GLOBAL_MEETINGS is false — skipping /meetings attempt");
-      }
+    try {
+      const resp = await client.get("/get_all_activity");
+      const items = extractArray(resp?.data);
+      if (items && items.length > 0) return items;
+    } catch (err) {
+      console.warn("getHistoryOfUser: get_all_activity failed", err?.response?.status ?? err.message);
+    }
 
-      try {
-        const usersQuery = isAuth ? "/users/meetings?mine=true" : "/users/meetings";
-        const respUsers = await apiClient.get(usersQuery, {
-          headers: { "Content-Type": "application/json", ...(isAuth ? getAuthHeaders() : {}) },
-        });
-        if (respUsers && respUsers.data) {
-          const body = respUsers.data;
-          if (Array.isArray(body)) return body;
-          if (Array.isArray(body.meetings)) return body.meetings;
-          if (Array.isArray(body.data)) return body.data;
-          const found = Object.values(body).find((v) => Array.isArray(v));
-          if (found) return found;
-        }
-      } catch (err) {
-        console.debug("/users/meetings attempt failed or empty:", err?.response?.status ?? err);
-      }
-
-      try {
-        const request = await client.get("/get_all_activity");
-        const payload = request?.data ?? {};
-        const items = Array.isArray(payload)
-          ? payload
-          : Array.isArray(payload.data)
-          ? payload.data
-          : Array.isArray(payload.history)
-          ? payload.history
-          : payload.meetings ?? [];
-        if (Array.isArray(items) && items.length > 0) {
-          return items;
-        }
-      } catch (err) {
-        console.debug("get_all_activity failed or empty:", err?.response?.status ?? err);
-      }
-
-      try {
-        const raw = localStorage.getItem("meeting_history_v1");
-        if (!raw) return [];
-        const parsed = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed : [];
-      } catch (err) {
-        console.warn("localStorage fallback read failed", err);
-        return [];
-      }
-    } catch (outerErr) {
-      console.error("getHistoryOfUser unexpected error:", outerErr);
+    try {
+      const raw = localStorage.getItem("meeting_history_v1");
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (err) {
+      console.warn("getHistoryOfUser: localStorage fallback failed", err.message);
       return [];
     }
   };
 
-  // addToUserHistory (tries global meetings -> users/meetings -> user-scoped add_to_activity -> localStorage)
+
   const addToUserHistory = async (meetingPayload) => {
     const payloadObj =
       typeof meetingPayload === "string"
@@ -299,139 +239,126 @@ export const AuthProvider = ({ children }) => {
       createdAt: payloadObj.createdAt || new Date().toISOString(),
       link:
         payloadObj.link ||
-        (payloadObj.meetingCode ? `${window.location.origin}/room/${payloadObj.meetingCode}` : null),
+        (payloadObj.meetingCode
+          ? `${window.location.origin}/room/${payloadObj.meetingCode}`
+          : null),
     };
 
-    const isAuth = !!localStorage.getItem("token");
+    const isAuth = !!readToken();
+    const headers = { "Content-Type": "application/json", ...authHeader() };
 
     if (SUPPORTS_GLOBAL_MEETINGS) {
       try {
-        const resp = await apiClient.post("/meetings", body, {
-          headers: { "Content-Type": "application/json", ...(isAuth ? getAuthHeaders() : {}) },
-        });
-        if (resp && (resp.status === 200 || resp.status === 201)) {
-          return resp.data ?? body;
-        }
-        console.warn("POST /meetings returned non-OK:", resp.status, resp.data);
+        const resp = await apiClient.post("/meetings", body, { headers });
+        if (resp?.status === 200 || resp?.status === 201) return resp.data ?? body;
+        console.warn("addToUserHistory: POST /meetings returned non-OK status", resp?.status);
       } catch (err) {
         const status = err?.response?.status;
-        if (status === 404) {
-          console.debug("POST /meetings not found (404) — will try /users/meetings");
-        } else {
-          console.warn("POST /meetings failed — will try users or user-scoped fallback", status ?? err);
+        if (status !== 404) {
+          console.warn("addToUserHistory: POST /meetings failed", status ?? err.message);
         }
       }
-    } else {
-      console.debug("SUPPORTS_GLOBAL_MEETINGS is false — skipping POST /meetings attempt");
     }
 
     try {
-      const respUsers = await apiClient.post("/users/meetings", body, {
-        headers: { "Content-Type": "application/json", ...(isAuth ? getAuthHeaders() : {}) },
-      });
-      if (respUsers && (respUsers.status === 200 || respUsers.status === 201)) {
-        return respUsers.data ?? body;
-      }
-      console.warn("POST /users/meetings returned non-OK:", respUsers.status, respUsers.data);
+      const resp = await apiClient.post("/users/meetings", body, { headers });
+      if (resp?.status === 200 || resp?.status === 201) return resp.data ?? body;
+      console.warn("addToUserHistory: POST /users/meetings returned non-OK status", resp?.status);
     } catch (err) {
-      console.debug("POST /users/meetings failed or not present:", err?.response?.status ?? err);
+      console.warn("addToUserHistory: POST /users/meetings failed", err?.response?.status ?? err.message);
     }
 
     try {
-      const request = await client.post("/add_to_activity", {
+      const resp = await client.post("/add_to_activity", {
         meeting_code: payloadObj.meetingCode,
       });
-      return request.data ?? request;
+      return resp.data ?? resp;
     } catch (err) {
-      console.warn("user-scoped add_to_activity failed — falling back to localStorage", err?.response?.status ?? err);
+      console.warn("addToUserHistory: add_to_activity failed, falling back to localStorage", err?.response?.status ?? err.message);
     }
 
     try {
       const key = "meeting_history_v1";
       const raw = localStorage.getItem(key);
       const arr = raw ? JSON.parse(raw) : [];
+
+      const newEntry = {
+        meetingCode: payloadObj.meetingCode || `misc-${Date.now()}`,
+        hostName: payloadObj.hostName || payloadObj.host || "Host",
+        participants: payloadObj.participants || [],
+        createdAt: payloadObj.createdAt || new Date().toISOString(),
+        link:
+          payloadObj.link ||
+          (payloadObj.meetingCode
+            ? `${window.location.origin}/room/${payloadObj.meetingCode}`
+            : null),
+      };
+
       if (payloadObj.meetingCode) {
         const idx = arr.findIndex((m) => m.meetingCode === payloadObj.meetingCode);
-        const newEntry = {
-          meetingCode: payloadObj.meetingCode,
-          hostName: payloadObj.hostName || payloadObj.host || "Host",
-          participants: payloadObj.participants || [],
-          createdAt: payloadObj.createdAt || new Date().toISOString(),
-          link:
-            payloadObj.link ||
-            (payloadObj.meetingCode ? `${window.location.origin}/room/${payloadObj.meetingCode}` : null),
-        };
         if (idx >= 0) arr[idx] = newEntry;
         else arr.unshift(newEntry);
       } else {
-        arr.unshift({
-          meetingCode: payloadObj.meetingCode || `misc-${Date.now()}`,
-          hostName: payloadObj.hostName || "Host",
-          participants: payloadObj.participants || [],
-          createdAt: payloadObj.createdAt || new Date().toISOString(),
-          link: payloadObj.link || null,
-        });
+        arr.unshift(newEntry);
       }
+
       localStorage.setItem(key, JSON.stringify(arr.slice(0, 200)));
       return { success: true, source: "localStorage" };
-    } catch (lsErr) {
-      console.error("addToUserHistory fallback localStorage failed", lsErr);
-      return { success: false, error: lsErr?.message ?? "unknown" };
+    } catch (err) {
+      console.error("addToUserHistory: localStorage fallback failed", err.message);
+      return { success: false, error: err?.message ?? "unknown" };
     }
   };
 
-  // addParticipant (tries multiple endpoints)
   const addParticipant = async (meetingCode, participant) => {
     if (!meetingCode) throw new Error("meetingCode required");
-    const isAuth = !!localStorage.getItem("token");
+
+    const headers = { "Content-Type": "application/json", ...authHeader() };
     const payload = typeof participant === "object" ? participant : { participant };
 
     try {
       const resp = await apiClient.post(
         `/meetings/${encodeURIComponent(meetingCode)}/participants`,
         payload,
-        {
-          headers: { "Content-Type": "application/json", ...(isAuth ? getAuthHeaders() : {}) },
-        }
+        { headers }
       );
-      if (resp && (resp.status === 200 || resp.status === 201)) {
-        return resp.data ?? resp;
-      }
-      console.warn("POST /meetings/:code/participants returned non-OK", resp.status, resp.data);
+      if (resp?.status === 200 || resp?.status === 201) return resp.data ?? resp;
+      console.warn("addParticipant: /meetings/:code/participants returned non-OK status", resp?.status);
     } catch (err) {
-      console.debug("POST /meetings/:code/participants failed:", err?.response?.status ?? err);
+      console.warn("addParticipant: /meetings/:code/participants failed", err?.response?.status ?? err.message);
     }
 
     try {
       const resp = await apiClient.post(
         "/meetings/add_participant",
         { meetingCode, ...payload },
-        {
-          headers: { "Content-Type": "application/json", ...(isAuth ? getAuthHeaders() : {}) },
-        }
+        { headers }
       );
-      if (resp && (resp.status === 200 || resp.status === 201)) {
-        return resp.data ?? resp;
-      }
-      console.warn("POST /meetings/add_participant returned non-OK", resp.status, resp.data);
+      if (resp?.status === 200 || resp?.status === 201) return resp.data ?? resp;
+      console.warn("addParticipant: /meetings/add_participant returned non-OK status", resp?.status);
     } catch (err) {
-      console.debug("POST /meetings/add_participant failed:", err?.response?.status ?? err);
+      console.warn("addParticipant: /meetings/add_participant failed", err?.response?.status ?? err.message);
     }
 
-    throw new Error("Unable to add participant: server endpoints failed or not available");
+    throw new Error("addParticipant: all endpoints failed");
   };
 
-  const data = {
-    userData,
-    setUserData,
-    logout,
-    addToUserHistory,
-    getHistoryOfUser,
-    handleRegister,
-    handleLogin,
-    addParticipant,
-  };
-
-  return <AuthContext.Provider value={data}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider
+      value={{
+        userData,
+        setUserData,
+        logout,
+        addToUserHistory,
+        getHistoryOfUser,
+        handleRegister,
+        handleLogin,
+        addParticipant,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
 };
+
 export { apiClient };
