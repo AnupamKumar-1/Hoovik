@@ -9,8 +9,9 @@ print("Loading emotion model...")
 emotion_pipeline = pipeline(
     "text-classification",
     model="j-hartmann/emotion-english-distilroberta-base",
-    top_k=1
+    top_k=1,
 )
+
 
 def _extract_label(raw):
     try:
@@ -21,14 +22,16 @@ def _extract_label(raw):
                 return raw[0].get("label", "neutral")
             if isinstance(raw[0], list) and len(raw[0]) > 0:
                 return raw[0][0].get("label", "neutral")
-    except:
+    except Exception:
         pass
     return "neutral"
+
 
 def transcribe_and_emotion(wav_path):
     try:
         asr = asr_model.transcribe(wav_path, language="en")
-    except:
+    except Exception as e:
+        print(f"asr_service: transcription failed for {wav_path} — {e}")
         return []
 
     segments = []
@@ -41,15 +44,18 @@ def transcribe_and_emotion(wav_path):
         try:
             raw = emotion_pipeline(text, top_k=1)
             emo = normalize_emotion(_extract_label(raw))
-        except:
+        except Exception as e:
+            print(f"asr_service: emotion detection failed for segment — {e}")
             emo = "neutral"
 
-        segments.append({
-            "start": seg.get("start", 0),
-            "end": seg.get("end", 0),
-            "text": text,
-            "emotion": emo,
-            "emoji": get_emoji(emo),
-        })
+        segments.append(
+            {
+                "start": seg.get("start", 0),
+                "end": seg.get("end", 0),
+                "text": text,
+                "emotion": emo,
+                "emoji": get_emoji(emo),
+            }
+        )
 
     return segments
