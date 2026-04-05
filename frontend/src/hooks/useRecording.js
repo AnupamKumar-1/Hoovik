@@ -68,7 +68,7 @@ export default function useRecording({
       const parsed = JSON.parse(raw);
       return parsed?.hostSecret || null;
     } catch (e) {
-      console.warn("❌ Failed to read host secret", e);
+      console.warn("Failed to read host secret", e);
       return null;
     }
   }
@@ -97,21 +97,18 @@ export default function useRecording({
       const code = (roomId || "").toUpperCase();
 
       if (!code) {
-        console.error("❌ INVALID ROOM ID");
+        console.error("INVALID ROOM ID");
         return null;
       }
 
-      console.log("🔥 ROOM ID:", code);
-      console.log("🔥 HOST DATA:", localStorage.getItem(`host:${code}`));
+
 
       const hostSecret = getHostSecretForRoom(code);
 
       if (!hostSecret) {
-        console.error("❌ NO HOST SECRET FOUND → aborting");
+        console.error("NO HOST SECRET FOUND → aborting");
         return null;
       }
-
-      console.log("🔥 USING HOST SECRET:", hostSecret);
 
       const fd = new FormData();
       fd.append("meeting_code", code);
@@ -149,8 +146,6 @@ export default function useRecording({
         return null;
       }
 
-      console.log("🔥 FILE COUNT:", fileCount);
-
       const resp = await fetch(TRANSCRIPT_ENDPOINT, {
         method: "POST",
         headers: {
@@ -161,14 +156,14 @@ export default function useRecording({
 
       if (!resp.ok) {
         const errText = await resp.text();
-        console.error("❌ upload failed:", errText);
+        console.error("upload failed:", errText);
         return null;
       }
 
       const data = await resp.json();
 
       if (!data?.success) {
-        console.error("❌ transcript failed:", data);
+        console.error(" transcript failed:", data);
         return null;
       }
 
@@ -185,12 +180,12 @@ export default function useRecording({
         );
       } catch {}
 
-      console.log("✅ TRANSCRIPT SUCCESS");
+      console.log("TRANSCRIPT SUCCESS");
 
       return data;
 
     } catch (err) {
-      console.error("❌ upload error:", err);
+      console.error("upload error:", err);
       return null;
 
     } finally {
