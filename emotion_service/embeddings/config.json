@@ -1,0 +1,23 @@
+{
+  "paths": {
+    "data_root": "data",
+    "extract_dir": "extracted_dataset"
+  },
+
+  "processing": {
+    "chunk_size": 500,
+    "seq_len": 8,
+    "sample_rate": 16000,
+    "audio_window_sec": 0.8,
+    "audio_dim": 1024,
+    "face_dim": 27
+  },
+
+  "split": {
+    "train_ratio": 0.7,
+    "val_ratio": 0.15,
+    "seed": 42
+  },
+
+  "device": "cpu"
+}
