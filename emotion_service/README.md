@@ -15,7 +15,6 @@ The system is designed to run alongside a WebRTC video call, receiving frame and
 
 ## Architecture
 
-## Architecture (Mermaid)
 
 ```mermaid
 flowchart TD
@@ -65,7 +64,7 @@ M --> O[Confidence]
 M --> P[Probability distribution]
 M --> Q[Anomaly flag + score]
 M --> R[Latency]
-
+```
 ---
 
 ## Emotion Classes
