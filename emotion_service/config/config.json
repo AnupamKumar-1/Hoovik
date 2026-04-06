@@ -1,0 +1,71 @@
+{
+  "paths": {
+    "dataset": "extracted_dataset/dataset.npz",
+    "norm_dir": "extracted_dataset/norm_stats",
+
+    "checkpoints": {
+      "modal": "models/modal",
+      "xgb": "models/xgb"
+    },
+
+    "logs": "logs",
+
+    "models": {
+      "modal": "models/modal/best_modal.pt",
+      "xgb": "models/xgb/xgb_model.joblib",
+      "scaler": "models/xgb/scaler.joblib",
+      "pca": "models/xgb/pca.joblib"
+    }
+  },
+
+  "model": {
+    "seq_len": 8,
+    "face_dim": 27,
+    "audio_dim": 1024,
+    "d_model": 256,
+    "num_classes": 6,
+
+    "dropout": 0.25,
+    "nhead": 8,
+    "num_encoder_layers": 6,
+    "dim_feedforward": 768
+  },
+
+  "training": {
+    "batch_size": 64,
+    "epochs": 80,
+    "lr": 0.0003,
+    "weight_decay": 0.0001,
+    "patience": 12,
+    "warmup_epochs": 5,
+    "grad_clip": 1.0,
+    "label_smoothing": 0.1
+  },
+
+  "xgb": {
+    "n_estimators": 1500,
+    "max_depth": 6,
+    "learning_rate": 0.03,
+    "subsample": 0.8,
+    "colsample_bytree": 0.6,
+    "min_child_weight": 3,
+    "gamma": 0.1,
+    "reg_alpha": 0.1,
+    "reg_lambda": 1.0,
+    "early_stopping_rounds": 30,
+    "tree_method": "hist"
+  },
+
+  "features": {
+    "use_pca": false,
+    "pca_dim": 256
+  },
+
+
+
+  "misc": {
+    "seed": 42,
+    "class_names": ["angry", "fearful", "disgust", "happy", "sad", "neutral/calm"],
+    "class_counts": [1128, 576, 1128, 1128, 1128, 1692]
+  }
+}

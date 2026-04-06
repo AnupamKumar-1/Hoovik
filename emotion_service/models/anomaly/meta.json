@@ -1,0 +1,11 @@
+{
+  "threshold": 0.014778614994118724,
+  "target_fpr": 0.1,
+  "feature_dim": 5255,
+  "train_samples": 4476,
+  "val_samples": 1152,
+  "score_stats": {
+    "val_mean": 0.039763431116483144,
+    "val_std": 0.022315671574097848
+  }
+}

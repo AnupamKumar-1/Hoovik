@@ -1,0 +1,114 @@
+2026-04-04 12:11:08,596 | INFO | Device: mps
+2026-04-04 12:11:08,596 | INFO | Loading dataset...
+2026-04-04 12:14:59,631 | INFO | Loading dataset from: /Users/anupamkumar/Desktop/meet/emotion_service/embeddings/extracted_dataset/dataset.npz
+2026-04-04 12:17:22,508 | INFO | Loading dataset from: /Users/anupamkumar/Desktop/meet/emotion_service/extracted_dataset/dataset.npz
+2026-04-04 12:18:15,590 | INFO | Loading dataset from: /Users/anupamkumar/Desktop/meet/emotion_service/extracted_dataset/dataset.npz
+2026-04-04 12:18:22,273 | INFO | Epoch 1 | Val Loss 1.4057 | Val Acc 0.4036
+2026-04-04 12:18:27,341 | INFO | Epoch 2 | Val Loss 1.3038 | Val Acc 0.5634
+2026-04-04 12:18:32,342 | INFO | Epoch 3 | Val Loss 0.9986 | Val Acc 0.6120
+2026-04-04 12:18:37,433 | INFO | Epoch 4 | Val Loss 1.1781 | Val Acc 0.5599
+2026-04-04 12:18:42,409 | INFO | Epoch 5 | Val Loss 1.0392 | Val Acc 0.6484
+2026-04-04 12:18:47,642 | INFO | Epoch 6 | Val Loss 1.1429 | Val Acc 0.6085
+2026-04-04 12:18:52,943 | INFO | Epoch 7 | Val Loss 0.9142 | Val Acc 0.6536
+2026-04-04 12:18:58,408 | INFO | Epoch 8 | Val Loss 0.9598 | Val Acc 0.6753
+2026-04-04 12:19:03,492 | INFO | Epoch 9 | Val Loss 1.0041 | Val Acc 0.6597
+2026-04-04 12:19:08,547 | INFO | Epoch 10 | Val Loss 0.9535 | Val Acc 0.6658
+2026-04-04 12:19:13,494 | INFO | Epoch 11 | Val Loss 1.1023 | Val Acc 0.6562
+2026-04-04 12:19:18,503 | INFO | Epoch 12 | Val Loss 1.0126 | Val Acc 0.6632
+2026-04-04 12:19:23,477 | INFO | Epoch 13 | Val Loss 0.9343 | Val Acc 0.6953
+2026-04-04 12:19:28,490 | INFO | Epoch 14 | Val Loss 0.9899 | Val Acc 0.6884
+2026-04-04 12:19:33,614 | INFO | Epoch 15 | Val Loss 1.0237 | Val Acc 0.6988
+2026-04-04 12:19:38,949 | INFO | Epoch 16 | Val Loss 0.9656 | Val Acc 0.7031
+2026-04-04 12:19:44,399 | INFO | Epoch 17 | Val Loss 1.0092 | Val Acc 0.6936
+2026-04-04 12:19:50,028 | INFO | Epoch 18 | Val Loss 1.0310 | Val Acc 0.6979
+2026-04-04 12:19:55,697 | INFO | Epoch 19 | Val Loss 1.0164 | Val Acc 0.6988
+2026-04-04 12:19:56,063 | INFO | 
+ TEST ACC: 0.6858
+2026-04-04 12:19:56,073 | INFO | 
+              precision    recall  f1-score   support
+
+           0       0.88      0.77      0.82       192
+           1       0.68      0.74      0.71        96
+           2       0.56      0.77      0.65       192
+           3       0.93      0.56      0.70       192
+           4       0.53      0.57      0.55       192
+           5       0.71      0.72      0.71       288
+
+    accuracy                           0.69      1152
+   macro avg       0.71      0.69      0.69      1152
+weighted avg       0.72      0.69      0.69      1152
+
+2026-04-04 12:19:56,074 | INFO |  DONE
+2026-04-05 09:40:12,162 | INFO | Loading dataset from: /Users/anupamkumar/Desktop/meet/emotion_service/extracted_dataset/dataset.npz
+2026-04-05 09:41:31,432 | INFO | Loading dataset from: /Users/anupamkumar/Desktop/meet/emotion_service/extracted_dataset/dataset.npz
+2026-04-05 09:41:38,751 | INFO | Epoch 1 | Val Loss 1.5348 | Val Acc 0.3759
+2026-04-05 09:47:07,747 | INFO | Loading dataset from: /Users/anupamkumar/Desktop/meet/emotion_service/extracted_dataset/dataset.npz
+2026-04-05 09:47:15,038 | INFO | Epoch 1 | Val Loss 1.5216 | Val Acc 0.3880
+2026-04-05 09:47:19,986 | INFO | Epoch 2 | Val Loss 1.0692 | Val Acc 0.6172
+2026-04-05 09:47:24,973 | INFO | Epoch 3 | Val Loss 1.0964 | Val Acc 0.5660
+2026-04-05 09:47:29,926 | INFO | Epoch 4 | Val Loss 1.2043 | Val Acc 0.5660
+2026-04-05 09:47:34,874 | INFO | Epoch 5 | Val Loss 0.9145 | Val Acc 0.6519
+2026-04-05 09:47:39,917 | INFO | Epoch 6 | Val Loss 1.1967 | Val Acc 0.5929
+2026-04-05 09:47:45,135 | INFO | Epoch 7 | Val Loss 1.0705 | Val Acc 0.6476
+2026-04-05 09:47:50,223 | INFO | Epoch 8 | Val Loss 0.9710 | Val Acc 0.6467
+2026-04-05 09:47:55,565 | INFO | Epoch 9 | Val Loss 0.9593 | Val Acc 0.6467
+2026-04-05 09:48:00,824 | INFO | Epoch 10 | Val Loss 0.9416 | Val Acc 0.6615
+2026-04-05 09:48:06,134 | INFO | Epoch 11 | Val Loss 0.9366 | Val Acc 0.6667
+2026-04-05 09:48:11,598 | INFO | Epoch 12 | Val Loss 0.9896 | Val Acc 0.6710
+2026-04-05 09:48:16,781 | INFO | Epoch 13 | Val Loss 1.0053 | Val Acc 0.6745
+2026-04-05 09:48:21,863 | INFO | Epoch 14 | Val Loss 1.0095 | Val Acc 0.6840
+2026-04-05 09:48:27,939 | INFO | Epoch 15 | Val Loss 0.9843 | Val Acc 0.6858
+2026-04-05 09:48:33,267 | INFO | Epoch 16 | Val Loss 0.9493 | Val Acc 0.6979
+2026-04-05 09:48:38,638 | INFO | Epoch 17 | Val Loss 0.9779 | Val Acc 0.6892
+2026-04-05 09:55:36,418 | INFO | Loading dataset from: /Users/anupamkumar/Desktop/meet/emotion_service/extracted_dataset/dataset.npz
+2026-04-05 09:55:43,806 | INFO | Epoch 1 | Val Loss 1.4199 | Val Acc 0.4557
+2026-04-05 09:55:49,055 | INFO | Epoch 2 | Val Loss 1.2909 | Val Acc 0.5391
+2026-04-05 09:55:54,507 | INFO | Epoch 3 | Val Loss 1.2785 | Val Acc 0.5321
+2026-04-05 09:55:59,700 | INFO | Epoch 4 | Val Loss 1.1560 | Val Acc 0.5738
+2026-04-05 09:56:05,226 | INFO | Epoch 5 | Val Loss 1.0466 | Val Acc 0.6432
+2026-04-05 09:56:10,229 | INFO | Epoch 6 | Val Loss 1.1054 | Val Acc 0.6267
+2026-04-05 09:56:15,163 | INFO | Epoch 7 | Val Loss 1.1151 | Val Acc 0.6024
+2026-04-05 09:56:20,114 | INFO | Epoch 8 | Val Loss 1.0938 | Val Acc 0.6259
+2026-04-05 09:56:25,053 | INFO | Epoch 9 | Val Loss 0.9482 | Val Acc 0.6432
+2026-04-05 09:56:29,997 | INFO | Epoch 10 | Val Loss 1.0255 | Val Acc 0.6623
+2026-04-05 09:56:35,010 | INFO | Epoch 11 | Val Loss 0.9418 | Val Acc 0.6745
+2026-04-05 09:56:40,283 | INFO | Epoch 12 | Val Loss 1.0094 | Val Acc 0.6667
+2026-04-05 09:56:45,234 | INFO | Epoch 13 | Val Loss 1.1311 | Val Acc 0.6658
+2026-04-05 09:56:50,184 | INFO | Epoch 14 | Val Loss 1.0378 | Val Acc 0.6797
+2026-04-05 09:56:55,135 | INFO | Epoch 15 | Val Loss 0.9292 | Val Acc 0.7057
+2026-04-05 09:57:00,136 | INFO | Epoch 16 | Val Loss 1.0650 | Val Acc 0.6823
+2026-04-05 09:57:05,080 | INFO | Epoch 17 | Val Loss 1.0073 | Val Acc 0.7023
+2026-04-05 09:57:10,012 | INFO | Epoch 18 | Val Loss 1.0248 | Val Acc 0.6997
+2026-04-05 09:57:14,944 | INFO | Epoch 19 | Val Loss 1.0223 | Val Acc 0.6997
+2026-04-05 09:57:19,875 | INFO | Epoch 20 | Val Loss 1.0294 | Val Acc 0.6962
+2026-04-05 09:57:24,822 | INFO | Epoch 21 | Val Loss 1.1209 | Val Acc 0.6727
+2026-04-05 09:57:29,756 | INFO | Epoch 22 | Val Loss 0.9002 | Val Acc 0.6997
+2026-04-05 09:57:34,760 | INFO | Epoch 23 | Val Loss 1.1308 | Val Acc 0.6649
+2026-04-05 09:57:39,703 | INFO | Epoch 24 | Val Loss 0.9404 | Val Acc 0.6936
+2026-04-05 09:57:44,661 | INFO | Epoch 25 | Val Loss 1.0221 | Val Acc 0.6910
+2026-04-05 09:57:49,590 | INFO | Epoch 26 | Val Loss 1.1228 | Val Acc 0.6858
+2026-04-05 09:57:54,636 | INFO | Epoch 27 | Val Loss 1.0147 | Val Acc 0.6875
+2026-04-05 09:57:59,631 | INFO | Epoch 28 | Val Loss 1.1105 | Val Acc 0.6892
+2026-04-05 09:58:06,055 | INFO | Epoch 29 | Val Loss 1.0814 | Val Acc 0.7144
+2026-04-05 09:58:11,030 | INFO | Epoch 30 | Val Loss 1.1020 | Val Acc 0.6970
+2026-04-05 09:58:16,011 | INFO | Epoch 31 | Val Loss 1.2125 | Val Acc 0.6814
+2026-04-05 09:58:20,980 | INFO | Epoch 32 | Val Loss 1.1403 | Val Acc 0.7092
+2026-04-05 09:58:26,167 | INFO | Epoch 33 | Val Loss 1.1744 | Val Acc 0.7144
+2026-04-05 09:58:31,163 | INFO | Epoch 34 | Val Loss 1.2163 | Val Acc 0.7075
+2026-04-05 09:58:31,469 | INFO | 
+ TEST ACC: 0.6988
+2026-04-05 09:58:31,476 | INFO | 
+              precision    recall  f1-score   support
+
+           0       0.83      0.83      0.83       192
+           1       0.64      0.71      0.67        96
+           2       0.86      0.60      0.71       192
+           3       0.64      0.82      0.72       192
+           4       0.54      0.52      0.53       192
+           5       0.71      0.71      0.71       288
+
+    accuracy                           0.70      1152
+   macro avg       0.70      0.70      0.69      1152
+weighted avg       0.71      0.70      0.70      1152
+
+2026-04-05 09:58:31,476 | INFO |  DONE

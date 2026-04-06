@@ -1,0 +1,59 @@
+2026-04-04 12:33:52,224 | INFO | Loading dataset from: /Users/anupamkumar/Desktop/meet/emotion_service/extracted_dataset/dataset.npz
+2026-04-04 12:33:52,613 | INFO | Building features...
+2026-04-04 12:33:53,034 | INFO | Applying PCA...
+2026-04-04 12:34:02,006 | INFO | PCA explained variance: 0.948
+2026-04-04 12:34:02,006 | INFO | Training XGBoost...
+2026-04-04 12:34:30,141 | INFO |  TEST ACC: 0.6701
+2026-04-04 12:34:30,144 | INFO | 
+              precision    recall  f1-score   support
+
+       angry       0.81      0.69      0.75       192
+     fearful       0.75      0.44      0.55        96
+     disgust       0.64      0.73      0.68       192
+       happy       0.74      0.72      0.73       192
+         sad       0.51      0.54      0.53       192
+neutral/calm       0.67      0.74      0.70       288
+
+    accuracy                           0.67      1152
+   macro avg       0.69      0.64      0.66      1152
+weighted avg       0.68      0.67      0.67      1152
+
+2026-04-04 12:34:31,412 | INFO |  DONE
+2026-04-04 12:37:18,766 | INFO | Loading dataset from: /Users/anupamkumar/Desktop/meet/emotion_service/extracted_dataset/dataset.npz
+2026-04-04 12:37:19,145 | INFO | Building features...
+2026-04-04 12:37:19,569 | INFO | Training XGBoost...
+2026-04-04 12:42:27,334 | INFO |  TEST ACC: 0.7083
+2026-04-04 12:42:27,344 | INFO | 
+              precision    recall  f1-score   support
+
+       angry       0.86      0.74      0.80       192
+     fearful       0.86      0.53      0.66        96
+     disgust       0.68      0.73      0.70       192
+       happy       0.79      0.77      0.78       192
+         sad       0.51      0.59      0.55       192
+neutral/calm       0.71      0.77      0.74       288
+
+    accuracy                           0.71      1152
+   macro avg       0.74      0.69      0.70      1152
+weighted avg       0.72      0.71      0.71      1152
+
+2026-04-04 12:42:27,951 | INFO |  DONE
+2026-04-05 09:33:52,929 | INFO | Loading dataset from: /Users/anupamkumar/Desktop/meet/emotion_service/extracted_dataset/dataset.npz
+2026-04-05 09:33:53,340 | INFO | Building features...
+2026-04-05 09:33:53,781 | INFO | Training XGBoost...
+2026-04-05 09:39:16,674 | INFO |  TEST ACC: 0.7083
+2026-04-05 09:39:16,686 | INFO | 
+              precision    recall  f1-score   support
+
+       angry       0.86      0.74      0.80       192
+     fearful       0.86      0.53      0.66        96
+     disgust       0.68      0.73      0.70       192
+       happy       0.79      0.77      0.78       192
+         sad       0.51      0.59      0.55       192
+neutral/calm       0.71      0.77      0.74       288
+
+    accuracy                           0.71      1152
+   macro avg       0.74      0.69      0.70      1152
+weighted avg       0.72      0.71      0.71      1152
+
+2026-04-05 09:39:17,493 | INFO |  DONE
