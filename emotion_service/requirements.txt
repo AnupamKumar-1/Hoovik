@@ -1,34 +1,36 @@
-torch
-numpy>=1.26.0,<2.0.0
-pandas>=2.3.0
-scikit-learn>=1.4.0
-scipy>=1.11.0
+# Core ML
+torch==2.1.2
+torchvision==0.16.2
+torchaudio==2.1.2
+numpy==1.23.5
+pandas==2.2.2
+scikit-learn==1.5.2
+scipy==1.11.4
+xgboost==2.0.3
 
-librosa==0.11.0
-audioread==3.0.1
-soundfile>=0.12.1
-soxr>=0.5.0.post1
+# Transformers / embeddings
+transformers==4.40.0
+accelerate==1.13.0
 
-Pillow>=10.0.0
-mtcnn==1.0.0
-opencv-python-headless<4.10.0
+# Audio
+librosa==0.10.2
+soundfile==0.13.1
+soxr==1.0.0
 
-Flask>=3.0.0
-click>=8.0.0
-blinker>=1.6.0
-itsdangerous>=2.1.0
-Jinja2>=3.1.0
+# Vision
+opencv-python==4.9.0.80
+pillow==12.2.0
+facenet-pytorch==2.5.3
+py-feat==0.6.1
 
-matplotlib>=3.8.0
-tqdm>=4.65.0
-joblib>=1.3.0
+# Backend (FastAPI + Socket)
+fastapi==0.135.3
+uvicorn==0.43.0
+python-socketio==5.16.1
+python-multipart==0.0.22
+APScheduler==3.11.2
 
-platformdirs>=4.0.0
-pooch>=1.8.0
-lz4>=4.0.0
-gunicorn
-torchvision
-torchaudio
-h5py
-imageio-ffmpeg
-ffmpeg-python
+# Utils
+joblib==1.5.3
+h5py==3.16.0
+tqdm==4.67.3
