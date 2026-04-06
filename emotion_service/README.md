@@ -1,272 +1,417 @@
 # SkymeetAI - Emotion Service
 
-## Project Overview
 
-This project implements a multimodal system for emotion recognition and anomaly detection using audio and visual (facial) inputs. It combines deep learning models for feature extraction and fusion, trained on paired audio-image data, with an Isolation Forest for detecting anomalous inputs (e.g., out-of-distribution emotions or data artifacts).
+A real-time multimodal emotion recognition system built for deployment in video conferencing environments. Combines facial action unit analysis and speech-based audio embeddings through a hybrid deep learning + gradient boosting ensemble, served via FastAPI with Socket.IO support.
 
-Key features:
-- **Preprocessing**: Handles audio (mel spectrograms) and images (face cropping, resizing).
-- **Embedding Extraction**: Uses ResNet18 for images and a simple MLP for audio features.
-- **Pairing**: Aligns audio and image embeddings by emotion labels for training.
-- **Multimodal Training**: Fuses embeddings into a classifier for emotions (e.g., angry, happy, sad, neutral).
-- **Anomaly Detection**: Trains an Isolation Forest on fused embeddings to flag anomalies.
-- **Inference**: Predicts emotions and anomaly scores from audio/video inputs.
-- **API**: A Flask-based endpoint for real-time analysis.
-- **Evaluation**: Metrics, confusion matrices, and plots for model performance.
+---
 
-The system is designed for applications like meeting analysis, sentiment monitoring, or affective computing.
+## Overview
 
-## Datasets
+Most emotion recognition systems work on a single modality — either video or audio. This service processes both simultaneously and fuses predictions from two independently trained models: a Transformer that captures temporal patterns across a sequence of frames, and an XGBoost classifier trained on aggregated statistical features. An Isolation Forest anomaly detector gates inference at runtime to reject noisy or malformed inputs before they reach the models.
 
-This project uses the following publicly available datasets:
+The system is designed to run alongside a WebRTC video call, receiving frame and audio data from participants in real time and returning per-participant emotion predictions back to the host.
 
-- **CREMA-D (Crowd-sourced Emotional Multimodal Actors Dataset)**:
-  - Source: [Kaggle - CREMA-D](https://www.kaggle.com/datasets/ejlok1/cremad)
-  - Description: Audio recordings of actors expressing emotions (anger, disgust, fear, happy, neutral, sad). Includes ~7,442 clips with emotion labels encoded in filenames.
-  - Usage: Audio preprocessing and emotion pairing.
-  - License: CC BY 4.0 (check Kaggle for details).
-  - Preparation: Place audio files in a directory like `data/audio/`. Labels are extracted from filenames (e.g., 'ANG' → 'anger').
+---
 
-- **AffectNet Aligned (Facial Emotion Dataset)**:
-  - Source: [Kaggle - AffectNet Aligned](https://www.kaggle.com/datasets/yakhyokhuja/affectnetaligned)
-  - Description: ~420,000 aligned facial images labeled with 8 emotions (angry, calm, disgust, fear, happy, neutral, sad, surprise). Split into train/val/test.
-  - Usage: Image preprocessing, face cropping, and emotion pairing.
-  - License: For research/non-commercial use (refer to original AffectNet paper and Kaggle terms).
-  - Preparation: Organize into folders like `data/images/train/{class_id}/image.jpg`. Class IDs map to emotions (e.g., 0=angry).
+## Architecture
 
-**Note**: Download datasets from the links above. Ensure ethical use: these datasets involve human subjects, so respect privacy and avoid biased applications. The project filters to common emotions (angry, disgust, fear, happy, neutral, sad) for pairing.
+## Architecture (Mermaid)
 
-## Installation and Setup
+```mermaid
+flowchart TD
+
+A[Video Frames (streamed)]
+    --> B[Frame Buffer (deque, sliding window)]
+    --> C[Face Processing (fast_face)]
+
+C --> D1[Face sequence (xf)]
+C --> D2[Face mask (fm)]
+C --> D3[Audio placeholder (xa = zeros)]
+C --> D4[Audio mask (am = zeros)]
+
+D1 --> E[EmotionPredictor.predict]
+D2 --> E
+D3 --> E
+D4 --> E
+
+%% Split into two paths
+E --> F1[build_anomaly_features]
+E --> F2[Transformer (sequence model)]
+
+%% PATH 1
+F1 --> G[Aggregated vector (X)]
+G --> H[Scaler.transform]
+
+H --> I1[Isolation Forest]
+H --> I2[XGBoost]
+
+I1 --> J1[Anomaly score + flag]
+I2 --> J2[XGB probabilities]
+
+%% PATH 2
+F2 --> K[Transformer probabilities]
+
+%% Merge
+J2 --> L[EmotionEnsemble Fusion]
+K --> L
+
+%% Output
+L --> M[Final Output]
+
+J1 --> M
+
+M --> N[Emotion label]
+M --> O[Confidence]
+M --> P[Probability distribution]
+M --> Q[Anomaly flag + score]
+M --> R[Latency]
+
+---
+
+## Emotion Classes
+
+| Index | Label    | RAVDESS Code |
+|-------|----------|-------------|
+| 0     | Angry    | 05          |
+| 1     | Disgust  | 07          |
+| 2     | Fearful  | 06          |
+| 3     | Happy    | 03          |
+| 4     | Sad      | 04          |
+| 5     | Neutral  | 01 (Neutral), 02 (Calm) |
+
+> Note: RAVDESS classes "Neutral" (01) and "Calm" (02) are merged into a single "Neutral" class due to high similarity in expression and to improve class balance.
+
+---
+
+## Project Structure
+
+```
+emotion_service/
+├── config/
+│   └── config.json
+
+├── embeddings/
+│   └── extract_embeddings_data.py
+
+├── extracted_dataset/
+│   ├── dataset.npz
+│   ├── norm_stats/
+│   └── sample/
+
+├── training/
+│   ├── train_modal.py              # Transformer training
+│   └── train_xgb.py                # XGBoost training
+
+├── anomaly/
+│   └── train_anomaly.py            # Isolation Forest training
+
+├── inference/
+│   ├── ensemble.py                 # Fusion logic
+│   ├── predict.py                  # Main inference pipeline
+│   └── calibrate_ensemble.py       # Weight tuning
+
+├── inspect/
+│   └── inspect_embeddings.py
+
+├── models/
+│   ├── modal/
+│   │   └── best_modal.pt           # Transformer model
+│   │
+│   ├── xgb/
+│   │   ├── xgb_model.joblib        # Trained XGBoost
+│   │   ├── scaler.joblib           # Feature scaler
+│   │   ├── pca.joblib              # (optional PCA)
+│   │   └── best_xgb.json           # Config / params
+│   │
+│   ├── anomaly/
+│   │   ├── iso_forest.joblib       # Isolation Forest
+│   │   ├── scaler.joblib
+│   │   └── meta.json               # Threshold
+│   │
+│   └── ensemble/
+│       └── weights.json            # Fusion weights
+
+├── logs/
+│   ├── train_modal.log
+│   ├── train_xgb.log
+│   ├── train_anomaly.log
+│   ├── confusion_xgb.png
+│   ├── feature_importance_xgb.png
+│   └── anomaly_scores.png
+
+├── test_embeddings/
+├── test_videos/
+
+├── app.py                          # FastAPI server
+├── create_sample.py
+
+├── test_audio.py
+├── test_speed.py
+
+├── requirements.txt
+└── README.md
+```
+
+---
+
+## Models
+
+### Transformer (EmotionTransformer)
+
+- Dual-stream architecture with separate projections for **face (27-dim AU features)** and **audio (1024-dim embeddings)**, fused along the feature dimension  
+- Learns **temporal dynamics** across a fixed-length sequence (`SEQ_LEN`) using a **6-layer Transformer encoder (8 attention heads)**  
+- Incorporates **gated modality projection (sigmoid gating)** to suppress unreliable inputs (e.g., missing face/audio)  
+- Uses **attention-weighted pooling** instead of naive averaging to focus on informative frames  
+- Trained with:
+  - Cosine annealing scheduler with warmup  
+  - Class-weighted cross-entropy loss  
+  - Early stopping based on validation loss  
+
+---
+
+### XGBoost
+
+- Operates on **aggregated statistical features**, not raw sequences  
+- Feature vector includes:
+  - Mean, standard deviation, min, max  
+  - Temporal delta (last − first valid frame)  
+  - Modality presence indicators (face/audio masks)  
+- Pipeline:
+  - `StandardScaler` for normalization  
+  - Optional `PCA` for dimensionality reduction  
+- Uses **class-balanced sample weights** to address dataset imbalance  
+- Provides robust predictions when temporal modeling is weak or noisy  
+
+
+### Ensemble
+
+- Weighted average of Transformer softmax probabilities and XGBoost `predict_proba`
+- Weights calibrated via grid search on the validation set
+- Single-modality fallback weights (heuristic) when one modality is missing
+
+### Anomaly Detector
+
+- Isolation Forest trained on the same aggregated features as XGBoost
+- Decision score threshold set at a fixed percentile on the training set
+- Anomalies are flagged in the response but inference still runs — the caller decides how to handle it
+
+---
+
+## Data Pipeline
+
+Training uses the [RAVDESS dataset](https://zenodo.org/record/1188976) (Ryerson Audio-Visual Database of Emotional Speech and Song).
+
+**Extraction steps:**
+
+1. Uniformly sample `SEQ_LEN` frames per clip
+2. Extract face features via py-feat (AU intensities + emotion probabilities)
+3. Extract audio embeddings via Wav2Vec2 (mean-pooled hidden states, L2-normalised)
+4. Save intermediate chunks to allow resuming after interruption
+5. Merge chunks and split by actor (70 / 15 / 15) to prevent data leakage
+
+Actor-based splitting is critical — random splitting would allow the model to memorise speaker identity rather than learn emotion.
+
+---
+
+## API
+
+### Socket.IO — real-time inference
+
+Connect to the server and emit frames as binary data:
+
+```js
+socket.emit("frame", { frame: frameBytes });
+socket.on("emotion.result", (data) => {
+  console.log(data.result); // { emotion, confidence }
+});
+```
+
+### HTTP — `/analyze`
+
+For batch or HTTP-based clients:
+
+```bash
+curl -X POST http://localhost:8000/analyze \
+  -F "meeting_id=room123" \
+  -F "participant_id=user456" \
+  -F "type=frame" \
+  -F "file=@frame.jpg"
+```
+
+**Response:**
+
+### Response
+
+```json
+{
+  "meeting_id": "room123",
+  "participant_id": "user456",
+  "result": {
+    "emotion": "happy",
+    "confidence": 0.82,
+    "probs": {
+      "angry": 0.03,
+      "disgust": 0.01,
+      "fearful": 0.02,
+      "happy": 0.82,
+      "sad": 0.05,
+      "neutral": 0.07
+    }
+  }
+}
+```
+
+### Inference response schema
+
+```json
+{
+  "emotion": "happy",
+  "confidence": 0.82,
+  "modality": "both",
+  "probs": {
+    "happy": 0.82,
+    "neutral": 0.07
+  },
+  "latency_ms": 42.3,
+  "anomaly": false,
+  "anomaly_score": 0.12,
+  "status": "ok",
+  "error": null
+}
+```
+
+- **modality** — indicates which input modalities were available during inference  
+  Possible values:
+  - `both` — both face and audio features present  
+  - `audio_only` — only audio available  
+  - `video_only` — only face/video available  
+  - `none` — no valid input detected  
+---
+
+## Setup
 
 ### Requirements
-- Python 3.8+
-- Libraries: Install via `pip install -r requirements.txt`. The `requirements.txt` file specifies the following dependencies with version constraints for compatibility and reproducibility:
 
-```
-torch
-numpy>=1.26.0,<2.0.0
-pandas>=2.3.0
-scikit-learn>=1.4.0
-scipy>=1.11.0
-
-librosa==0.11.0
-audioread==3.0.1
-soundfile>=0.12.1
-soxr>=0.5.0.post1
-
-Pillow>=10.0.0
-mtcnn==1.0.0
-opencv-python-headless<4.10.0
-
-Flask>=3.0.0
-click>=8.0.0
-blinker>=1.6.0
-itsdangerous>=2.1.0
-Jinja2>=3.1.0
-
-matplotlib>=3.8.0
-tqdm>=4.65.0
-joblib>=1.3.0
-
-platformdirs>=4.0.0
-pooch>=1.8.0
-lz4>=4.0.0
-gunicorn
-torchvision
-torchaudio
-h5py
+```bash
+pip install -r requirements.txt
 ```
 
-**Notes on Dependencies**:
-- **Core ML**: `torch`, `torchvision`, `torchaudio` for PyTorch-based models and audio processing.
-- **Data Handling**: `numpy`, `pandas`, `scipy`, `h5py` for arrays, dataframes, and HDF5 storage.
-- **Audio**: `librosa`, `soundfile`, `audioread`, `soxr` for feature extraction (e.g., mel spectrograms).
-- **Images**: `Pillow`, `opencv-python-headless`, `mtcnn` for processing, face detection, and alignment.
-- **Web/API**: `Flask` and its dependencies (`click`, `blinker`, etc.) for the API server.
-- **Viz & Utils**: `matplotlib` for plots, `tqdm` for progress, `joblib` for model serialization.
-- **Deployment**: `gunicorn` for production serving, `lz4` for compression, `pooch`/`platformdirs` for caching/data management.
+Key dependencies: `torch`, `torchvision`, `torchaudio`, `transformers`, `xgboost`, `scikit-learn`, `py-feat`, `fastapi`, `uvicorn`, `python-socketio`, `librosa`, `soundfile`, `soxr`, `opencv-python-headless`, `joblib`, `apscheduler`
 
-Install with: `pip install -r requirements.txt`. Some packages (e.g., `opencv-python-headless`) are optional but recommended for headless environments like servers.
+### Config
 
-### Environment Setup
-1. Clone the repository: `git clone <repo-url> && cd emotion_service`
-2. Install dependencies: `pip install -r requirements.txt`
-3. Download datasets and place in `data/` folder.
-4. (Optional) Set environment variables:
-   - `FLASK_CORS_ORIGINS=http://localhost:3000` for API CORS.
-   - `BACKEND_URL=http://your-backend/api` for forwarding results.
-   - `LOG_LEVEL=DEBUG` for verbose logging.
-   - Install system dependencies: `ffmpeg` for video processing (e.g., `apt-get install ffmpeg` on Ubuntu).
+All paths and hyperparameters are in `config/config.json`. Set your dataset root, model output paths, and training parameters there before running anything.
 
-## Preprocessing
+### Training from Scratch
 
-### Images
-- Script: `preprocess_images.py`
-- Usage: `python preprocess_images.py --src data/images --out preprocessed_images.h5 --size 224 --face_crop 1 --workers 4`
-- Steps:
-  - Scans folder structure (e.g., `train/{class_id}/img.jpg`).
-  - Optional: Face cropping using OpenCV Haar cascade or MTCNN.
-  - Center-crop to square, resize to 224x224, normalize to [0,1].
-  - Saves to HDF5: Groups for train/val/test with datasets `images` (N,H,W,C), `labels` (int), `paths` (str).
+```bash
+# 1. Extract features from RAVDESS
+python embeddings/extract_embeddings_data.py
 
-### Audio
-- Script: `preprocessing_audio.py`
-- Usage: `python preprocessing_audio.py --audio_dir data/audio --out_h5 preprocessed_audio.h5 --fixed_duration 3.0 --workers 6`
-- Steps:
-  - Loads WAV files, resamples to 16kHz.
-  - Trims silence, normalizes, pads/truncates to fixed duration (e.g., 3s).
-  - Computes log-mel spectrograms (64 bands).
-  - Saves to HDF5: `features/fixed` (N,64,frames), `labels`, `paths`. Also generates a CSV manifest.
+# 2. Verify the dataset before training
+python inspect/inspect_embeddings.py
 
-### Embeddings Extraction
-- Script: `extract_embeddings.py`
-- Usage: Run directly: `python extract_embeddings.py`
-- Steps:
-  - Loads preprocessed HDF5s.
-  - Images: ResNet18 (pretrained) → 512-d embeddings.
-  - Audio: MLP on flattened mel → 128-d embeddings.
-  - Saves: `embeddings_images.h5` (split/embeddings (N,512)), `embeddings_audio.h5` (all/embeddings (N,128)).
+# 3. Train the Transformer (temporal model)
+python training/train_modal.py
 
-### Pairing Embeddings
-- Script: `make_paired_h5_filtered.py`
-- Usage: `python make_paired_h5_filtered.py`
-- Steps:
-  - Pairs image-audio embeddings by common emotions (angry, disgust, fear, happy, neutral, sad).
-  - Balances classes via oversampling audio pools.
-  - Saves per-split: `saved_paired_{split}_paired_embeddings.h5` with `image_embeddings` (N,512), `audio_embeddings` (N,128), `labels`, `paths`.
+# 4. Train XGBoost (statistical model)
+python training/train_xgb.py
 
-## Training
+# 5. Train Anomaly Detector (Isolation Forest)
+python anomaly/train_anomaly.py
 
-### Multimodal Emotion Classifier
-- Script: `train_multimodal.py`
-- Usage: `python train_multimodal.py --train_h5 saved_paired_train_paired_embeddings.h5 --val_h5 saved_paired_val_paired_embeddings.h5 --test_h5 saved_paired_test_paired_embeddings.h5 --epochs 50 --batch_size 128 --lr 0.001 --save_dir saved_models`
-- Architecture:
-  - Image: ResNet18 (pretrained) + MLP → 256-d.
-  - Audio: MLP on 128-d → 256-d.
-  - Fusion: Concat → Linear → Softmax (num_classes=6).
-- Features: Class weighting, OneCycleLR scheduler, validation.
-- Output: Saves best checkpoint `multimodal_best.pth` with state dict and class labels.
+# 6. Calibrate ensemble weights on validation set
+python inference/calibrate_ensemble.py
 
-### Anomaly Detector (Isolation Forest)
-- Script: `train_anomaly.py`
-- Usage: `python train_anomaly.py --train_h5 saved_paired_train_paired_embeddings.h5 --test_h5 saved_paired_test_paired_embeddings.h5 --save_dir results/anomaly --n_estimators 200 --contamination 0.01`
-- Steps:
-  - Concatenates image+audio embeddings (N,640).
-  - Fits IsolationForest.
-- Output: `isolation_forest.joblib`, anomaly scores (.npz), plots (histograms, PCA scatters).
+# 7. Start the server
+uvicorn app:app --host 0.0.0.0 --port 8000
 
-## Evaluation and Plotting
+# Create a test sample (generates xf, xa, fm, am)
+python create_sample.py
 
-- Script: `train_eval_plot.py`
-- Usage: `python train_eval_plot.py --model_path saved_models/multimodal_best.pth --test_h5 saved_paired_test_paired_embeddings.h5 --val_h5 saved_paired_val_paired_embeddings.h5 --save_dir results/plots`
-- Computes: Accuracy, F1, classification report, confusion matrix.
-- Plots: Confusion matrices (raw/normalized), test vs val accuracy, per-class F1.
-- Saves: Raw predictions (.npz) for further analysis.
-
-## Inference
-
-### Command-Line Prediction
-- Script: `predict.py`
-- Usage:
-  - Video: `python predict.py --video test.mp4 --multimodal saved_models/multimodal_best.pth --isolation results/anomaly/isolation_forest.joblib`
-  - Image+Audio: `python predict.py --image frame.jpg --audio clip.wav --multimodal ... --isolation ...`
-- Output: JSON with `emotion_probs` (dict of probabilities), `anomaly_score` (higher=more anomalous), `anomaly_flag` ("anomaly" or "normal").
-
-### API Endpoint
-- Script: `app.py`
-- Usage: Run `python app.py` (listens on port 5002). For production: `gunicorn -w 4 app:app`.
-- Endpoint: POST `/analyze`
-  - Form-data: `meeting_id` (str), `participant_id` (str), `file` (audio/video file), `type` (audio|video).
-- Response: JSON with timeline, anomalies, emotions.
-- Features: Preloads models, CORS support, optional backend forwarding.
-- Development: `FLASK_ENV=development python app.py`
-
-## Architecture Diagrams
-
-### Overall System Architecture
-The system follows a pipeline from data ingestion to inference. Below is a textual representation (ASCII art):
+# Run inference
+python inference/predict.py \
+  --face xf.npy \
+  --audio xa.npy \
+  --face_mask fm.npy \
+  --audio_mask am.npy
 
 ```
-+-------------+     +-------------+
-|   CREMA-D   |     | AffectNet   |
-|   (Audio)   |     |  (Images)   |
-+------+------+     +------+------+
-       |                   |
-       v                   v
-+------+------+     +------+------+
-| Preprocess  |     | Preprocess  |
-| Audio       |     | Images      |
-+------+------+     +------+------+
-       |                   |
-       v                   v
-+------+------+     +------+------+
-| Extract     |     | Extract     |
-| Embeddings  |     | Embeddings  |
-| (MLP)       |     | (ResNet18)  |
-+------+------+     +------+------+
-       |                   |
-       +---------+---------+
-                 |
-                 v
-        +--------+--------+
-        | Pair Embeddings |
-        | by Emotion     |
-        +--------+--------+
-                 |
-                 v
-        +--------+--------+
-        | Train Multimodal|
-        | Fusion Model    |
-        +--------+--------+
-                 |
-                 v
-        +--------+--------+
-        | Train Anomaly   |
-        | Detector (IF)   |
-        +--------+--------+
-                 |
-                 v
-        +--------+--------+
-        | Inference:      |
-        | Predict Emotions|
-        | & Anomalies     |
-        +--------+--------+
-```
+---
 
-### Multimodal Model Architecture
-Detailed structure of the emotion classifier (ASCII art):
+## Design Decisions
 
-```
-Image Input (3x224x224)
-      |
-      v
-ResNet18 (Pretrained) --> 512-d Feature
-      |
-      v
-MLP (Linear + ReLU) --> 256-d Embedding
+### Why use two models instead of one?
+The system combines a Transformer and XGBoost because they capture **complementary aspects** of the data:
 
-Audio Input (Mel Spectrogram --> Flattened 128-d)
-      |
-      v
-MLP (Linear + ReLU) --> 256-d Embedding
+- The **Transformer** models temporal dynamics — how facial expressions and audio evolve over time.
+- **XGBoost** operates on aggregated statistical features, capturing the overall distribution without relying on sequence order.
 
-Concat (512-d Total)
-      |
-      v
-Fusion Linear --> Logits (6 Classes: angry, disgust, fear, happy, neutral, sad)
-      |
-      v
-Softmax --> Probabilities
-```
+Since both models make different types of errors, combining them via an ensemble improves overall robustness and generalisation.
 
-### Anomaly Detection Flow
-```
-Paired Embeddings (Image 512-d + Audio 128-d) --> Concat (640-d)
-      |
-      v
-Isolation Forest Fit (on Train Data)
-      |
-      v
-Inference: Decision Function --> Anomaly Score
-           Predict --> -1 (Anomaly) / 1 (Normal)
-```
+---
+
+### Why actor-based splitting?
+RAVDESS contains recordings from 24 actors. A random train-test split can leak actor identity into both sets, allowing the model to overfit to speaker-specific traits.
+
+To prevent this:
+- Data is split **by actor (70 / 15 / 15)**  
+- Ensures the model is evaluated on **unseen speakers**
+
+This provides a more realistic measure of real-world performance.
+
+---
+
+### Why anomaly-aware inference instead of filtering?
+In real-time systems (e.g., video calls), inputs can be noisy or corrupted:
+- Low lighting or missing faces  
+- Audio dropouts or background noise  
+- Network artifacts  
+
+Instead of blocking inference, the system:
+- Uses an **Isolation Forest** to detect anomalies  
+- Outputs an **anomaly score + flag alongside predictions**
+
+This keeps the system responsive while allowing downstream applications to decide how to handle unreliable inputs.
+
+---
+
+### Why merge Neutral and Calm?
+RAVDESS defines separate classes for *Neutral (01)* and *Calm (02)*, but:
+
+- They are **visually and acoustically very similar**
+- Distinguishing them is often ambiguous, even for humans
+- Keeping them separate introduces class imbalance
+
+Merging them into a single **Neutral** class:
+- Improves class balance  
+- Simplifies the learning problem  
+- Leads to more stable and reliable predictions
+
+---
+
+## Limitations
+
+- **CPU-bound inference by default**  
+  The system runs on CPU unless explicitly configured for GPU or Apple MPS. This can increase latency for longer sequences or high-throughput scenarios.
+
+- **Dataset-specific calibration**  
+  Ensemble weights are calibrated on RAVDESS validation actors. Performance may degrade on out-of-domain speakers, languages, or recording conditions.
+
+- **Heuristic single-modality fallback**  
+  When one modality (face or audio) is missing, fallback weights are applied heuristically rather than being separately calibrated.
+
+- **In-memory buffering for streaming**  
+  The HTTP and Socket.IO endpoints maintain per-participant frame buffers in memory. This may not scale well for large numbers of concurrent users and should be replaced with a shared or distributed cache in production.
+
+- **Limited real-time audio integration**  
+  In the current real-time pipeline, audio features are replaced with zero vectors, effectively making inference video-only. Full audio integration would improve multimodal performance.
+
+- **Dependency on face detection quality**  
+  If face detection fails (e.g., occlusion, poor lighting), the system cannot extract valid features, which may lead to degraded or skipped predictions.
+
+  ---
+
+## License
+
+MIT
