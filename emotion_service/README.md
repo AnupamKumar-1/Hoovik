@@ -15,55 +15,88 @@ The system is designed to run alongside a WebRTC video call, receiving frame and
 
 ## Architecture
 
-
 ```mermaid
 flowchart TD
 
-A[Video Frames (streamed)]
-    --> B[Frame Buffer (deque, sliding window)]
-    --> C[Face Processing (fast_face)]
+%% INPUT
+A["Video Frames streamed"]
+    --> B["Frame Buffer - sliding window"]
+    --> C["Face Processing fast_face"]
 
-C --> D1[Face sequence (xf)]
-C --> D2[Face mask (fm)]
-C --> D3[Audio placeholder (xa = zeros)]
-C --> D4[Audio mask (am = zeros)]
+C --> D1["Face sequence xf"]
+C --> D2["Face mask fm"]
+C --> D3["Audio placeholder xa"]
+C --> D4["Audio mask am"]
 
-D1 --> E[EmotionPredictor.predict]
+D1 --> E["EmotionPredictor"]
 D2 --> E
 D3 --> E
 D4 --> E
 
-%% Split into two paths
-E --> F1[build_anomaly_features]
-E --> F2[Transformer (sequence model)]
+%% ======================
+%% FEATURE PATH
+%% ======================
+subgraph AGG["Aggregated Feature Pipeline"]
+    direction TB
+    F1["build_anomaly_features"]
+    G["Aggregated vector X"]
+    H["Scaler transform"]
+    I1["Isolation Forest"]
+    I2["XGBoost"]
+    J1["Anomaly score + flag"]
+    J2["XGB probabilities"]
 
-%% PATH 1
-F1 --> G[Aggregated vector (X)]
-G --> H[Scaler.transform]
+    F1 --> G --> H
+    H --> I1 --> J1
+    H --> I2 --> J2
+end
 
-H --> I1[Isolation Forest]
-H --> I2[XGBoost]
+%% ======================
+%% SEQUENCE PATH
+%% ======================
+subgraph SEQ["Sequence Model"]
+    direction TB
+    F2["Transformer"]
+    K["Transformer probabilities"]
 
-I1 --> J1[Anomaly score + flag]
-I2 --> J2[XGB probabilities]
+    F2 --> K
+end
 
-%% PATH 2
-F2 --> K[Transformer probabilities]
+%% CONNECT
+E --> F1
+E --> F2
 
-%% Merge
-J2 --> L[EmotionEnsemble Fusion]
+%% ======================
+%% ENSEMBLE
+%% ======================
+subgraph ENS["Fusion"]
+    L["EmotionEnsemble"]
+end
+
+J2 --> L
 K --> L
 
-%% Output
-L --> M[Final Output]
+%% ======================
+%% OUTPUT
+%% ======================
+subgraph OUT["Output"]
+    direction TB
+    M["Final Output"]
+    N["Emotion"]
+    O["Confidence"]
+    P["Probabilities"]
+    Q["Anomaly flag + score"]
+    R["Latency"]
 
+    M --> N
+    M --> O
+    M --> P
+    M --> Q
+    M --> R
+end
+
+L --> M
 J1 --> M
-
-M --> N[Emotion label]
-M --> O[Confidence]
-M --> P[Probability distribution]
-M --> Q[Anomaly flag + score]
-M --> R[Latency]
 ```
 ---
 
