@@ -229,6 +229,45 @@ emotion_service/
 
 ---
 
+## Performance
+
+- Transformer Accuracy: **69.7%**
+- XGBoost Accuracy: **70.8%**
+- Ensemble Accuracy: **75.2%**
+
+The ensemble combines temporal (Transformer) and statistical (XGBoost) signals, achieving a significant improvement over individual models.
+
+**Best weights:**
+- Transformer: 0.10
+- XGBoost: 0.90
+---
+## Visualizations
+
+### Anomaly Score Distribution
+![Anomaly Scores](logs/anomaly_scores.png)
+
+- Distribution of anomaly scores for train vs validation  
+- Red dashed line shows threshold (~10% FPR)  
+- Higher spread in validation indicates real-world variance  
+
+---
+
+### Confusion Matrix (XGBoost)
+![Confusion Matrix](logs/confusion_xgb.png)
+
+- Strong performance on **angry, happy, neutral**  
+- Confusion between **sad ↔ neutral** and **fearful ↔ angry**  
+- Reflects subtle emotional differences in dataset  
+
+---
+
+### Feature Importance (XGBoost)
+![Feature Importance](logs/feature_importance_xgb.png)
+
+- Top features dominate prediction (long-tail distribution)  
+- Indicates some embeddings are highly discriminative  
+- Supports effectiveness of aggregated feature design  
+
 ## Data Pipeline
 
 Training uses the [RAVDESS dataset](https://zenodo.org/record/1188976) (Ryerson Audio-Visual Database of Emotional Speech and Song).
