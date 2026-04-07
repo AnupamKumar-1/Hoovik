@@ -1,49 +1,68 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import styles from "../styles/videoComponent.module.css";
+
 
 export default function ChatInput({ onSend }) {
   const [text, setText] = useState("");
+  const inputRef = useRef(null);
+
+  const canSend = text.trim().length > 0;
 
   const handleSend = () => {
     const t = text.trim();
-    if (t) {
-      onSend(t);
-      setText("");
+    if (!t) return;
+    onSend(t);
+    setText("");
+    // Restore focus after React re-render
+    requestAnimationFrame(() => inputRef.current?.focus());
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
     }
   };
 
   return (
-    <div
-      className={styles.chatInput || ""}
-      style={{ display: "flex", gap: 8, padding: 8 }}
-    >
+    <div className={styles.chatInputWrap}>
       <input
+        ref={inputRef}
+        className={styles.chatInputField}
+        type="text"
         value={text}
         onChange={(e) => setText(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") handleSend();
-        }}
-        placeholder="Type a message..."
-        style={{
-          flex: 1,
-          padding: "8px 10px",
-          borderRadius: 6,
-          border: "1px solid rgba(255,255,255,0.06)",
-          background: "rgba(255,255,255,0.02)",
-          color: "#E6EEF9",
-        }}
+        onKeyDown={handleKeyDown}
+        placeholder="Type a message…"
+        aria-label="Chat message"
+        autoComplete="off"
+        spellCheck="true"
+        maxLength={1000}
       />
 
       <button
+        className={styles.chatSendButton}
         onClick={handleSend}
-        style={{
-          padding: "8px 12px",
-          borderRadius: 6,
-          background: "rgba(0,150,255,0.12)",
-          border: "none",
-          color: "#E6EEF9",
-        }}
+        disabled={!canSend}
+        aria-label="Send message"
+        title="Send (Enter)"
+        type="button"
       >
+        {/* Send arrow */}
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <line x1="22" y1="2" x2="11" y2="13" />
+          <polygon points="22 2 15 22 11 13 2 9 22 2" />
+        </svg>
         Send
       </button>
     </div>

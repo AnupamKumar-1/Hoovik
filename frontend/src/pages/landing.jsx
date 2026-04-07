@@ -1,61 +1,188 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import "../App.css";
 import "../styles/landing.css";
 
 export default function LandingPage() {
-  const router = useNavigate();
+  const navigate = useNavigate();
 
   return (
     <div className="lp-root">
+      {/* Background mesh */}
+      <div className="lp-bg-mesh" aria-hidden />
+
+      {/* ── NAV ── */}
       <header className="lp-nav" role="navigation" aria-label="Main navigation">
-        <div className="lp-brand" onClick={() => router("/")}>
-          <svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden>
-            <rect x="2" y="2" width="20" height="20" rx="6" fill="#05233a"/>
-            <path d="M7 12h10M7 8h10M7 16h10" stroke="white" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" opacity="0.92"/>
-          </svg>
-          <h2>SkyMeet</h2>
+        <div className="lp-brand" onClick={() => navigate("/")}>
+          <div className="lp-brand-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path
+                d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.89L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"
+                stroke="#38bdf8"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </div>
+          <span className="lp-brand-name">SkyMeetAI</span>
         </div>
 
-        <div className="nav-actions" role="menubar" aria-label="Auth">
-          <p role="menuitem" onClick={() => router("/auth")}>Login</p>
+        <div className="lp-nav-right">
+          <button className="lp-nav-link" onClick={() => navigate("/auth")}>
+            Login
+          </button>
           <button
-            className="nav-cta"
-            onClick={() => router("/auth")}
-            aria-label="Get started"
+            className="lp-nav-cta"
+            onClick={() => navigate("/auth")}
+            aria-label="Get started with SkyMeetAI"
           >
-            Get Started
+            Get Started →
           </button>
         </div>
       </header>
 
+      {/* ── HERO ── */}
       <main className="lp-hero">
-        <section className="lp-card lp-hero-left">
+        {/* Left */}
+        <section className="lp-hero-left">
+          <div className="lp-badge" aria-label="AI features">
+            <div className="lp-badge-dot" />
+            <span className="lp-badge-text">
+              Real-time Emotion AI + Smart Transcription
+            </span>
+          </div>
+
           <h1>
-            <span className="accent">Connect</span> with your loved ones
+            Intelligent meetings,
+            <span className="lp-h1-line2">
+              {" beyond "}
+              <span className="lp-accent">video calls.</span>
+            </span>
           </h1>
-          <p className="lead">
-            Close the distance with secure, instant video rooms. Easy to create,
-            simple to share — built for moments that matter.
+
+          <p className="lp-lead">
+            Experience next-generation video meetings powered by AI. Analyze
+            emotions in real-time, generate speaker-aware transcripts, and gain
+            deeper insights from every conversation.
           </p>
 
-          <div style={{ marginTop: 18, color: "var(--muted)", fontSize: 13 }}>
-            <strong>Tip:</strong> After creating an account you can host meetings,
-            save transcripts and access recordings from anywhere.
+          <div className="lp-cta-row">
+            <button
+              className="lp-btn-primary"
+              onClick={() => navigate("/auth")}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <path
+                  d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.89L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              Start Smart Meeting
+            </button>
+
+            <button
+              className="lp-btn-ghost"
+              onClick={() => navigate("/auth")}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <path
+                  d="M15 3h6v6M14 10l6.1-6.1M9 21H3v-6M10 14l-6.1 6.1"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                />
+              </svg>
+              Join with Room Code
+            </button>
+          </div>
+
+          <div className="lp-stats-row">
+            <div className="lp-stat">
+              <span className="lp-stat-val">WebRTC</span>
+              <span className="lp-stat-label">Low-latency P2P streaming</span>
+            </div>
+            <div className="lp-stat">
+              <span className="lp-stat-val">&lt;80ms</span>
+              <span className="lp-stat-label">Emotion inference latency</span>
+            </div>
+            <div className="lp-stat">
+              <span className="lp-stat-val">Whisper AI</span>
+              <span className="lp-stat-label">Accurate meeting transcripts</span>
+            </div>
           </div>
         </section>
 
-        <aside className="lp-card lp-hero-right" aria-hidden>
-          <div className="lp-illustration">
-            <img src="/mobile.png" alt="SkyMeet preview on mobile" />
+        {/* Right */}
+        <aside className="lp-hero-right" aria-label="Live meeting preview">
+          <div className="lp-glass-card">
+            <div className="lp-card-top">
+              <span className="lp-card-title">AI POWERED SESSION</span>
+              <div className="lp-card-dots" aria-hidden>
+                <div className="lp-dot lp-dot-r" />
+                <div className="lp-dot lp-dot-y" />
+                <div className="lp-dot lp-dot-g" />
+              </div>
+            </div>
+
+            <div className="lp-video-grid" aria-hidden>
+              <div className="lp-vid-tile lp-vid-main">
+                <div className="lp-speaking-ring" />
+                <div className="lp-vid-avatar">
+                  <div className="lp-avatar-ring lp-av1">A</div>
+                  <span className="lp-vid-name">Arjun K.</span>
+                </div>
+                <div className="lp-vid-bar">
+                  <div className="lp-live-dot" />
+                  <span className="lp-vid-bar-text">Active Speaker</span>
+                  <div className="lp-wave-bars">
+                    {[0.6, 0.45, 0.75, 0.55, 0.65].map((d, i) => (
+                      <div
+                        key={i}
+                        className="lp-wave-bar"
+                        style={{ "--d": `${d}s` }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="lp-vid-tile">
+                <div className="lp-vid-avatar">
+                  <div className="lp-avatar-ring lp-av2">P</div>
+                  <span className="lp-vid-name">Priya M.</span>
+                </div>
+              </div>
+
+              <div className="lp-vid-tile">
+                <div className="lp-vid-avatar">
+                  <div className="lp-avatar-ring lp-av3">R</div>
+                  <span className="lp-vid-name">Rahul S.</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="lp-card-bottom">
+              <span className="lp-chip lp-chip-sky">● Live Emotion AI</span>
+              <span className="lp-chip lp-chip-gold">✦ Smart Transcript</span>
+              <span className="lp-chip lp-chip-green">⬤ Real-time Meeting</span>
+            </div>
           </div>
         </aside>
       </main>
 
-      <div className="lp-foot">
-        Built with ❤️ — SkyMeet. Privacy-first video rooms. 
-        <span style={{ color: "var(--muted)" }}> sign up to get full access.</span>
-      </div>
+      {/* ── FOOTER ── */}
+      <footer className="lp-foot">
+        <p>
+          Built with ❤️ - <strong>SkyMeetAI</strong> — Intelligent real-time
+          meeting platform.
+        </p>
+        <span className="lp-foot-status">
+          Emotion & transcription services active
+        </span>
+      </footer>
     </div>
   );
 }

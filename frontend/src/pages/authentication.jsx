@@ -1,28 +1,7 @@
-import * as React from 'react';
+import * as React from "react";
 import { useNavigate } from "react-router-dom";
-import Avatar from '@mui/material/Avatar';
-import Button from '@mui/material/Button';
-import CssBaseline from '@mui/material/CssBaseline';
-import TextField from '@mui/material/TextField';
-import Paper from '@mui/material/Paper';
-import Box from '@mui/material/Box';
-import Grid from '@mui/material/Grid';
-import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
-import Typography from '@mui/material/Typography';
-import { createTheme, ThemeProvider } from '@mui/material/styles';
-import { AuthContext } from '../contexts/AuthContext';
-import Snackbar from '@mui/material/Snackbar';
-import '../styles/authentication.css';
-
-const defaultTheme = createTheme({
-  palette: {
-    primary: { main: '#0096ff' },
-    secondary: { main: '#00d4ff' },
-  },
-  typography: {
-    fontFamily: `'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial`,
-  },
-});
+import { AuthContext } from "../contexts/AuthContext";
+import "../styles/authentication.css";
 
 export default function Authentication() {
   const navigate = useNavigate();
@@ -32,159 +11,269 @@ export default function Authentication() {
   const [name, setName] = React.useState("");
   const [error, setError] = React.useState("");
   const [message, setMessage] = React.useState("");
-  const [formState, setFormState] = React.useState(0);
+  const [formState, setFormState] = React.useState(0); // 0 = login, 1 = register
   const [open, setOpen] = React.useState(false);
+  const [loading, setLoading] = React.useState(false);
 
   const { handleRegister, handleLogin } = React.useContext(AuthContext);
 
   const handleAuth = async (e) => {
     e.preventDefault();
-
+    setError("");
+    setLoading(true);
     try {
       if (formState === 0) {
-
         await handleLogin(username, password);
-
-
         navigate("/home", { replace: true });
-
       } else {
-
         const result = await handleRegister(name, username, password);
-
-        setUsername("");
-        setPassword("");
-        setName("");
+        setUsername(""); setPassword(""); setName("");
         setMessage(result || "Registered successfully");
         setOpen(true);
-        setError("");
         setFormState(0);
       }
     } catch (err) {
-      const msg = err?.response?.data?.message || "Something went wrong";
-      setError(msg);
+      setError(err?.response?.data?.message || "Something went wrong");
+    } finally {
+      setLoading(false);
     }
   };
 
+  // Auto-dismiss snack
+  React.useEffect(() => {
+    if (!open) return;
+    const t = setTimeout(() => setOpen(false), 4000);
+    return () => clearTimeout(t);
+  }, [open]);
+
+  const isLogin = formState === 0;
+
   return (
-    <ThemeProvider theme={defaultTheme}>
-      <Grid container component="main" className="auth-root">
-        <CssBaseline />
+    <div className="au-root">
+      {/* Mesh background */}
+      <div className="au-bg" aria-hidden />
 
+      {/* ── LEFT HERO ── */}
+      <aside className="au-hero" aria-hidden>
+        <div className="au-hero-inner">
+          <div className="au-hero-logo">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.89L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"
+                stroke="#38bdf8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+              />
+            </svg>
+            <span>SkyMeetAI</span>
+          </div>
 
-        <Grid
-          item xs={false} sm={4} md={5}
-          className="auth-hero"
-          sx={{
-            backgroundImage:
-              'url(https://images.unsplash.com/photo-1504384308090-c894fdcc538d?q=80&w=1600&auto=format&fit=crop)',
-          }}
-        />
+          <div className="au-hero-content">
+            <div className="au-hero-badge">
+              <span className="au-hero-badge-dot" />
+              Real-time AI Meeting Platform
+            </div>
+            <h2 className="au-hero-heading">
+              Meetings that<br />
+              <span className="au-hero-accent">understand you.</span>
+            </h2>
+            <p className="au-hero-lead">
+              Emotion-aware transcription, live AI insights,
+              and crystal-clear WebRTC — all in one place.
+            </p>
 
-        <Grid
-          item xs={12}
-          sm={8}
-          md={7}
-          component={Paper}
-          elevation={0}
-          square
-          className="auth-panel"
-        >
-          <Box className="auth-box">
-            <Avatar className="auth-avatar" sx={{ bgcolor: 'primary.main' }}>
-              <LockOutlinedIcon />
-            </Avatar>
+            <div className="au-hero-stats">
+              <div className="au-hero-stat">
+                <span className="au-stat-val">WebRTC</span>
+                <span className="au-stat-label">P2P streaming</span>
+              </div>
+              <div className="au-hero-stat">
+                <span className="au-stat-val">&lt;80ms</span>
+                <span className="au-stat-label">Emotion AI</span>
+              </div>
+              <div className="au-hero-stat">
+                <span className="au-stat-val">Whisper</span>
+                <span className="au-stat-label">Transcription</span>
+              </div>
+            </div>
+          </div>
 
-            <Typography component="h1" variant="h5" className="auth-title">
-              {formState === 0 ? "Sign In" : "Create an Account"}
-            </Typography>
+          {/* Decorative glass card */}
+          <div className="au-hero-card" aria-hidden>
+            <div className="au-hero-card-top">
+              <span className="au-hero-card-label">AI POWERED SESSION</span>
+              <div className="au-hero-card-dots">
+                <span className="au-dot au-dot-r" />
+                <span className="au-dot au-dot-y" />
+                <span className="au-dot au-dot-g" />
+              </div>
+            </div>
+            <div className="au-hero-avatars">
+              {["A", "P", "R"].map((l, i) => (
+                <div key={i} className={`au-av au-av-${i + 1}`}>{l}</div>
+              ))}
+            </div>
+            <div className="au-hero-chips">
+              <span className="au-chip au-chip-sky">● Live Emotion AI</span>
+              <span className="au-chip au-chip-gold">✦ Smart Transcript</span>
+            </div>
+          </div>
+        </div>
+      </aside>
 
-            <Box className="auth-toggle">
-              <Button
-                variant={formState === 0 ? "contained" : "outlined"}
-                onClick={() => setFormState(0)}
-              >
-                Sign In
-              </Button>
-              <Button
-                variant={formState === 1 ? "contained" : "outlined"}
-                onClick={() => setFormState(1)}
-              >
-                Sign Up
-              </Button>
-            </Box>
+      {/* ── RIGHT PANEL ── */}
+      <main className="au-panel">
+        <div className="au-form-card">
 
-            {/* FORM */}
-            <Box
-              component="form"
-              noValidate
-              onSubmit={handleAuth}
-              sx={{ mt: 1, width: '100%' }}
+          {/* Brand mark */}
+          <div className="au-form-brand">
+            <div className="au-form-brand-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.89L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"
+                  stroke="#38bdf8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+                />
+              </svg>
+            </div>
+            <span className="au-form-brand-name">SkyMeetAI</span>
+          </div>
+
+          {/* Heading */}
+          <h1 className="au-form-title">
+            {isLogin ? "Welcome back" : "Create account"}
+          </h1>
+          <p className="au-form-sub">
+            {isLogin
+              ? "Sign in to your SkyMeetAI account"
+              : "Join the intelligent meeting platform"}
+          </p>
+
+          {/* Toggle tabs */}
+          <div className="au-tabs" role="tablist">
+            <button
+              role="tab"
+              aria-selected={isLogin}
+              className={`au-tab ${isLogin ? "au-tab-active" : ""}`}
+              onClick={() => { setFormState(0); setError(""); }}
+              type="button"
             >
-              {formState === 1 && (
-                <TextField
-                  margin="normal"
-                  required
-                  fullWidth
-                  label="Full Name"
+              Sign In
+            </button>
+            <button
+              role="tab"
+              aria-selected={!isLogin}
+              className={`au-tab ${!isLogin ? "au-tab-active" : ""}`}
+              onClick={() => { setFormState(1); setError(""); }}
+              type="button"
+            >
+              Sign Up
+            </button>
+          </div>
+
+          {/* Form */}
+          <form className="au-form" onSubmit={handleAuth} noValidate>
+
+            {!isLogin && (
+              <div className="au-field au-field-animate">
+                <label className="au-label" htmlFor="au-name">Full Name</label>
+                <input
+                  id="au-name"
+                  className="au-input"
+                  type="text"
+                  placeholder="e.g. Alex Kumar"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  variant="outlined"
-                  className="auth-input"
                   autoComplete="name"
+                  required
                 />
-              )}
+              </div>
+            )}
 
-              <TextField
-                margin="normal"
-                required
-                fullWidth
-                label="Username"
+            <div className="au-field">
+              <label className="au-label" htmlFor="au-username">Username</label>
+              <input
+                id="au-username"
+                className="au-input"
+                type="text"
+                placeholder="your username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                variant="outlined"
-                className="auth-input"
                 autoComplete="username"
-              />
-
-              <TextField
-                margin="normal"
                 required
-                fullWidth
+              />
+            </div>
+
+            <div className="au-field">
+              <label className="au-label" htmlFor="au-password">Password</label>
+              <input
+                id="au-password"
+                className="au-input"
                 type="password"
-                label="Password"
+                placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                variant="outlined"
-                className="auth-input"
-                autoComplete="current-password"
+                autoComplete={isLogin ? "current-password" : "new-password"}
+                required
               />
+            </div>
 
-              {error && (
-                <Typography variant="body2" className="auth-error">
-                  {error}
-                </Typography>
+            {/* Error */}
+            {error && (
+              <div className="au-error" role="alert">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+                <span>{error}</span>
+              </div>
+            )}
+
+            {/* Submit */}
+            <button
+              type="submit"
+              className="au-submit"
+              disabled={loading}
+            >
+              {loading ? (
+                <span className="au-spinner" aria-hidden />
+              ) : (
+                <>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    {isLogin
+                      ? <><path d="M15 3h6v6M14 10l6.1-6.1M9 21H3v-6M10 14l-6.1 6.1" /></>
+                      : <><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2" /><circle cx="9" cy="7" r="4" /><line x1="19" y1="8" x2="19" y2="14" /><line x1="22" y1="11" x2="16" y2="11" /></>
+                    }
+                  </svg>
+                  {isLogin ? "Sign In" : "Create Account"}
+                </>
               )}
+            </button>
 
-              <Button
-                type="submit"
-                fullWidth
-                variant="contained"
-                className="auth-submit"
-              >
-                {formState === 0 ? "Login" : "Register"}
-              </Button>
-            </Box>
-          </Box>
-        </Grid>
-      </Grid>
+          </form>
 
-      <Snackbar
-        open={open}
-        autoHideDuration={4000}
-        onClose={() => setOpen(false)}
-        message={message}
-      />
-    </ThemeProvider>
+          {/* Footer note */}
+          <p className="au-form-foot">
+            {isLogin ? "Don't have an account? " : "Already have an account? "}
+            <button
+              type="button"
+              className="au-form-foot-link"
+              onClick={() => { setFormState(isLogin ? 1 : 0); setError(""); }}
+            >
+              {isLogin ? "Sign up" : "Sign in"}
+            </button>
+          </p>
+
+        </div>
+      </main>
+
+      {/* Snackbar */}
+      {open && (
+        <div className="au-snack" role="status" aria-live="polite">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden>
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+          {message}
+        </div>
+      )}
+    </div>
   );
 }

@@ -1,7 +1,75 @@
-import React, { useEffect, useRef, useState } from "react";
-import styles from "../styles/videoComponent.module.css";
-import { FaUserAlt } from "react-icons/fa";
+
+import React, {
+  useEffect,
+  useRef,
+  useState,
+  useMemo,
+  useCallback,
+} from "react";
 import { motion } from "framer-motion";
+import styles from "../styles/videoComponent.module.css";
+
+const AVATAR_PALETTES = [
+  { bg: "linear-gradient(135deg,#0ea5e9,#38bdf8)", glow: "0 0 22px rgba(14,165,233,0.38)" },
+  { bg: "linear-gradient(135deg,#7c3aed,#a78bfa)", glow: "0 0 22px rgba(124,58,237,0.38)" },
+  { bg: "linear-gradient(135deg,#d97706,#fbbf24)", glow: "0 0 22px rgba(217,119,6,0.38)" },
+  { bg: "linear-gradient(135deg,#059669,#34d399)", glow: "0 0 22px rgba(5,150,105,0.38)" },
+  { bg: "linear-gradient(135deg,#db2777,#f472b6)", glow: "0 0 22px rgba(219,39,119,0.38)" },
+  { bg: "linear-gradient(135deg,#dc2626,#f87171)", glow: "0 0 22px rgba(220,38,38,0.32)" },
+];
+
+function getAvatarColor(initial) {
+  const idx = ((initial?.charCodeAt(0) ?? 0) % AVATAR_PALETTES.length);
+  return AVATAR_PALETTES[idx];
+}
+
+function deriveName(meta, emotion, peerId) {
+  const raw =
+    meta?.name ??
+    emotion?.__name ??
+    emotion?.name ??
+    emotion?.displayName ??
+    emotion?.display_name ??
+    null;
+  if (raw && typeof raw === "string" && raw.trim().length > 0) return raw.trim();
+  if (typeof peerId === "string" && peerId.length > 0) return peerId.slice(0, 6);
+  return "Unknown";
+}
+
+function isValidStream(s) {
+  return !!s && typeof s.getVideoTracks === "function";
+}
+
+function getLiveVideoTrack(s) {
+  if (!isValidStream(s)) return null;
+  return s.getVideoTracks().find((t) => t.readyState === "live") ?? null;
+}
+
+function isTrackActive(t) {
+  return !!t && t.readyState === "live" && !t.muted;
+}
+
+const WAVE_DELAYS = [0.55, 0.40, 0.70, 0.50, 0.62, 0.48, 0.75];
+
+function WaveBars() {
+  return (
+    <div className={styles.waveBars} aria-hidden="true">
+      {WAVE_DELAYS.map((d, i) => (
+        <span key={i} className={styles.waveBar} style={{ animationDuration: `${d}s` }} />
+      ))}
+    </div>
+  );
+}
+
+function UserIcon() {
+  return (
+    <svg width="8" height="8" viewBox="0 0 24 24" fill="none"
+      stroke="rgba(255,255,255,0.65)" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+    </svg>
+  );
+}
 
 function ParticipantCard({
   peerId,
@@ -10,143 +78,208 @@ function ParticipantCard({
   style = {},
   meta,
   emotion,
-  isActive,
-  isHost,
-  DEBUG_SHOW_EMOTION_FOR_EVERYONE,
+  isActive = false,
+  isHost = false,
+  showStatusBar,
+  DEBUG_SHOW_EMOTION_FOR_EVERYONE = false,
   renderEmotionBadgeForId,
 }) {
   const videoRef = useRef(null);
-  const [videoActive, setVideoActive] = useState(true);
+  const unmountedRef = useRef(false);
+  const lastStreamIdRef = useRef(null);
 
-  const name =
-    meta?.name ||
-    emotion?.name ||
-    emotion?.displayName ||
-    emotion?.display_name ||
-    peerId?.slice(0, 6) ||
-    "Unknown";
+  const [videoActive, setVideoActive] = useState(false);
 
-  const videoTrack = stream?.getVideoTracks?.().find(
-    (t) => t.readyState === "live"
-  );
-  const hasVideoTrack = !!videoTrack;
-  const showVideo = hasVideoTrack && videoActive;
+  const name = useMemo(() => deriveName(meta, emotion, peerId), [meta, emotion, peerId]);
+  const initial = useMemo(() => (name[0] ?? "?").toUpperCase(), [name]);
+  const avatarColor = useMemo(() => getAvatarColor(initial), [initial]);
 
-  // clear srcObject when stream or video state changes
+  const videoTrack = getLiveVideoTrack(stream);
+  const showVideo = videoActive && Boolean(videoTrack);
+
+  const safeSetVideoActive = useCallback((val) => {
+    if (!unmountedRef.current) setVideoActive(val);
+  }, []);
+
   useEffect(() => {
-    const el = videoRef.current;
-    if (!el) return;
+    unmountedRef.current = false;
+    return () => {
+      unmountedRef.current = true;
+    };
+  }, []);
 
-    if (hasVideoTrack && videoActive) {
-      if (el.srcObject !== stream) {
-        try {
-          el.srcObject = stream;
-        } catch (err) {
-          console.warn("Failed to assign srcObject on participant video", err);
-        }
-      }
-    } else {
-      if (el.srcObject) {
-        try {
-          el.srcObject = null;
-        } catch (err) {
-          console.warn("Failed to clear srcObject on participant video", err);
-        }
-      }
-    }
-  }, [stream, hasVideoTrack, videoActive]);
-
-  // Track mute - unmute - ended events to toggle videoActive
   useEffect(() => {
     if (!videoTrack) {
-      setVideoActive(false);
+      safeSetVideoActive(false);
       return;
     }
 
-    setVideoActive(true);
+    safeSetVideoActive(isTrackActive(videoTrack));
 
-    const handleMute = () => setVideoActive(false);
-    const handleUnmute = () => setVideoActive(true);
-    const handleEnded = () => setVideoActive(false);
+    const onMute = () => safeSetVideoActive(false);
+    const onUnmute = () => safeSetVideoActive(true);
+    const onEnded = () => safeSetVideoActive(false);
 
-    videoTrack.onmute = handleMute;
-    videoTrack.onunmute = handleUnmute;
-    videoTrack.onended = handleEnded;
+    videoTrack.addEventListener("mute", onMute);
+    videoTrack.addEventListener("unmute", onUnmute);
+    videoTrack.addEventListener("ended", onEnded);
 
     return () => {
-      videoTrack.onmute = null;
-      videoTrack.onunmute = null;
-      videoTrack.onended = null;
+      videoTrack.removeEventListener("mute", onMute);
+      videoTrack.removeEventListener("unmute", onUnmute);
+      videoTrack.removeEventListener("ended", onEnded);
     };
-  }, [videoTrack]);
+  }, [videoTrack, safeSetVideoActive]);
+
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el || unmountedRef.current) return;
+
+    const currentStreamId = stream?.id;
+
+    if (showVideo && isValidStream(stream)) {
+      if (lastStreamIdRef.current !== currentStreamId) {
+        try {
+          el.srcObject = stream;
+          lastStreamIdRef.current = currentStreamId;
+        } catch {
+          return;
+        }
+      }
+
+      const p = el.play();
+      if (p !== undefined) {
+        p.catch(() => { });
+      }
+    } else if (el.srcObject) {
+      try {
+        el.pause();
+        el.srcObject = null;
+        lastStreamIdRef.current = null;
+      } catch { }
+    }
+  }, [stream, showVideo]);
+
+  useEffect(() => {
+    const el = videoRef.current;
+    return () => {
+      if (el) {
+        try {
+          el.pause();
+          el.srcObject = null;
+        } catch { }
+      }
+    };
+  }, []);
+
+  const renderStatusBar =
+    showStatusBar !== undefined ? showStatusBar : !compact && isActive;
+
+  const cardClasses = [
+    styles.participantCard,
+    compact ? styles.participantCardCompact : "",
+    isActive ? styles.participantCardSpeaking : "",
+  ].filter(Boolean).join(" ");
+
+  const cardStyle = useMemo(() => ({
+    position: "relative",
+    overflow: "hidden",
+    boxSizing: "border-box",
+    ...(compact
+      ? { width: 160, height: 90, borderRadius: 10 }
+      : { width: "100%", height: "100%", borderRadius: 14 }),
+    ...style,
+  }), [compact, style]);
+
+  const emotionBadge = useMemo(() => {
+    if ((isHost || DEBUG_SHOW_EMOTION_FOR_EVERYONE) && renderEmotionBadgeForId) {
+      return renderEmotionBadgeForId(peerId);
+    }
+    return null;
+  }, [peerId, isHost, DEBUG_SHOW_EMOTION_FOR_EVERYONE, renderEmotionBadgeForId]);
 
   return (
     <motion.div
-      layout
-      initial={{ opacity: 0, scale: 0.96 }}
+      layout={false}
+      initial={{ opacity: 0, scale: 0.97 }}
       animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.96 }}
-      className={`${styles.participantCard} ${compact ? styles.participantCardCompact : ""
-        } ${isActive ? styles.participantCardSpeaking : ""}`}
+      exit={{ opacity: 0, scale: 0.97 }}
+      transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+      className={cardClasses}
       title={name}
-      style={{
-        width: compact ? 160 : "100%",
-        height: compact ? 90 : "100%",
-        aspectRatio: compact ? "16/9" : undefined,
-        outline: isActive ? "3px solid #2ecc71" : "none",
-        boxSizing: "border-box",
-        transition: "outline 160ms ease",
-        ...style,
-      }}
+      style={cardStyle}
+      aria-label={`${name}${isActive ? ", active speaker" : ""}`}
     >
-      {showVideo ? (
+      {isActive && <div className={styles.speakingRingOverlay} aria-hidden="true" />}
+
+      {showVideo && (
         <video
           ref={videoRef}
           autoPlay
-          style={{ width: "100%", height: "100%", objectFit: "cover"  }}
+          playsInline
+          aria-label={`${name}'s video`}
+          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
         />
-      ) : (
+      )}
+
+      {!showVideo && (
         <div className={styles.cameraOffPlaceholder}>
-          <div style={{ textAlign: "center" }}>
-            {name?.[0] ? (
-              <span style={{ fontSize: compact ? 18 : 36 }}>
-                {name[0].toUpperCase()}
-              </span>
-            ) : (
-              <FaUserAlt size={compact ? 14 : 28} />
-            )}
+          <div className={styles.avatarStack}>
+            <div
+              className={styles.avatarCircle}
+              style={{
+                width: compact ? 32 : 56,
+                height: compact ? 32 : 56,
+                fontSize: compact ? "0.85rem" : "1.3rem",
+                background: avatarColor.bg,
+                boxShadow: avatarColor.glow,
+              }}
+            >
+              {initial}
+            </div>
             {!compact && (
-              <div style={{ marginTop: 6, fontSize: 13 }}>
-                {name} · Camera off
-              </div>
+              <span className={styles.avatarPlaceholderName}>{name}</span>
             )}
           </div>
         </div>
       )}
 
-      <div className={styles.participantOverlay}>
-        <div className={styles.namePill}>
-          <FaUserAlt />
-          <span>{name}</span>
-        </div>
+      <div
+        className={[styles.namePill, compact ? styles.namePillCompact : ""].filter(Boolean).join(" ")}
+        aria-hidden="true"
+      >
+        <span className={styles.namePillIcon}><UserIcon /></span>
+        <span className={styles.namePillText}>{name}</span>
+        {isActive && <span className={styles.namePillSpeakerDot} />}
       </div>
 
-      {(isHost || DEBUG_SHOW_EMOTION_FOR_EVERYONE) &&
-        renderEmotionBadgeForId?.(peerId)}
+      {renderStatusBar && (
+        <div className={styles.activeSpeakerBar} aria-label={`${name} is the active speaker`}>
+          <span className={styles.activeSpeakerLiveDot} aria-hidden="true" />
+          <span className={styles.activeSpeakerLabel}>Active Speaker</span>
+          <WaveBars />
+        </div>
+      )}
+
+      {emotionBadge}
     </motion.div>
   );
 }
 
-function areEqual(prev, next) {
+function arePropsEqual(prev, next) {
   return (
     prev.peerId === next.peerId &&
     prev.stream === next.stream &&
-    prev.meta === next.meta &&
-    prev.emotion === next.emotion &&
     prev.isActive === next.isActive &&
     prev.isHost === next.isHost &&
-    prev.compact === next.compact
+    prev.compact === next.compact &&
+    prev.showStatusBar === next.showStatusBar &&
+    prev.meta?.name === next.meta?.name &&
+    prev.meta?.userId === next.meta?.userId &&
+    prev.emotion?.label === next.emotion?.label &&
+    prev.emotion?.score === next.emotion?.score &&
+    prev.DEBUG_SHOW_EMOTION_FOR_EVERYONE === next.DEBUG_SHOW_EMOTION_FOR_EVERYONE
   );
 }
 
-export default React.memo(ParticipantCard, areEqual);
+export default React.memo(ParticipantCard, arePropsEqual);
