@@ -8,6 +8,7 @@ export default function useSocket({
   setChatMessages,
   seenMsgIdsRef,
   createPeerConnection,
+  safeNegotiateOffer,
   isInitiatorFor,
   politeRef,
   pendingCandidatesRef,
@@ -30,6 +31,10 @@ export default function useSocket({
     
     const onConnect = () => {
       setMyId(socket.id);
+      Object.keys(pcsRef.current).forEach((peerId) => {
+        closePeer(peerId);
+      });
+
       try {
         window.myId = socket.id;
       } catch { }
@@ -79,7 +84,20 @@ export default function useSocket({
       pendingCandidatesRef.current[p.id] =
         pendingCandidatesRef.current[p.id] || [];
 
-      createPeerConnection(p.id);
+      const pc = createPeerConnection(p.id);
+      if (!pc) return;
+
+      if (isInitiatorFor(p.id)) {
+        const tryNegotiate = () => {
+          if (pc.signalingState === "stable") {
+            safeNegotiateOffer(p.id);
+          } else {
+            setTimeout(tryNegotiate, 50);
+          }
+        };
+
+        tryNegotiate();
+      }
     };
 
     const onExistingParticipants = (existing) => {
@@ -171,6 +189,10 @@ export default function useSocket({
     socket.on("end-meeting", onEndMeeting);
 
     const onDisconnect = () => {
+      Object.keys(pcsRef.current).forEach((peerId) => {
+        closePeer(peerId);
+      });
+
       cleanupAll();
       navigate("/home");
     };

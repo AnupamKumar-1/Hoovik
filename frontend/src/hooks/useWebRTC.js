@@ -85,59 +85,69 @@ export default function useWebRTC({
   }, [pcsRef, setRemoteStreams, removeAnalyzer]);
 
 
-  // createPeerConnection
+  
 
 
   const createPeerConnection = useCallback((peerId) => {
     // Return existing healthy connection
     const existing = pcsRef.current[peerId];
-    if (existing && existing.connectionState !== "closed") return existing;
 
+    if (existing) {
+      safeClose(existing);
+      delete pcsRef.current[peerId];
+    }
     const pc = new RTCPeerConnection(ICE_CONFIG);
 
-    // Initialise signaling state for this peer
     makingOfferRef.current[peerId] = false;
     ignoreOfferRef.current[peerId] = false;
     pendingCandidatesRef.current[peerId] = [];
     isSettingRemoteAnswerPending.current[peerId] = false;
     analyzerAttachedRef.current[peerId] = false;
 
-    // ── Attach local tracks
+
     try {
       const ls = localStreamRef.current;
-      if (ls && pc.getSenders().length === 0) {
-        ls.getTracks().forEach((track) => pc.addTrack(track, ls));
+      if (ls) {
+        ls.getTracks().forEach((track) => {
+          const sender = pc.getSenders().find(
+            (s) => s.track?.kind === track.kind
+          );
+
+          if (sender) {
+            sender.replaceTrack(track);
+          } else {
+            pc.addTrack(track, ls);
+          }
+        });
       }
     } catch (err) {
       console.error(`[useWebRTC] Failed to add local tracks for ${peerId}:`, err);
       safeClose(pc);
       return null;
     }
-
-    // Register AFTER tracks are attached successfully
     pcsRef.current[peerId] = pc;
 
-    // ── Remote stream
-    remoteStreamsMapRef.current[peerId] = new MediaStream();
 
     pc.ontrack = (ev) => {
-      const stream = remoteStreamsMapRef.current[peerId];
+      const stream = ev.streams?.[0];
       if (!stream) return;
 
-      const track = ev.track;
-      if (!stream.getTracks().some((t) => t.id === track.id)) {
-        stream.addTrack(track);
-      }
+      setRemoteStreams((prev) => ({
+        ...prev,
+        [peerId]: stream,
+      }));
 
-      setRemoteStreams((prev) => ({ ...prev, [peerId]: stream }));
-
-      // Attach audio analyzer — set flag BEFORE call to prevent double-attach
-      if (streamHasAudio(stream) && !analyzerAttachedRef.current[peerId]) {
+      // Attach analyzer once
+      if (
+        streamHasAudio(stream) &&
+        analyzerAttachedRef.current[peerId] !== true
+      ) {
         analyzerAttachedRef.current[peerId] = true;
+
         try {
           createAnalyzerForStream(peerId, stream);
         } catch (err) {
-          console.warn(`[useWebRTC] Analyzer attach failed for ${peerId}:`, err);
+          console.warn(`[useWebRTC] Analyzer failed:`, err);
           analyzerAttachedRef.current[peerId] = false;
         }
       }

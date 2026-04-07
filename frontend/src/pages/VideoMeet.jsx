@@ -45,7 +45,11 @@ const SPEAKER_DEBOUNCE_MS = 700;
 const LARGE_ROOM_THRESHOLD = 6;
 
 function isValidStream(s) {
-  return !!s && typeof s.getTracks === "function";
+  return (
+    s &&
+    typeof s.getTracks === "function" &&
+    s.getTracks().some((t) => t.readyState === "live")
+  );
 }
 
 function getGridStyle(count) {
@@ -449,6 +453,36 @@ export default function VideoMeet() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [toggleMute, toggleVideo]);
 
+  useEffect(() => {
+    const stream = localStreamRef.current;
+    if (!stream) return;
+
+    Object.entries(pcsRef.current).forEach(([peerId, pc]) => {
+      const senders = pc.getSenders();
+
+      stream.getTracks().forEach((track) => {
+        const sender = senders.find(
+          (s) => s.track?.kind === track.kind
+        );
+
+        if (sender) {
+          sender.replaceTrack(track);
+        } else {
+          pc.addTrack(track, stream);
+        }
+      });
+
+      safeNegotiateOffer(peerId);
+    });
+  }, [videoOff, muted]);
+  useEffect(() => {
+    return () => {
+      Object.keys(pcsRef.current).forEach((peerId) => {
+        closePeer(peerId);
+      });
+    };
+  }, []);
+
   useSocket({
     socketRef,
     roomId,
@@ -476,13 +510,13 @@ export default function VideoMeet() {
 
   const remoteEntries = useMemo(() => {
     const mySocketId = myId;
+
     return Object.entries(remoteStreams)
       .filter(
         ([peerId, stream]) =>
           peerId &&
           peerId !== mySocketId &&
-          isValidStream(stream) &&
-          stream.getTracks().length > 0
+          isValidStream(stream)
       )
       .sort(([a], [b]) => a.localeCompare(b));
   }, [remoteStreams, myId]);
