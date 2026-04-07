@@ -41,16 +41,11 @@ import useAudioAnalyzer from "../hooks/useAudioAnalyzer";
 import useEmotionCapture from "../hooks/useEmotionCapture";
 
 const DEBUG_SHOW_EMOTION_FOR_EVERYONE = false;
-const SPEAKER_DEBOUNCE_MS = 300;
-const SPEAKER_HOLD_MS = 1200;
+const SPEAKER_DEBOUNCE_MS = 700;
 const LARGE_ROOM_THRESHOLD = 6;
 
 function isValidStream(s) {
-  return (
-    !!s &&
-    typeof s.getTracks === "function" &&
-    s.getTracks().length > 0
-  );
+  return !!s && typeof s.getTracks === "function";
 }
 
 function getGridStyle(count) {
@@ -69,6 +64,15 @@ function getCardMinHeight(count) {
   return 200;
 }
 
+function useIsScrolledToBottom(ref, threshold = 60) {
+  const check = useCallback(() => {
+    const el = ref.current;
+    if (!el) return true;
+    return el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
+  }, [ref, threshold]);
+  return check;
+}
+
 function ChatPanel({
   chatMessages,
   participantsMeta,
@@ -78,14 +82,13 @@ function ChatPanel({
   chatContainerRef,
   chatEndRef,
 }) {
+  const isAtBottom = useIsScrolledToBottom(chatContainerRef);
+
   useEffect(() => {
-    const el = chatContainerRef.current;
-    if (!el) return;
-    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-    if (distanceFromBottom < 80) {
+    if (isAtBottom()) {
       chatEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
     }
-  }, [chatMessages, chatContainerRef, chatEndRef]);
+  }, [chatMessages, isAtBottom, chatEndRef]);
 
   return (
     <motion.aside
@@ -137,16 +140,13 @@ function ChatPanel({
                 </div>
               )}
               <div
-                className={`${styles.msgBubble} ${isOwn ? styles.msgBubbleOwn : styles.msgBubbleOther
-                  }`}
+                className={`${styles.msgBubble} ${isOwn ? styles.msgBubbleOwn : styles.msgBubbleOther}`}
               >
                 {m.text}
               </div>
               <div className={styles.msgMeta}>
                 {isOwn && (
-                  <span className={`${styles.msgMetaName} ${styles.msgMetaNameOwn}`}>
-                    You
-                  </span>
+                  <span className={`${styles.msgMetaName} ${styles.msgMetaNameOwn}`}>You</span>
                 )}
                 <span>
                   {new Date(m.ts).toLocaleTimeString([], {
@@ -236,7 +236,6 @@ export default function VideoMeet() {
   const chatEndRef = useRef(null);
   const cleanupRef = useRef(null);
   const speakerTimerRef = useRef(null);
-  const lastSwitchRef = useRef(0);
 
   const [remoteStreams, setRemoteStreams] = useState({});
   const [connecting, setConnecting] = useState(true);
@@ -409,27 +408,14 @@ export default function VideoMeet() {
   useEffect(() => {
     if (!activeSpeakerId) return;
 
-    const now = Date.now();
-    const normalizedId =
-      activeSpeakerId === myId || activeSpeakerId === "local"
-        ? "local"
-        : activeSpeakerId;
-
-    if (
-      stableSpeakerId &&
-      stableSpeakerId !== normalizedId &&
-      now - lastSwitchRef.current < SPEAKER_HOLD_MS
-    ) {
-      return;
-    }
-
     if (speakerTimerRef.current) clearTimeout(speakerTimerRef.current);
 
     speakerTimerRef.current = setTimeout(() => {
-      lastSwitchRef.current = Date.now();
+      const normalizedId =
+        activeSpeakerId === myId ? "local" : activeSpeakerId;
       setStableSpeakerId(normalizedId);
     }, SPEAKER_DEBOUNCE_MS);
-  }, [activeSpeakerId, myId, stableSpeakerId]);
+  }, [activeSpeakerId, myId]);
 
   useEffect(() => {
     return () => {
@@ -446,7 +432,9 @@ export default function VideoMeet() {
     const onKeyDown = (e) => {
       const tag = (e.target?.tagName || "").toUpperCase();
       const isEditable =
-        tag === "INPUT" || tag === "TEXTAREA" || e.target?.isContentEditable;
+        tag === "INPUT" ||
+        tag === "TEXTAREA" ||
+        e.target?.isContentEditable;
       if (isEditable) return;
 
       if (e.key === "m" || e.key === "M") {
@@ -487,17 +475,23 @@ export default function VideoMeet() {
   });
 
   const remoteEntries = useMemo(() => {
+    const mySocketId = myId;
     return Object.entries(remoteStreams)
       .filter(
         ([peerId, stream]) =>
-          peerId && peerId !== myId && isValidStream(stream)
+          peerId &&
+          peerId !== mySocketId &&
+          isValidStream(stream) &&
+          stream.getTracks().length > 0
       )
       .sort(([a], [b]) => a.localeCompare(b));
   }, [remoteStreams, myId]);
 
   const participantMap = useMemo(() => {
     const map = {};
-    participantsMeta.forEach((p) => { map[p.id] = p.meta; });
+    participantsMeta.forEach((p) => {
+      map[p.id] = p.meta;
+    });
     return map;
   }, [participantsMeta]);
 
@@ -568,7 +562,7 @@ export default function VideoMeet() {
                 ...gridStyle,
               }}
             >
-              <AnimatePresence mode={isLargeRoom ? undefined : "popLayout"}>
+              <AnimatePresence mode={isLargeRoom ? "sync" : "popLayout"}>
                 {remoteEntries.map(([peerId, stream]) => (
                   <ParticipantCard
                     key={peerId}

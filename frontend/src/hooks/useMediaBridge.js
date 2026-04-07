@@ -1,6 +1,5 @@
 import { useEffect } from "react";
 
-
 export default function useMediaBridge({
   localStreamRef,
   createAnalyzerForStream,
@@ -10,34 +9,44 @@ export default function useMediaBridge({
   recordersRef,
   startPeriodicEmotionCapture,
   stopPeriodicEmotionCapture,
+  pcsRef,
+  safeNegotiateOffer,  
 }) {
   useEffect(() => {
+
+    const renegotiateAllPeers = () => {
+      const pcs = pcsRef.current || {};
+      Object.keys(pcs).forEach((peerId) => {
+        try {
+          safeNegotiateOffer(peerId);
+        } catch { }
+      });
+    };
 
     const setupVolumeAnalyzer = (stream) => {
       try {
         if (stream) {
           localStreamRef.current = stream;
         }
+
         createAnalyzerForStream("local", stream || localStreamRef.current);
-      } catch (e) {
-        console.warn("setupVolumeAnalyzer failed", e);
-      }
+
+        // ✅ IMPORTANT
+        renegotiateAllPeers();
+
+      } catch (e) { }
     };
 
     const stopVolumeAnalyzer = () => {
       try {
         removeAnalyzer("local");
-      } catch (e) {
-        console.warn("stopVolumeAnalyzer failed", e);
-      }
+      } catch { }
     };
 
     const startTranscription = (stream) => {
       try {
         startRecordingForStream("local", stream || localStreamRef.current);
-      } catch (e) {
-        console.warn("startTranscription failed", e);
-      }
+      } catch { }
     };
 
     const stopTranscription = () => {
@@ -47,43 +56,32 @@ export default function useMediaBridge({
           rec.recorder.stop();
         }
         if (recordersRef.current) delete recordersRef.current["local"];
-      } catch (e) {
-        console.warn("stopTranscription failed", e);
-      }
+      } catch { }
     };
 
     const startRecording = (stream) => {
       try {
         startRecordingForStream("local", stream || localStreamRef.current);
-      } catch (e) {
-        console.warn("startRecording failed", e);
-      }
+      } catch { }
     };
 
     const stopRecording = () => {
       try {
         stopAllRecorders();
-      } catch (e) {
-        console.warn("stopRecording failed", e);
-      }
+      } catch { }
     };
 
     const startEmotion = (opts = {}) => {
       try {
         startPeriodicEmotionCapture(opts);
-      } catch (e) {
-        console.warn("startEmotion failed", e);
-      }
+      } catch { }
     };
 
     const stopEmotion = () => {
       try {
         stopPeriodicEmotionCapture();
-      } catch (e) {
-        console.warn("stopEmotion failed", e);
-      }
+      } catch { }
     };
-
 
     const bridge = {
       setupVolumeAnalyzer,
@@ -101,7 +99,7 @@ export default function useMediaBridge({
     return () => {
       try {
         delete window.__MEDIA_BRIDGE__;
-      } catch {}
+      } catch { }
     };
   }, [
     localStreamRef,
@@ -112,5 +110,7 @@ export default function useMediaBridge({
     recordersRef,
     startPeriodicEmotionCapture,
     stopPeriodicEmotionCapture,
+    pcsRef,
+    safeNegotiateOffer,
   ]);
 }

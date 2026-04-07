@@ -7,10 +7,8 @@ export default function LandingPage() {
 
   return (
     <div className="lp-root">
-      {/* Background mesh */}
+      
       <div className="lp-bg-mesh" aria-hidden />
-
-      {/* ── NAV ── */}
       <header className="lp-nav" role="navigation" aria-label="Main navigation">
         <div className="lp-brand" onClick={() => navigate("/")}>
           <div className="lp-brand-icon">
@@ -41,7 +39,6 @@ export default function LandingPage() {
         </div>
       </header>
 
-      {/* ── HERO ── */}
       <main className="lp-hero">
         {/* Left */}
         <section className="lp-hero-left">
