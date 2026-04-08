@@ -27,6 +27,37 @@ async function copyToClipboard(text) {
   }
 }
 
+async function createRoomAndGetLink(name) {
+  const token = localStorage.getItem("token");
+  const headers = { "Content-Type": "application/json" };
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const res = await fetch(`${API_BASE}/rooms`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ hostName: name.trim() }),
+  });
+
+  if (!res.ok) throw new Error("Failed to create room");
+
+  const { roomCode, hostSecret } = await res.json();
+  const code = roomCode.toUpperCase();
+  const link = `${window.location.origin}/room/${code}`;
+
+  localStorage.setItem("displayName", name.trim());
+  localStorage.setItem(
+    `host:${code}`,
+    JSON.stringify({
+      hostName: name.trim(),
+      hostSecret: hostSecret || null,
+      meetingCode: code,
+      createdAt: new Date().toISOString(),
+    })
+  );
+
+  return { code, link };
+}
+
 function getTranscriptKey(item, index) {
   const id = item._id || item.id || "";
   const code = (item.meeting_code || item.meetingCode || "local").toString();
@@ -66,7 +97,6 @@ function mapTranscript(t) {
   };
 }
 
-/* ─── Snackbar ─── */
 function Snack({ msg, severity, open }) {
   return (
     <div className={`hm-snack hm-snack-${severity} ${open ? "hm-snack-show" : ""}`}>
@@ -161,31 +191,20 @@ export default function Home() {
   async function createRoom() {
     if (!name.trim()) { showSnack("Please enter your name first.", "error"); return; }
     try {
-      const token = localStorage.getItem("token");
-      const headers = { "Content-Type": "application/json" };
-      if (token) headers.Authorization = `Bearer ${token}`;
-      const res = await fetch(`${API_BASE}/rooms`, { method: "POST", headers, body: JSON.stringify({ hostName: name.trim() }) });
-      if (!res.ok) throw new Error("Failed to create room");
-      const { roomCode, hostSecret } = await res.json();
-      localStorage.setItem("displayName", name.trim());
-      localStorage.setItem(`host:${roomCode.toUpperCase()}`, JSON.stringify({ hostName: name.trim(), hostSecret: hostSecret || null, meetingCode: roomCode.toUpperCase(), createdAt: new Date().toISOString() }));
-      navigate(`/room/${roomCode.toUpperCase()}`);
+      const { code, link } = await createRoomAndGetLink(name);
+      await copyToClipboard(link);
+      setRoom(link);
+      showSnack("Meeting created & link copied", "success");
+      navigate(`/room/${code}`);
     } catch (err) { console.error(err); showSnack("Unable to create room.", "error"); }
   }
 
   async function copyLink() {
     if (!name.trim()) { showSnack("Enter your name before creating a link", "error"); return; }
     try {
-      const token = localStorage.getItem("token");
-      const headers = { "Content-Type": "application/json" };
-      if (token) headers.Authorization = `Bearer ${token}`;
-      const res = await fetch(`${API_BASE}/rooms`, { method: "POST", headers, body: JSON.stringify({ hostName: name.trim() }) });
-      if (!res.ok) throw new Error("Failed to create room");
-      const { roomCode, hostSecret } = await res.json();
-      const link = `${window.location.origin}/room/${roomCode.toUpperCase()}`;
-      localStorage.setItem("displayName", name.trim());
-      localStorage.setItem(`host:${roomCode.toUpperCase()}`, JSON.stringify({ hostName: name.trim(), hostSecret: hostSecret || null, createdAt: new Date().toISOString() }));
+      const { link } = await createRoomAndGetLink(name);
       const copied = await copyToClipboard(link);
+      setRoom(link);
       showSnack(copied ? "Link copied to clipboard" : `Copy failed — link: ${link}`, copied ? "success" : "error");
     } catch (err) { console.error(err); showSnack("Unable to create room link.", "error"); }
   }
@@ -213,7 +232,6 @@ export default function Home() {
     <div className="hm-root">
       <div className="hm-bg" aria-hidden />
 
-      {/* ── TOPBAR ── */}
       <header className="hm-topbar">
         <div className="hm-brand" onClick={() => navigate("/")}>
           <div className="hm-brand-icon">
@@ -233,7 +251,6 @@ export default function Home() {
         </div>
       </header>
 
-      {/* ── WELCOME ── */}
       <div className="hm-welcome">
         <div className="hm-welcome-avatar" aria-hidden>{displayInitial}</div>
         <div className="hm-welcome-text">
@@ -242,13 +259,10 @@ export default function Home() {
         </div>
       </div>
 
-      {/* ── GRID ── */}
       <div className="hm-grid">
 
-        {/* LEFT COLUMN */}
         <div className="hm-left">
 
-          {/* Create Room */}
           <div className="hm-card">
             <div className="hm-card-header">
               <div>
@@ -272,7 +286,7 @@ export default function Home() {
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
                     <path d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
                   </svg>
-                  Copy Link
+                  Create & Copy Link
                 </button>
               </div>
               <div className="hm-tip-row">
@@ -284,7 +298,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Join Room */}
           <div className="hm-card">
             <div className="hm-card-header">
               <div>
@@ -308,7 +321,6 @@ export default function Home() {
 
         </div>
 
-        {/* RIGHT COLUMN — TRANSCRIPTS */}
         <div className="hm-card hm-transcripts">
           <div className="hm-card-header">
             <div>
@@ -322,7 +334,6 @@ export default function Home() {
 
           <div className="hm-divider" />
 
-          {/* Disabled state */}
           {!TRANSCRIPTS_ENABLED && (
             <div className="hm-tx-notice hm-tx-notice-warn">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
@@ -335,7 +346,6 @@ export default function Home() {
             </div>
           )}
 
-          {/* Empty state */}
           {recentLocal.length === 0 && TRANSCRIPTS_ENABLED && (
             <div className="hm-tx-empty">
               <div className="hm-tx-empty-icon" aria-hidden>
@@ -348,7 +358,6 @@ export default function Home() {
             </div>
           )}
 
-          {/* Transcript list */}
           {recentLocal.map((t, i) => {
             const key = getTranscriptKey(t, i);
             const isExpanded = !!expandedTranscripts[key];
@@ -415,7 +424,6 @@ export default function Home() {
         </div>
 
       </div>
-
 
       <Snack msg={snackMsg} severity={snackSeverity} open={snackOpen} />
     </div>
