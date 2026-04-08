@@ -13,6 +13,7 @@ import useMeetingLifecycle from "../hooks/useMeetingLifecycle";
 import styles from "../styles/videoComponent.module.css";
 import { TRANSCRIPTS_ENABLED } from "../environment";
 import ParticipantCard from "./ParticipantCard";
+import SpotlightCard from "./SpotlightCard";
 import useChat from "../hooks/useChat";
 import {
   SOCKET_SERVER_URL,
@@ -40,9 +41,8 @@ import EmotionServicePanel from "./EmotionServicePanel";
 import useAudioAnalyzer from "../hooks/useAudioAnalyzer";
 import useEmotionCapture from "../hooks/useEmotionCapture";
 
-const DEBUG_SHOW_EMOTION_FOR_EVERYONE = false;
+const HOST_ONLY_EMOTION = true;
 const SPEAKER_DEBOUNCE_MS = 700;
-const LARGE_ROOM_THRESHOLD = 6;
 
 function isValidStream(s) {
   return (
@@ -52,29 +52,12 @@ function isValidStream(s) {
   );
 }
 
-function getGridStyle(count) {
-  if (count === 0) return {};
-  if (count === 1) return { gridTemplateColumns: "1fr", gridTemplateRows: "1fr" };
-  if (count === 2) return { gridTemplateColumns: "repeat(2, 1fr)", gridTemplateRows: "1fr" };
-  if (count === 3) return { gridTemplateColumns: "repeat(3, 1fr)", gridTemplateRows: "1fr" };
-  if (count === 4) return { gridTemplateColumns: "repeat(2, 1fr)", gridTemplateRows: "repeat(2, 1fr)" };
-  return { gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))" };
-}
-
-function getCardMinHeight(count) {
-  if (count === 1) return "60vh";
-  if (count <= 2) return 280;
-  if (count <= 4) return 240;
-  return 200;
-}
-
 function useIsScrolledToBottom(ref, threshold = 60) {
-  const check = useCallback(() => {
+  return useCallback(() => {
     const el = ref.current;
     if (!el) return true;
     return el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
   }, [ref, threshold]);
-  return check;
 }
 
 function ChatPanel({
@@ -108,7 +91,7 @@ function ChatPanel({
         <strong>Chat</strong>
         <div className={styles.chatHeaderCount}>
           <span className={styles.chatHeaderCountDot} />
-          {participantsMeta.length} in call
+          {participantsMeta.length + 1} in call
         </div>
       </div>
 
@@ -123,7 +106,9 @@ function ChatPanel({
           <div className={styles.chatEmptyState}>
             <FaRegComments size={20} style={{ opacity: 0.3, color: "var(--vm-muted-bright)" }} />
             <p className={styles.chatEmptyStateText}>
-              No messages yet.<br />Say hello! 👋
+              No messages yet.
+              <br />
+              Say hello! 👋
             </p>
           </div>
         )}
@@ -143,9 +128,7 @@ function ChatPanel({
                   <span className={styles.msgMetaName}>{m.meta?.name || "User"}</span>
                 </div>
               )}
-              <div
-                className={`${styles.msgBubble} ${isOwn ? styles.msgBubbleOwn : styles.msgBubbleOther}`}
-              >
+              <div className={`${styles.msgBubble} ${isOwn ? styles.msgBubbleOwn : styles.msgBubbleOther}`}>
                 {m.text}
               </div>
               <div className={styles.msgMeta}>
@@ -153,28 +136,15 @@ function ChatPanel({
                   <span className={`${styles.msgMetaName} ${styles.msgMetaNameOwn}`}>You</span>
                 )}
                 <span>
-                  {new Date(m.ts).toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
+                  {new Date(m.ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                 </span>
                 {isOwn && (
                   <>
                     {m.status === "pending" && (
-                      <span
-                        className={`${styles.msgStatusIcon} ${styles.msgStatusPending}`}
-                        aria-label="Sending"
-                      >
-                        ●
-                      </span>
+                      <span className={`${styles.msgStatusIcon} ${styles.msgStatusPending}`} aria-label="Sending">●</span>
                     )}
                     {m.status === "sent" && (
-                      <span
-                        className={`${styles.msgStatusIcon} ${styles.msgStatusSent}`}
-                        aria-label="Sent"
-                      >
-                        ✓
-                      </span>
+                      <span className={`${styles.msgStatusIcon} ${styles.msgStatusSent}`} aria-label="Sent">✓</span>
                     )}
                     {m.status === "failed" && (
                       <span
@@ -208,17 +178,8 @@ function ChatPanel({
 function EmptyStateIcon() {
   return (
     <div className={styles.emptyStateIcon}>
-      <svg
-        width="26"
-        height="26"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        aria-hidden="true"
-      >
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d="M23 7l-7 5 7 5V7z" />
         <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
       </svg>
@@ -268,7 +229,19 @@ export default function VideoMeet() {
   const videoOffRef = useRef(videoOff);
   useEffect(() => { mutedRef.current = muted; }, [muted]);
   useEffect(() => { videoOffRef.current = videoOff; }, [videoOff]);
-  useEffect(() => { remoteStreamsRef.current = remoteStreams; }, [remoteStreams]);
+
+  // Unwrap { stream, trackCount } → raw MediaStream for all consumers
+  const unwrappedRemoteStreams = useMemo(() => {
+    const out = {};
+    for (const [id, entry] of Object.entries(remoteStreams)) {
+      out[id] = entry?.stream ?? entry;
+    }
+    return out;
+  }, [remoteStreams]);
+
+  useEffect(() => {
+    remoteStreamsRef.current = unwrappedRemoteStreams;
+  }, [unwrappedRemoteStreams]);
 
   const {
     chatMessages,
@@ -286,7 +259,7 @@ export default function VideoMeet() {
   });
 
   const { activeSpeakerId, createAnalyzerForStream, removeAnalyzer } =
-    useAudioAnalyzer({ remoteStreams, localStreamRef, mutedRef, pcsRef });
+    useAudioAnalyzer({ remoteStreams: unwrappedRemoteStreams, localStreamRef, mutedRef, pcsRef });
 
   const {
     recordersRef,
@@ -308,6 +281,7 @@ export default function VideoMeet() {
     handleSignal,
     politeRef,
     pendingCandidatesRef,
+    flushPendingPeers,
   } = useWebRTC({
     socketRef,
     localStreamRef,
@@ -326,7 +300,7 @@ export default function VideoMeet() {
       myId,
       roomId,
       isHost,
-      DEBUG_SHOW_EMOTION_FOR_EVERYONE,
+      DEBUG_SHOW_EMOTION_FOR_EVERYONE: false,
     });
 
   const { toggleMute, toggleVideo, startScreenShare } = useMediaControls({
@@ -367,11 +341,10 @@ export default function VideoMeet() {
       setRemoteStreams,
       recordersRef,
       SOCKET_SERVER_URL,
+      flushPendingPeers,
     });
 
-  useEffect(() => {
-    cleanupRef.current = cleanupAll;
-  }, [cleanupAll]);
+  useEffect(() => { cleanupRef.current = cleanupAll; }, [cleanupAll]);
 
   useMediaBridge({
     localStreamRef,
@@ -394,53 +367,58 @@ export default function VideoMeet() {
     }
   }, []);
 
-  const closePeer = useCallback((peerId) => {
-    const pc = pcsRef.current[peerId];
-    if (pc) {
-      try { pc.close(); } catch { }
-      delete pcsRef.current[peerId];
-    }
-    setRemoteStreams((prev) => {
-      if (!prev[peerId]) return prev;
-      const copy = { ...prev };
-      delete copy[peerId];
-      return copy;
-    });
-    setStableSpeakerId((prev) => (prev === peerId ? null : prev));
-  }, []);
+  const closePeer = useCallback(
+    (peerId) => {
+      const pc = pcsRef.current[peerId];
+      if (pc) {
+        try { pc.close(); } catch { }
+        delete pcsRef.current[peerId];
+      }
+      try {
+        const rec = recordersRef.current?.[peerId];
+        if (rec?.state === "recording") rec.stop();
+        delete recordersRef.current[peerId];
+      } catch { }
+
+      removeAnalyzer(peerId);
+
+      setRemoteStreams((prev) => {
+        const next = { ...prev };
+        delete next[peerId];
+        return next;
+      });
+      setStableSpeakerId((prev) => (prev === peerId ? null : prev));
+    },
+    [pcsRef, recordersRef, removeAnalyzer]
+  );
 
   useEffect(() => {
     if (!activeSpeakerId) return;
-
     if (speakerTimerRef.current) clearTimeout(speakerTimerRef.current);
-
     speakerTimerRef.current = setTimeout(() => {
-      const normalizedId =
-        activeSpeakerId === myId ? "local" : activeSpeakerId;
+      const normalizedId = activeSpeakerId === myId ? "local" : activeSpeakerId;
       setStableSpeakerId(normalizedId);
     }, SPEAKER_DEBOUNCE_MS);
   }, [activeSpeakerId, myId]);
 
   useEffect(() => {
-    return () => {
-      if (speakerTimerRef.current) clearTimeout(speakerTimerRef.current);
-    };
+    return () => { if (speakerTimerRef.current) clearTimeout(speakerTimerRef.current); };
   }, []);
 
   useEffect(() => {
-    if (shareEmotion && isHost) startPeriodicEmotionCapture({});
-    else stopPeriodicEmotionCapture();
+    if (!isHost) return;
+    if (shareEmotion) {
+      startPeriodicEmotionCapture({});
+    } else {
+      stopPeriodicEmotionCapture();
+    }
   }, [shareEmotion, isHost, startPeriodicEmotionCapture, stopPeriodicEmotionCapture]);
 
   useEffect(() => {
     const onKeyDown = (e) => {
       const tag = (e.target?.tagName || "").toUpperCase();
-      const isEditable =
-        tag === "INPUT" ||
-        tag === "TEXTAREA" ||
-        e.target?.isContentEditable;
+      const isEditable = tag === "INPUT" || tag === "TEXTAREA" || e.target?.isContentEditable;
       if (isEditable) return;
-
       if (e.key === "m" || e.key === "M") {
         toggleMute(mutedRef.current, setMuted, mutedRef, TRANSCRIPTS_ENABLED, recordersRef);
       } else if (e.key === "v" || e.key === "V") {
@@ -454,33 +432,7 @@ export default function VideoMeet() {
   }, [toggleMute, toggleVideo]);
 
   useEffect(() => {
-    const stream = localStreamRef.current;
-    if (!stream) return;
-
-    Object.entries(pcsRef.current).forEach(([peerId, pc]) => {
-      const senders = pc.getSenders();
-
-      stream.getTracks().forEach((track) => {
-        const sender = senders.find(
-          (s) => s.track?.kind === track.kind
-        );
-
-        if (sender) {
-          sender.replaceTrack(track);
-        } else {
-          pc.addTrack(track, stream);
-        }
-      });
-
-      safeNegotiateOffer(peerId);
-    });
-  }, [videoOff, muted]);
-  useEffect(() => {
-    return () => {
-      Object.keys(pcsRef.current).forEach((peerId) => {
-        closePeer(peerId);
-      });
-    };
+    return () => { Object.keys(pcsRef.current).forEach((peerId) => closePeer(peerId)); };
   }, []);
 
   useSocket({
@@ -509,27 +461,24 @@ export default function VideoMeet() {
   });
 
   const remoteEntries = useMemo(() => {
-    const mySocketId = myId;
-
-    return Object.entries(remoteStreams)
-      .filter(
-        ([peerId, stream]) =>
-          peerId &&
-          peerId !== mySocketId &&
-          isValidStream(stream)
-      )
+    return Object.entries(unwrappedRemoteStreams)
+      .filter(([peerId, stream]) => peerId && peerId !== myId && isValidStream(stream))
       .sort(([a], [b]) => a.localeCompare(b));
-  }, [remoteStreams, myId]);
+  }, [unwrappedRemoteStreams, myId]);
+
+  const activeEntry =
+    remoteEntries.find(([id]) => id === stableSpeakerId) || remoteEntries[0] || null;
+
+  const otherEntries = remoteEntries.filter(([id]) => id !== activeEntry?.[0]);
 
   const participantMap = useMemo(() => {
     const map = {};
-    participantsMeta.forEach((p) => {
-      map[p.id] = p.meta;
-    });
+    participantsMeta.forEach((p) => { map[p.id] = p.meta; });
     return map;
   }, [participantsMeta]);
 
   const socketEmotionMap = useMemo(() => {
+    if (!isHost && HOST_ONLY_EMOTION) return {};
     const map = {};
     participantsMeta.forEach((p) => {
       const userId = p.meta?.userId;
@@ -537,19 +486,7 @@ export default function VideoMeet() {
       if (!map[p.id] && emotionsMap[p.id]) map[p.id] = emotionsMap[p.id];
     });
     return map;
-  }, [participantsMeta, emotionsMap]);
-
-  const gridStyle = useMemo(
-    () => getGridStyle(remoteEntries.length),
-    [remoteEntries.length]
-  );
-
-  const cardMinHeight = useMemo(
-    () => getCardMinHeight(remoteEntries.length),
-    [remoteEntries.length]
-  );
-
-  const isLargeRoom = remoteEntries.length >= LARGE_ROOM_THRESHOLD;
+  }, [participantsMeta, emotionsMap, isHost]);
 
   return (
     <div className={styles.meetVideoContainer}>
@@ -572,11 +509,7 @@ export default function VideoMeet() {
       </AnimatePresence>
 
       <div className={styles.conferenceWrap}>
-        <div
-          className={styles.conferenceView}
-          aria-live="polite"
-          aria-label="Participants"
-        >
+        <div className={styles.conferenceView} aria-live="polite" aria-label="Participants">
           {remoteEntries.length === 0 && !connecting && (
             <div className={styles.emptyState} role="status">
               <EmptyStateIcon />
@@ -585,32 +518,34 @@ export default function VideoMeet() {
           )}
 
           {remoteEntries.length > 0 && (
-            <div
-              style={{
-                display: "grid",
-                gap: 10,
-                width: "100%",
-                height: "100%",
-                alignItems: "stretch",
-                justifyItems: "stretch",
-                ...gridStyle,
-              }}
-            >
-              <AnimatePresence mode={isLargeRoom ? "sync" : "popLayout"}>
-                {remoteEntries.map(([peerId, stream]) => (
+            <div style={{ display: "flex", width: "100%", height: "100%", gap: 10 }}>
+              <div style={{ flex: 1 }}>
+                {activeEntry && (
+                  <SpotlightCard
+                    id={activeEntry[0]}
+                    stream={activeEntry[1]}
+                    meta={participantMap[activeEntry[0]]}
+                    emotion={isHost ? socketEmotionMap[activeEntry[0]] : undefined}
+                    isActive={true}
+                    isHost={isHost}
+                  />
+                )}
+              </div>
+
+              <div className={styles.rightColumn}>
+                {otherEntries.map(([peerId, stream]) => (
                   <ParticipantCard
                     key={peerId}
                     peerId={peerId}
                     stream={stream}
                     meta={participantMap[peerId]}
-                    emotion={socketEmotionMap[peerId]}
+                    emotion={isHost ? socketEmotionMap[peerId] : undefined}
                     isActive={stableSpeakerId === peerId}
                     isHost={isHost}
-                    DEBUG_SHOW_EMOTION_FOR_EVERYONE={DEBUG_SHOW_EMOTION_FOR_EVERYONE}
-                    style={{ minHeight: cardMinHeight }}
+                    compact
                   />
                 ))}
-              </AnimatePresence>
+              </div>
             </div>
           )}
         </div>
@@ -635,29 +570,23 @@ export default function VideoMeet() {
           muted
           playsInline
           aria-label="Your local video"
-          style={{
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-            display: "block",
-          }}
+          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
         />
         <div
           className={styles.youBadge}
-          style={
-            stableSpeakerId === "local"
-              ? { boxShadow: "0 0 12px rgba(14,165,233,0.7)" }
-              : undefined
-          }
+          style={stableSpeakerId === "local" ? { boxShadow: "0 0 12px rgba(14,165,233,0.7)" } : undefined}
         >
-          You
+          {localStorage.getItem("displayName") || "You"}
+          {isHost && (
+            <span style={{ marginLeft: 4, fontSize: "0.7em", opacity: 0.75, fontWeight: 600 }}>
+              (Host)
+            </span>
+          )}
         </div>
         <div className={styles.previewControls}>
           <button
             className={`${styles.iconButton} ${muted ? styles.active : ""}`}
-            onClick={() =>
-              toggleMute(muted, setMuted, mutedRef, TRANSCRIPTS_ENABLED, recordersRef)
-            }
+            onClick={() => toggleMute(muted, setMuted, mutedRef, TRANSCRIPTS_ENABLED, recordersRef)}
             aria-label={muted ? "Unmute" : "Mute"}
             title={muted ? "Unmute" : "Mute"}
             style={{ minWidth: 30, minHeight: 30, fontSize: "0.82rem", padding: 6 }}
@@ -673,13 +602,13 @@ export default function VideoMeet() {
           >
             {videoOff ? <FaVideoSlash /> : <FaVideo />}
           </button>
-          {(isHost || DEBUG_SHOW_EMOTION_FOR_EVERYONE) && (
+          {isHost && (
             <button
               className={`${styles.iconButton} ${shareEmotion ? styles.active : ""}`}
               onClick={() => setShareEmotion((v) => !v)}
               aria-pressed={shareEmotion}
-              aria-label={shareEmotion ? "Stop sharing emotions" : "Share emotions"}
-              title={shareEmotion ? "Stop sharing emotions" : "Share emotions"}
+              aria-label={shareEmotion ? "Stop emotion detection" : "Start emotion detection"}
+              title={shareEmotion ? "Stop emotion detection" : "Start emotion detection (host only)"}
               style={{ minWidth: 30, minHeight: 30, fontSize: 13, padding: 6 }}
             >
               😊
@@ -702,16 +631,10 @@ export default function VideoMeet() {
         )}
       </AnimatePresence>
 
-      <div
-        className={styles.buttonContainers}
-        role="toolbar"
-        aria-label="Meeting controls"
-      >
+      <div className={styles.buttonContainers} role="toolbar" aria-label="Meeting controls">
         <button
           className={`${styles.iconButton} ${muted ? styles.active : ""}`}
-          onClick={() =>
-            toggleMute(muted, setMuted, mutedRef, TRANSCRIPTS_ENABLED, recordersRef)
-          }
+          onClick={() => toggleMute(muted, setMuted, mutedRef, TRANSCRIPTS_ENABLED, recordersRef)}
           aria-label={muted ? "Unmute microphone" : "Mute microphone"}
           title={muted ? "Unmute (M)" : "Mute (M)"}
           aria-pressed={muted}
@@ -751,13 +674,13 @@ export default function VideoMeet() {
           <FaComments />
         </button>
 
-        {(isHost || DEBUG_SHOW_EMOTION_FOR_EVERYONE) && (
+        {isHost && (
           <button
             className={`${styles.iconButton} ${shareEmotion ? styles.active : ""}`}
             onClick={() => setShareEmotion((v) => !v)}
             aria-pressed={shareEmotion}
-            aria-label={shareEmotion ? "Stop sharing emotions" : "Share emotions"}
-            title={shareEmotion ? "Stop sharing emotions" : "Share emotions"}
+            aria-label={shareEmotion ? "Stop emotion detection" : "Start emotion detection"}
+            title={shareEmotion ? "Stop emotion detection" : "Start emotion detection (host only)"}
           >
             😊
           </button>
@@ -775,12 +698,14 @@ export default function VideoMeet() {
         </button>
       </div>
 
-      <EmotionServicePanel
-        emotionsMap={emotionsMap}
-        participantsMeta={participantsMeta}
-        isHost={isHost}
-        DEBUG_SHOW_EMOTION_FOR_EVERYONE={DEBUG_SHOW_EMOTION_FOR_EVERYONE}
-      />
+      {isHost && (
+        <EmotionServicePanel
+          emotionsMap={emotionsMap}
+          participantsMeta={participantsMeta}
+          isHost={isHost}
+          DEBUG_SHOW_EMOTION_FOR_EVERYONE={false}
+        />
+      )}
     </div>
   );
 }

@@ -1,5 +1,10 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
+/**
+ * All props are stored in a ref so every socket handler always calls the
+ * latest version of each callback — no stale-closure bugs even though the
+ * effect only runs once per socket instance.
+ */
 export default function useSocket({
   socketRef,
   roomId,
@@ -24,62 +29,90 @@ export default function useSocket({
   handleIncomingMessage,
   handleAck,
 }) {
+  // Mirror every prop into a ref so handlers always see current values.
+  const h = useRef({});
+  h.current = {
+    setMyId,
+    setParticipantsMeta,
+    setChatMessages,
+    seenMsgIdsRef,
+    createPeerConnection,
+    safeNegotiateOffer,
+    isInitiatorFor,
+    politeRef,
+    pendingCandidatesRef,
+    pcsRef,
+    closePeer,
+    removeAnalyzer,
+    recordersRef,
+    setEmotionsMap,
+    handleSignal,
+    navigate,
+    cleanupAll,
+    persistHistorySnapshot,
+    handleIncomingMessage,
+    handleAck,
+  };
+
   useEffect(() => {
     const socket = socketRef.current;
     if (!socket) return;
 
-    
-    const onConnect = () => {
-      setMyId(socket.id);
-      Object.keys(pcsRef.current).forEach((peerId) => {
-        closePeer(peerId);
-      });
+    let disconnectTimer = null;
 
-      try {
-        window.myId = socket.id;
-      } catch { }
+    // ── connect ─────────────────────────────────────────────────────────────
+    const onConnect = () => {
+      h.current.setMyId(socket.id);
+      if (disconnectTimer) {
+        clearTimeout(disconnectTimer);
+        disconnectTimer = null;
+      }
+      try { window.myId = socket.id; } catch { }
     };
     socket.on("connect", onConnect);
 
-    // CHAT HISTORY
+    // ── chat history ─────────────────────────────────────────────────────────
     const onChatHistory = (history = []) => {
-      const seen = seenMsgIdsRef.current;
+      const seen = h.current.seenMsgIdsRef.current;
       const unique = [];
-
       for (const m of history) {
         const id = m.id || `${m.userId}:${m.ts}`;
         if (seen.has(id)) continue;
         seen.add(id);
         unique.push(m);
       }
-
-      setChatMessages(unique);
+      // Merge with any optimistic local messages that haven't been acked yet.
+      h.current.setChatMessages((prev) => {
+        if (unique.length === 0) return prev;
+        const existingIds = new Set(prev.map((m) => m.id || `${m.userId}:${m.ts}`));
+        const fresh = unique.filter((m) => {
+          const id = m.id || `${m.userId}:${m.ts}`;
+          return !existingIds.has(id);
+        });
+        return fresh.length > 0 ? [...prev, ...fresh] : prev;
+      });
     };
-    socket.once("chat-history", onChatHistory);
+    socket.on("chat-history", onChatHistory);
 
-    // PARTICIPANTS
+    // ── participants-updated ─────────────────────────────────────────────────
     const onParticipantsUpdated = (participants) => {
       if (!Array.isArray(participants)) return;
-
-      setParticipantsMeta(
+      h.current.setParticipantsMeta(
         participants
           .filter((p) => p.id !== socket.id)
-          .map((p) => ({
-            id: p.id,
-            meta: p.meta || {},
-            polite: !!p.polite,
-          }))
+          .map((p) => ({ id: p.id, meta: p.meta || {}, polite: !!p.polite }))
       );
     };
     socket.on("participants-updated", onParticipantsUpdated);
 
+    // ── shared peer setup logic ──────────────────────────────────────────────
     const setupPeer = (p) => {
       if (!p?.id || p.id === socket.id) return;
 
+      const { politeRef, pendingCandidatesRef, createPeerConnection, isInitiatorFor, safeNegotiateOffer } = h.current;
+
       politeRef.current[p.id] =
-        typeof p.polite === "boolean"
-          ? p.polite
-          : !isInitiatorFor(p.id);
+        typeof p.polite === "boolean" ? p.polite : !isInitiatorFor(p.id);
 
       pendingCandidatesRef.current[p.id] =
         pendingCandidatesRef.current[p.id] || [];
@@ -95,25 +128,21 @@ export default function useSocket({
             setTimeout(tryNegotiate, 50);
           }
         };
-
         tryNegotiate();
       }
     };
 
+    // ── existing-participants ────────────────────────────────────────────────
     const onExistingParticipants = (existing) => {
       const normalized = (Array.isArray(existing) ? existing : []).map(
-        (item) => ({
-          id: item.id,
-          polite: item.polite,
-          meta: item.meta || {},
-        })
+        (item) => ({ id: item.id, polite: item.polite, meta: item.meta || {} })
       );
 
-      setParticipantsMeta((prev) => {
+      h.current.setParticipantsMeta((prev) => {
         const map = {};
         prev.forEach((p) => (map[p.id] = p));
         normalized.forEach((p) => {
-          map[p.id] = { id: p.id, meta: p.meta || {} };
+          map[p.id] = { id: p.id, meta: p.meta || {}, polite: p.polite };
         });
         return Object.values(map);
       });
@@ -122,11 +151,12 @@ export default function useSocket({
     };
     socket.on("existing-participants", onExistingParticipants);
 
+    // ── user-joined ──────────────────────────────────────────────────────────
     const onUserJoined = (peer) => {
       const peerId = peer?.id;
       if (!peerId || peerId === socket.id) return;
 
-      setParticipantsMeta((prev) => {
+      h.current.setParticipantsMeta((prev) => {
         if (prev.some((p) => p.id === peerId)) return prev;
         return [...prev, { id: peerId, meta: peer.meta || {} }];
       });
@@ -135,17 +165,15 @@ export default function useSocket({
     };
     socket.on("user-joined", onUserJoined);
 
+    // ── user-left ────────────────────────────────────────────────────────────
     const onUserLeft = (peerId) => {
-      setParticipantsMeta((prev) =>
+      h.current.setParticipantsMeta((prev) =>
         prev.filter((p) => p.id !== peerId)
       );
-
-      closePeer(peerId);
-      removeAnalyzer(peerId);
-
-      delete recordersRef.current[peerId];
-
-      setEmotionsMap((prev) => {
+      h.current.closePeer(peerId);
+      h.current.removeAnalyzer(peerId);
+      delete h.current.recordersRef.current[peerId];
+      h.current.setEmotionsMap((prev) => {
         const copy = { ...prev };
         delete copy[peerId];
         return copy;
@@ -153,55 +181,55 @@ export default function useSocket({
     };
     socket.on("user-left", onUserLeft);
 
-
+    // ── signal ───────────────────────────────────────────────────────────────
     const onSignal = async (fromId, messageStr) => {
       if (!fromId || !messageStr) return;
-
       try {
-        await handleSignal(fromId, messageStr);
-      } catch (err) {
-        console.warn("Signal error:", err);
-      }
+        await h.current.handleSignal(fromId, messageStr);
+      } catch { }
     };
     socket.on("signal", onSignal);
 
-    // CHAT
+    // ── chat-message ─────────────────────────────────────────────────────────
     const onChatMessage = (m) => {
-      handleIncomingMessage(m);
+      h.current.handleIncomingMessage(m);
     };
     socket.on("chat-message", onChatMessage);
 
+    // ── chat-ack ─────────────────────────────────────────────────────────────
     const onChatAck = (msg) => {
       if (!msg?.id) return;
-      handleAck(msg.id);
+      h.current.handleAck(msg.id);
     };
     socket.on("chat-ack", onChatAck);
 
-    // END / DISCONNECT
+    // ── end-meeting ──────────────────────────────────────────────────────────
     const onEndMeeting = async () => {
       try {
-        await persistHistorySnapshot();
+        await h.current.persistHistorySnapshot();
       } catch { }
-
-      cleanupAll();
-      navigate("/home");
+      h.current.cleanupAll();
+      h.current.navigate("/home");
     };
     socket.on("end-meeting", onEndMeeting);
 
+    // ── disconnect ───────────────────────────────────────────────────────────
     const onDisconnect = () => {
-      Object.keys(pcsRef.current).forEach((peerId) => {
-        closePeer(peerId);
-      });
-
-      cleanupAll();
-      navigate("/home");
+      if (disconnectTimer) return;
+      disconnectTimer = setTimeout(() => {
+        if (!socket.connected) {
+          Object.keys(h.current.pcsRef.current).forEach((peerId) => {
+            h.current.closePeer(peerId);
+          });
+          h.current.cleanupAll();
+          h.current.navigate("/home");
+        }
+      }, 3000);
     };
     socket.on("disconnect", onDisconnect);
 
-
+    // ── emotion handlers ─────────────────────────────────────────────────────
     const emotionHandler = (payload) => {
-      console.log("EMOTION EVENT RECEIVED:", payload);
-
       const participantId =
         payload.participant_id ||
         payload.participantId ||
@@ -210,24 +238,21 @@ export default function useSocket({
 
       if (!participantId) return;
 
-      const emotion = payload?.result?.result || payload?.result || payload?.emotion;
+      const emotion =
+        payload?.result?.result || payload?.result || payload?.emotion;
 
       if (!emotion) return;
 
-      // direct label
       if (emotion.label) {
-        setEmotionsMap((prev) => ({
+        h.current.setEmotionsMap((prev) => ({
           ...prev,
-          [participantId]: {
-            label: emotion.label,
-            score: emotion.score ?? 1,
-          },
+          [participantId]: { label: emotion.label, score: emotion.score ?? 1 },
         }));
         return;
       }
 
       if (emotion.emotion) {
-        setEmotionsMap((prev) => ({
+        h.current.setEmotionsMap((prev) => ({
           ...prev,
           [participantId]: {
             label: emotion.emotion,
@@ -242,27 +267,23 @@ export default function useSocket({
           (max, curr) => (curr[1] > max[1] ? curr : max),
           ["neutral/calm", 0]
         );
-
-        setEmotionsMap((prev) => ({
+        h.current.setEmotionsMap((prev) => ({
           ...prev,
-          [participantId]: {
-            label: topLabel,
-            score: topScore,
-          },
+          [participantId]: { label: topLabel, score: topScore },
         }));
       }
     };
-
-    socket.onAny((event, ...args) => {
-      console.log("📡 SOCKET EVENT:", event, args);
-    });
 
     socket.on("emotion.result", emotionHandler);
     socket.on("emotion.update", emotionHandler);
     socket.on("emotion", emotionHandler);
 
-    // CLEANUP
+    // ── cleanup ──────────────────────────────────────────────────────────────
     return () => {
+      if (disconnectTimer) {
+        clearTimeout(disconnectTimer);
+        disconnectTimer = null;
+      }
       socket.off("connect", onConnect);
       socket.off("chat-history", onChatHistory);
       socket.off("participants-updated", onParticipantsUpdated);
@@ -278,5 +299,8 @@ export default function useSocket({
       socket.off("emotion.update", emotionHandler);
       socket.off("emotion", emotionHandler);
     };
-  }, [socketRef, handleSignal, createPeerConnection]);
+    // Intentionally only re-runs when the socket instance changes.
+    // All other values are accessed through the stable `h` ref.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [socketRef.current]);
 }

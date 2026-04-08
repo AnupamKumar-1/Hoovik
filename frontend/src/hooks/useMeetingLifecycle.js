@@ -1,11 +1,7 @@
-import { useEffect, useCallback } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import io from "socket.io-client";
 import {
   initMediaController,
-  setLocalStream,
-  setPeerConnections,
-  setVideoElement,
-  setSocketRef,
   setExternalCleaners,
 } from "../utils/mediaController";
 
@@ -34,96 +30,133 @@ export default function useMeetingLifecycle({
   setRemoteStreams,
   recordersRef,
   SOCKET_SERVER_URL,
+  flushPendingPeers,
 }) {
+  const participantsMetaRef = useRef(participantsMeta);
+  const isHostRef = useRef(isHost);
+  const startedRef = useRef(false);
+
+  useEffect(() => {
+    participantsMetaRef.current = participantsMeta;
+  }, [participantsMeta]);
+
+  useEffect(() => {
+    isHostRef.current = isHost;
+  }, [isHost]);
 
   const persistHistorySnapshot = useCallback(async () => {
-    if (!isHost || typeof addToUserHistory !== "function") return;
-
+    if (!isHostRef.current || typeof addToUserHistory !== "function") return;
     try {
-      const participantList = (participantsMeta || []).map(p =>
-        p?.meta?.name ||
-        p?.meta?.displayName ||
-        p?.meta?.username ||
-        p?.id ||
-        "Guest"
+      const participantList = (participantsMetaRef.current || []).map(
+        (p) =>
+          p?.meta?.name ||
+          p?.meta?.displayName ||
+          p?.meta?.username ||
+          p?.id ||
+          "Guest"
       );
-
       await addToUserHistory({
         meetingCode: (roomId || "").toUpperCase(),
         hostName: localStorage.getItem("displayName") || "Host",
         participants: participantList,
         createdAt: new Date().toISOString(),
-        link: `${window.location.origin}/room/${(roomId || "").toUpperCase()}`
+        link: `${window.location.origin}/room/${(roomId || "").toUpperCase()}`,
       });
-
-      console.log("[history] persisted meeting snapshot");
-    } catch (err) {
-      console.warn("[history] persist failed", err);
-    }
-  }, [participantsMeta, roomId, addToUserHistory, isHost]);
+    } catch { }
+  }, [roomId, addToUserHistory]);
 
   const cleanupAll = useCallback(async () => {
     try {
       socketRef.current?.removeAllListeners?.();
       socketRef.current?.disconnect();
-    } catch {}
-
-    try { window.myId = null; } catch {}
-
-    try {
-      localStreamRef.current?.getTracks()?.forEach(t => t.stop());
-    } catch {}
+    } catch { }
+    socketRef.current = null;
 
     try {
-      prevLocalStreamRef.current?.getTracks()?.forEach(t => t.stop());
-    } catch {}
+      window.myId = null;
+    } catch { }
+
+    try {
+      localStreamRef.current?.getTracks?.().forEach((t) => t.stop());
+    } catch { }
+
+    try {
+      prevLocalStreamRef.current?.getTracks?.().forEach((t) => t.stop());
+    } catch { }
 
     try {
       const prev = window.__previousLocalStreamForToggle;
-      if (prev && prev.getTracks) {
-        prev.getTracks().forEach(t => t.stop());
+      if (prev?.getTracks) {
+        prev.getTracks().forEach((t) => t.stop());
       }
       window.__previousLocalStreamForToggle = null;
-    } catch {}
+    } catch { }
 
-    if (localVideoRef.current) localVideoRef.current.srcObject = null;
+    if (localVideoRef.current) {
+      try {
+        localVideoRef.current.pause();
+        localVideoRef.current.srcObject = null;
+      } catch { }
+    }
 
     localStreamRef.current = null;
     prevLocalStreamRef.current = null;
 
     try {
-      Object.keys(pcsRef.current).forEach(pid => {
-        try { pcsRef.current[pid].close(); } catch {}
+      Object.values(pcsRef.current || {}).forEach((pc) => {
+        try {
+          pc.ontrack = null;
+          pc.onicecandidate = null;
+          pc.onnegotiationneeded = null;
+          pc.close();
+        } catch { }
       });
-    } catch {}
+    } catch { }
 
     pcsRef.current = {};
+
     setRemoteStreams({});
     setParticipantsMeta([]);
 
-    stopPeriodicEmotionCapture();
+    try {
+      stopPeriodicEmotionCapture();
+    } catch { }
 
     try {
-      const tmpStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
-      tmpStream.getTracks().forEach(track => track.stop());
-    } catch (e) {
-      console.warn("Force release failed:", e);
-    }
-  }, [stopPeriodicEmotionCapture]);
+      const tmp = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: true,
+      });
+      tmp.getTracks().forEach((t) => t.stop());
+    } catch { }
+  }, [
+    socketRef,
+    localStreamRef,
+    prevLocalStreamRef,
+    localVideoRef,
+    pcsRef,
+    setRemoteStreams,
+    setParticipantsMeta,
+    stopPeriodicEmotionCapture,
+  ]);
 
   async function start() {
     try {
       setConnecting(true);
 
-      const constraints = {
+      const stream = await navigator.mediaDevices.getUserMedia({
         audio: true,
         video: { width: { ideal: 1280 }, height: { ideal: 720 } },
-      };
-
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      });
 
       localStreamRef.current = stream;
-      if (localVideoRef.current) localVideoRef.current.srcObject = stream;
+
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
+        try {
+          await localVideoRef.current.play();
+        } catch { }
+      }
 
       createAnalyzerForStream("local", stream);
       startRecordingForStream("local", stream);
@@ -132,34 +165,25 @@ export default function useMeetingLifecycle({
       socketRef.current = socket;
 
       await new Promise((resolve, reject) => {
-        const CLEANUP = () => {
+        const TO = setTimeout(() => reject(new Error()), 8000);
+
+        const cleanup = () => {
+          clearTimeout(TO);
           socket.off("connect", onConnect);
           socket.off("connect_error", onError);
         };
 
         const onConnect = () => {
-          CLEANUP();
+          cleanup();
           resolve();
         };
-
-        const onError = (err) => {
-          CLEANUP();
-          reject(err || new Error("socket connect error"));
+        const onError = () => {
+          cleanup();
+          reject();
         };
 
         socket.on("connect", onConnect);
         socket.on("connect_error", onError);
-
-        const TO = setTimeout(() => {
-          CLEANUP();
-          reject(new Error("socket connect timeout"));
-        }, 5000);
-
-        const origResolve = resolve;
-        resolve = (...args) => { clearTimeout(TO); origResolve(...args); };
-        const origReject = reject;
-        reject = (...args) => { clearTimeout(TO); origReject(...args); };
-
         socket.connect();
       });
 
@@ -171,21 +195,18 @@ export default function useMeetingLifecycle({
       );
 
       try {
-        if (typeof setExternalCleaners === "function") {
-          setExternalCleaners({
-            recordersRef,
-            removeAnalyzerFn: removeAnalyzer,
-            prevLocalStreamRef,
-          });
-        }
-      } catch (e) {
-        console.warn("registering external cleaners failed:", e);
-      }
+        setExternalCleaners({
+          recordersRef,
+          removeAnalyzerFn: removeAnalyzer,
+          prevLocalStreamRef,
+        });
+      } catch { }
 
-      setLocalStream(localStreamRef.current);
-      setPeerConnections(pcsRef.current);
-      setVideoElement(localVideoRef.current);
-      setSocketRef(socketRef.current);
+      setTimeout(() => {
+        try {
+          flushPendingPeers?.();
+        } catch { }
+      }, 300);
 
       let uid = localStorage.getItem("userId");
       if (!uid) {
@@ -197,10 +218,9 @@ export default function useMeetingLifecycle({
         name: localStorage.getItem("displayName") || "Guest",
         userId: uid,
       });
-
     } catch (err) {
-      console.error("start error:", err);
-      alert("Unable to access camera/mic or connect to signaling server.");
+      console.error(err);
+      alert("Unable to access camera/mic or connect.");
     } finally {
       setConnecting(false);
     }
@@ -210,65 +230,60 @@ export default function useMeetingLifecycle({
     try {
       if (socketRef.current?.connected) {
         socketRef.current.emit("leave-call", roomId);
-        await new Promise(r => setTimeout(r, 50));
+        await new Promise((r) => setTimeout(r, 80));
       }
-    } catch (e) {
-      console.warn("leaveCall emit failed", e);
-    }
-
+    } catch { }
     await cleanupAll();
     navigate("/home");
   }
 
   async function endMeeting() {
     try {
-      if (isHost) {
-
+      if (isHostRef.current) {
         if (TRANSCRIPTS_ENABLED) {
-          const code = roomId.toUpperCase();
+          const code = (roomId || "").toUpperCase();
           const hostDataRaw = localStorage.getItem(`host:${code}`);
           const hostData = hostDataRaw ? JSON.parse(hostDataRaw) : null;
 
-          console.log("🔥 HOST DATA (END MEETING):", hostData);
-
-          if (!hostData?.hostSecret) {
-            console.error("HOST SECRET MISSING — cannot upload transcript");
-          } else {
+          if (hostData?.hostSecret) {
             try {
               await uploadRecordingsAndStoreTranscript({
                 hostSecret: hostData.hostSecret,
                 meetingCode: code,
               });
-            } catch (e) {
-              console.warn("uploadRecordingsAndStoreTranscript failed", e);
-            }
+            } catch { }
           }
         } else {
-          try { stopAllRecorders(); } catch { }
-          try { recordersRef.current = {}; } catch { }
+          try {
+            stopAllRecorders();
+          } catch { }
+          try {
+            recordersRef.current = {};
+          } catch { }
         }
+
+        await persistHistorySnapshot();
 
         if (socketRef.current?.connected) {
           socketRef.current.emit("end-meeting", roomId);
-          await new Promise((r) => setTimeout(r, 50));
+          await new Promise((r) => setTimeout(r, 80));
         }
-
       } else {
         await leaveCall();
+        return;
       }
-
-    } catch (err) {
-      console.error("endMeeting error:", err);
-    } finally {
-      await cleanupAll();
-      navigate("/home");
-    }
+    } catch { }
+    await cleanupAll();
+    navigate("/home");
   }
 
   useEffect(() => {
+    if (startedRef.current) return;
+    startedRef.current = true;
+
     const name =
       localStorage.getItem("displayName") ||
-      prompt("Enter display name", "Guest") ||
+      prompt("Enter your display name", "Guest") ||
       "Guest";
 
     localStorage.setItem("displayName", name);
@@ -277,11 +292,9 @@ export default function useMeetingLifecycle({
 
     const onBeforeUnload = () => {
       try {
-        if (isHost) {
-          persistHistorySnapshot();
-        }
+        if (isHostRef.current) persistHistorySnapshot();
         socketRef.current?.emit("leave-call", roomId);
-      } catch {}
+      } catch { }
     };
 
     window.addEventListener("beforeunload", onBeforeUnload);
@@ -290,14 +303,7 @@ export default function useMeetingLifecycle({
       cleanupAll();
       window.removeEventListener("beforeunload", onBeforeUnload);
     };
-
   }, [roomId]);
 
-  return {
-    start,
-    leaveCall,
-    endMeeting,
-    cleanupAll,
-    persistHistorySnapshot,
-  };
+  return { start, leaveCall, endMeeting, cleanupAll, persistHistorySnapshot };
 }
