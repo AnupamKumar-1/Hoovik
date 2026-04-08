@@ -7,7 +7,6 @@ function safeClose(pc) {
   } catch { }
 }
 
-const NEGOTIATION_DEBOUNCE_MS = 100;
 const DISCONNECTED_TIMEOUT_MS = 5000;
 
 export default function useWebRTC({
@@ -25,7 +24,6 @@ export default function useWebRTC({
   const politeRef = useRef({});
   const pendingCandidatesRef = useRef({});
   const isSettingRemoteAnswerPending = useRef({});
-  const negotiationTimeoutRef = useRef({});
   const disconnectTimeoutRef = useRef({});
   const analyzerAttachedRef = useRef({});
   const pendingSignalsRef = useRef({});
@@ -34,10 +32,6 @@ export default function useWebRTC({
 
   const teardown = useCallback(
     (peerId) => {
-      if (negotiationTimeoutRef.current[peerId]) {
-        clearTimeout(negotiationTimeoutRef.current[peerId]);
-        delete negotiationTimeoutRef.current[peerId];
-      }
       if (disconnectTimeoutRef.current[peerId]) {
         clearTimeout(disconnectTimeoutRef.current[peerId]);
         delete disconnectTimeoutRef.current[peerId];
@@ -66,28 +60,6 @@ export default function useWebRTC({
       });
     },
     [pcsRef, setRemoteStreams, removeAnalyzer]
-  );
-
-  const safeNegotiateOffer = useCallback(
-    async (peerId) => {
-      const pc = pcsRef.current[peerId];
-      if (!pc) return;
-
-      if (makingOfferRef.current[peerId] || pc.connectionState === "closed") return;
-
-      try {
-        makingOfferRef.current[peerId] = true;
-        await pc.setLocalDescription(await pc.createOffer());
-        socketRef.current?.emit(
-          "signal",
-          peerId,
-          JSON.stringify({ description: pc.localDescription })
-        );
-      } catch { } finally {
-        makingOfferRef.current[peerId] = false;
-      }
-    },
-    [pcsRef, socketRef]
   );
 
   const createPeerConnection = useCallback(
@@ -150,7 +122,6 @@ export default function useWebRTC({
         const attach = () => {
           setRemoteStreams((prev) => {
             const existing = prev[peerId];
-
             const trackCount = stream.getTracks().length;
 
             if (
@@ -173,22 +144,22 @@ export default function useWebRTC({
 
         attach();
 
-        setTimeout(() => {
-          const pcNow = pcsRef.current[peerId];
-          if (!pcNow || pcNow.__id !== pcId) return;
-          attach();
-        }, 300);
+        stream.addEventListener("addtrack", attach);
+        stream.addEventListener("removetrack", attach);
 
         if (
           stream.getAudioTracks().length &&
           analyzerAttachedRef.current[peerId] !== true
         ) {
           analyzerAttachedRef.current[peerId] = true;
-          setTimeout(() => {
+
+          const tryAttachAnalyzer = () => {
             const pcNow = pcsRef.current[peerId];
             if (!pcNow || pcNow.__id !== pcId) return;
             createAnalyzerForStream(peerId, stream);
-          }, 300);
+          };
+
+          setTimeout(tryAttachAnalyzer, 200);
         }
       };
 
@@ -201,36 +172,27 @@ export default function useWebRTC({
         );
       };
 
-      pc.onnegotiationneeded = () => {
-        if (negotiationTimeoutRef.current[peerId]) {
-          clearTimeout(negotiationTimeoutRef.current[peerId]);
+      pc.onnegotiationneeded = async () => {
+        if (
+          makingOfferRef.current[peerId] ||
+          pc.signalingState !== "stable" ||
+          pc.connectionState === "closed"
+        )
+          return;
+
+        try {
+          makingOfferRef.current[peerId] = true;
+
+          await pc.setLocalDescription(await pc.createOffer());
+
+          socketRef.current?.emit(
+            "signal",
+            peerId,
+            JSON.stringify({ description: pc.localDescription })
+          );
+        } catch { } finally {
+          makingOfferRef.current[peerId] = false;
         }
-
-        negotiationTimeoutRef.current[peerId] = setTimeout(async () => {
-          const pcNow = pcsRef.current[peerId];
-          if (!pcNow || pcNow.__id !== pcId) return;
-
-          delete negotiationTimeoutRef.current[peerId];
-
-          if (
-            makingOfferRef.current[peerId] ||
-            pcNow.signalingState !== "stable" ||
-            pcNow.connectionState === "closed"
-          )
-            return;
-
-          try {
-            makingOfferRef.current[peerId] = true;
-            await pcNow.setLocalDescription(await pcNow.createOffer());
-            socketRef.current?.emit(
-              "signal",
-              peerId,
-              JSON.stringify({ description: pcNow.localDescription })
-            );
-          } catch { } finally {
-            makingOfferRef.current[peerId] = false;
-          }
-        }, NEGOTIATION_DEBOUNCE_MS);
       };
 
       pc.onconnectionstatechange = () => {
@@ -241,14 +203,6 @@ export default function useWebRTC({
             clearTimeout(disconnectTimeoutRef.current[peerId]);
             delete disconnectTimeoutRef.current[peerId];
           }
-
-          setTimeout(() => {
-            const pcNow = pcsRef.current[peerId];
-            if (!pcNow || pcNow.__id !== pcId) return;
-            if (pcNow.signalingState === "stable") {
-              safeNegotiateOffer(peerId);
-            }
-          }, 200);
         }
 
         if (state === "disconnected") {
@@ -282,20 +236,6 @@ export default function useWebRTC({
         });
       }
 
-      setTimeout(() => {
-        const pcNow = pcsRef.current[peerId];
-        if (!pcNow || pcNow.__id !== pcId) return;
-        safeNegotiateOffer(peerId);
-      }, 0);
-
-      setTimeout(() => {
-        const pcNow = pcsRef.current[peerId];
-        if (!pcNow || pcNow.__id !== pcId) return;
-        if (pcNow.connectionState !== "connected") {
-          safeNegotiateOffer(peerId);
-        }
-      }, 800);
-
       return pc;
     },
     [
@@ -306,7 +246,6 @@ export default function useWebRTC({
       setRemoteStreams,
       createAnalyzerForStream,
       teardown,
-      safeNegotiateOffer,
     ]
   );
 
@@ -315,12 +254,9 @@ export default function useWebRTC({
     pendingPeerQueueRef.current = [];
 
     queue.forEach((peerId) => {
-      const pc = createPeerConnection(peerId);
-      if (pc) {
-        safeNegotiateOffer(peerId);
-      }
+      createPeerConnection(peerId);
     });
-  }, [createPeerConnection, safeNegotiateOffer]);
+  }, [createPeerConnection]);
 
   const handleSignal = useCallback(
     async (fromId, messageStr) => {
@@ -410,7 +346,6 @@ export default function useWebRTC({
 
   return {
     createPeerConnection,
-    safeNegotiateOffer,
     handleSignal,
     teardown,
     politeRef,

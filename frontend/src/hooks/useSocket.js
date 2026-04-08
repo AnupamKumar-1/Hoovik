@@ -1,10 +1,5 @@
 import { useEffect, useRef } from "react";
 
-/**
- * All props are stored in a ref so every socket handler always calls the
- * latest version of each callback — no stale-closure bugs even though the
- * effect only runs once per socket instance.
- */
 export default function useSocket({
   socketRef,
   roomId,
@@ -13,8 +8,6 @@ export default function useSocket({
   setChatMessages,
   seenMsgIdsRef,
   createPeerConnection,
-  safeNegotiateOffer,
-  isInitiatorFor,
   politeRef,
   pendingCandidatesRef,
   pcsRef,
@@ -29,7 +22,6 @@ export default function useSocket({
   handleIncomingMessage,
   handleAck,
 }) {
-  // Mirror every prop into a ref so handlers always see current values.
   const h = useRef({});
   h.current = {
     setMyId,
@@ -37,8 +29,6 @@ export default function useSocket({
     setChatMessages,
     seenMsgIdsRef,
     createPeerConnection,
-    safeNegotiateOffer,
-    isInitiatorFor,
     politeRef,
     pendingCandidatesRef,
     pcsRef,
@@ -60,18 +50,18 @@ export default function useSocket({
 
     let disconnectTimer = null;
 
-    // ── connect ─────────────────────────────────────────────────────────────
     const onConnect = () => {
       h.current.setMyId(socket.id);
       if (disconnectTimer) {
         clearTimeout(disconnectTimer);
         disconnectTimer = null;
       }
-      try { window.myId = socket.id; } catch { }
+      try {
+        window.myId = socket.id;
+      } catch { }
     };
     socket.on("connect", onConnect);
 
-    // ── chat history ─────────────────────────────────────────────────────────
     const onChatHistory = (history = []) => {
       const seen = h.current.seenMsgIdsRef.current;
       const unique = [];
@@ -81,10 +71,11 @@ export default function useSocket({
         seen.add(id);
         unique.push(m);
       }
-      // Merge with any optimistic local messages that haven't been acked yet.
       h.current.setChatMessages((prev) => {
         if (unique.length === 0) return prev;
-        const existingIds = new Set(prev.map((m) => m.id || `${m.userId}:${m.ts}`));
+        const existingIds = new Set(
+          prev.map((m) => m.id || `${m.userId}:${m.ts}`)
+        );
         const fresh = unique.filter((m) => {
           const id = m.id || `${m.userId}:${m.ts}`;
           return !existingIds.has(id);
@@ -94,7 +85,6 @@ export default function useSocket({
     };
     socket.on("chat-history", onChatHistory);
 
-    // ── participants-updated ─────────────────────────────────────────────────
     const onParticipantsUpdated = (participants) => {
       if (!Array.isArray(participants)) return;
       h.current.setParticipantsMeta(
@@ -105,37 +95,29 @@ export default function useSocket({
     };
     socket.on("participants-updated", onParticipantsUpdated);
 
-    // ── shared peer setup logic ──────────────────────────────────────────────
     const setupPeer = (p) => {
       if (!p?.id || p.id === socket.id) return;
 
-      const { politeRef, pendingCandidatesRef, createPeerConnection, isInitiatorFor, safeNegotiateOffer } = h.current;
+      const { politeRef, pendingCandidatesRef, createPeerConnection } =
+        h.current;
 
       politeRef.current[p.id] =
-        typeof p.polite === "boolean" ? p.polite : !isInitiatorFor(p.id);
+        typeof p.polite === "boolean" ? p.polite : true;
 
       pendingCandidatesRef.current[p.id] =
         pendingCandidatesRef.current[p.id] || [];
 
       const pc = createPeerConnection(p.id);
       if (!pc) return;
-
-      if (isInitiatorFor(p.id)) {
-        const tryNegotiate = () => {
-          if (pc.signalingState === "stable") {
-            safeNegotiateOffer(p.id);
-          } else {
-            setTimeout(tryNegotiate, 50);
-          }
-        };
-        tryNegotiate();
-      }
     };
 
-    // ── existing-participants ────────────────────────────────────────────────
     const onExistingParticipants = (existing) => {
       const normalized = (Array.isArray(existing) ? existing : []).map(
-        (item) => ({ id: item.id, polite: item.polite, meta: item.meta || {} })
+        (item) => ({
+          id: item.id,
+          polite: item.polite,
+          meta: item.meta || {},
+        })
       );
 
       h.current.setParticipantsMeta((prev) => {
@@ -151,7 +133,6 @@ export default function useSocket({
     };
     socket.on("existing-participants", onExistingParticipants);
 
-    // ── user-joined ──────────────────────────────────────────────────────────
     const onUserJoined = (peer) => {
       const peerId = peer?.id;
       if (!peerId || peerId === socket.id) return;
@@ -165,7 +146,6 @@ export default function useSocket({
     };
     socket.on("user-joined", onUserJoined);
 
-    // ── user-left ────────────────────────────────────────────────────────────
     const onUserLeft = (peerId) => {
       h.current.setParticipantsMeta((prev) =>
         prev.filter((p) => p.id !== peerId)
@@ -181,7 +161,6 @@ export default function useSocket({
     };
     socket.on("user-left", onUserLeft);
 
-    // ── signal ───────────────────────────────────────────────────────────────
     const onSignal = async (fromId, messageStr) => {
       if (!fromId || !messageStr) return;
       try {
@@ -190,20 +169,17 @@ export default function useSocket({
     };
     socket.on("signal", onSignal);
 
-    // ── chat-message ─────────────────────────────────────────────────────────
     const onChatMessage = (m) => {
       h.current.handleIncomingMessage(m);
     };
     socket.on("chat-message", onChatMessage);
 
-    // ── chat-ack ─────────────────────────────────────────────────────────────
     const onChatAck = (msg) => {
       if (!msg?.id) return;
       h.current.handleAck(msg.id);
     };
     socket.on("chat-ack", onChatAck);
 
-    // ── end-meeting ──────────────────────────────────────────────────────────
     const onEndMeeting = async () => {
       try {
         await h.current.persistHistorySnapshot();
@@ -213,7 +189,6 @@ export default function useSocket({
     };
     socket.on("end-meeting", onEndMeeting);
 
-    // ── disconnect ───────────────────────────────────────────────────────────
     const onDisconnect = () => {
       if (disconnectTimer) return;
       disconnectTimer = setTimeout(() => {
@@ -228,7 +203,6 @@ export default function useSocket({
     };
     socket.on("disconnect", onDisconnect);
 
-    // ── emotion handlers ─────────────────────────────────────────────────────
     const emotionHandler = (payload) => {
       const participantId =
         payload.participant_id ||
@@ -246,7 +220,10 @@ export default function useSocket({
       if (emotion.label) {
         h.current.setEmotionsMap((prev) => ({
           ...prev,
-          [participantId]: { label: emotion.label, score: emotion.score ?? 1 },
+          [participantId]: {
+            label: emotion.label,
+            score: emotion.score ?? 1,
+          },
         }));
         return;
       }
@@ -278,7 +255,6 @@ export default function useSocket({
     socket.on("emotion.update", emotionHandler);
     socket.on("emotion", emotionHandler);
 
-    // ── cleanup ──────────────────────────────────────────────────────────────
     return () => {
       if (disconnectTimer) {
         clearTimeout(disconnectTimer);
@@ -299,8 +275,5 @@ export default function useSocket({
       socket.off("emotion.update", emotionHandler);
       socket.off("emotion", emotionHandler);
     };
-    // Intentionally only re-runs when the socket instance changes.
-    // All other values are accessed through the stable `h` ref.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [socketRef.current]);
 }

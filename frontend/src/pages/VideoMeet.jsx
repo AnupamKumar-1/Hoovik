@@ -443,8 +443,6 @@ export default function VideoMeet() {
     setChatMessages,
     seenMsgIdsRef,
     createPeerConnection,
-    safeNegotiateOffer,
-    isInitiatorFor,
     politeRef,
     pendingCandidatesRef,
     pcsRef,
