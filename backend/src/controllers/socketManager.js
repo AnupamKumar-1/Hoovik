@@ -167,6 +167,7 @@ export function connectToSocket(
               oldSocket.leave(`meeting:${code}`);
               oldSocket.removeAllListeners();
               oldSocket.emit = () => { };
+              try { oldSocket.disconnect(true); } catch { }
             }
 
             existing.socketId = socket.id;
@@ -247,7 +248,19 @@ export function connectToSocket(
 
           await broadcastParticipants(code, io);
 
+          setTimeout(() => {
+            if (!meetingParticipants[code]) return;
+
+            const participants = Array.from(meetingParticipants[code].values()).map((p) => ({
+              id: p.socketId,
+              meta: p.meta || {},
+            }));
+
+            io.in(`meeting:${code}`).emit("participants-updated", participants);
+          }, 300);
+
           console.log(`[socket] ${name} (${socket.id}) joined ${code} — polite:${politeRole}`);
+
         });
       } catch (err) {
         console.error("[socket][join-call]", err);

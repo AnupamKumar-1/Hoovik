@@ -177,6 +177,7 @@ export default function useMeetingLifecycle({
           cleanup();
           resolve();
         };
+
         const onError = () => {
           cleanup();
           reject();
@@ -202,11 +203,9 @@ export default function useMeetingLifecycle({
         });
       } catch { }
 
-      setTimeout(() => {
-        try {
-          flushPendingPeers?.();
-        } catch { }
-      }, 300);
+      if (localStreamRef.current) {
+        flushPendingPeers?.();
+      }
 
       let uid = localStorage.getItem("userId");
       if (!uid) {
