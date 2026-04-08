@@ -9,32 +9,23 @@ export default function useMediaBridge({
   recordersRef,
   startPeriodicEmotionCapture,
   stopPeriodicEmotionCapture,
-  pcsRef,
-  safeNegotiateOffer,  
+  flushPendingPeers,
 }) {
   useEffect(() => {
-
-    const renegotiateAllPeers = () => {
-      const pcs = pcsRef.current || {};
-      Object.keys(pcs).forEach((peerId) => {
-        try {
-          safeNegotiateOffer(peerId);
-        } catch { }
-      });
-    };
-
     const setupVolumeAnalyzer = (stream) => {
       try {
         if (stream) {
           localStreamRef.current = stream;
+          if (typeof flushPendingPeers === "function") {
+            flushPendingPeers();
+          }
         }
 
-        createAnalyzerForStream("local", stream || localStreamRef.current);
+        const s = stream || localStreamRef.current;
+        if (!s) return;
 
-        // ✅ IMPORTANT
-        renegotiateAllPeers();
-
-      } catch (e) { }
+        createAnalyzerForStream("local", s);
+      } catch { }
     };
 
     const stopVolumeAnalyzer = () => {
@@ -45,23 +36,35 @@ export default function useMediaBridge({
 
     const startTranscription = (stream) => {
       try {
-        startRecordingForStream("local", stream || localStreamRef.current);
+        const s = stream || localStreamRef.current;
+        if (!s) return;
+
+        if (recordersRef.current?.["local"]) return;
+
+        startRecordingForStream("local", s);
       } catch { }
     };
 
     const stopTranscription = () => {
       try {
         const rec = recordersRef.current?.["local"];
-        if (rec?.recorder && rec.recorder.state !== "inactive") {
+        if (rec?.recorder?.state !== "inactive") {
           rec.recorder.stop();
         }
-        if (recordersRef.current) delete recordersRef.current["local"];
+        if (recordersRef.current) {
+          delete recordersRef.current["local"];
+        }
       } catch { }
     };
 
     const startRecording = (stream) => {
       try {
-        startRecordingForStream("local", stream || localStreamRef.current);
+        const s = stream || localStreamRef.current;
+        if (!s) return;
+
+        if (recordersRef.current?.["local"]) return;
+
+        startRecordingForStream("local", s);
       } catch { }
     };
 
@@ -110,7 +113,6 @@ export default function useMediaBridge({
     recordersRef,
     startPeriodicEmotionCapture,
     stopPeriodicEmotionCapture,
-    pcsRef,
-    safeNegotiateOffer,
+    flushPendingPeers,
   ]);
 }
