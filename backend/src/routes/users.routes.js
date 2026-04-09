@@ -10,6 +10,7 @@ import {
   addParticipant,
   logout,
   upsertMeeting,
+  getMe,
 } from "../controllers/user.controller.js";
 
 const router = Router();
@@ -28,4 +29,5 @@ router.get("/get_all_activity", jwtAuth, getUserHistory);
 router.post("/meetings/:code/participants", jwtAuth, addParticipant);
 router.post("/add_participant", jwtAuth, addParticipant);
 router.post("/meetings", jwtAuth, upsertMeeting);
+router.get("/me", jwtAuth, getMe);
 export default router;

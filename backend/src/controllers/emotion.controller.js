@@ -168,7 +168,7 @@ export async function uploadEmotionFileHandler(req, res) {
   try {
     const meetingId = req.body?.meeting_id || req.body?.meetingId;
     const participantId = req.body?.participant_id || req.body?.participantId;
-    const type = req.body?.type || "audio"; 
+    const type = req.body?.type || "audio";
     const file = req.file;
 
     if (!meetingId || !participantId || !file) {

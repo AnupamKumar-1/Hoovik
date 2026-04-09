@@ -1,44 +1,30 @@
 import express from "express";
 import passport from "passport";
+import rateLimit from "express-rate-limit";
 import "../../config/passport.js";
 import * as ctrl from "../controllers/transcript.controller.js";
 
 const router = express.Router();
 
-const optionalAuth = (req, res, next) => {
-  passport.authenticate("jwt", { session: false }, (err, user) => {
-    if (err) {
-      console.warn("passport error:", err);
-    }
+const transcriptLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 500,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: "Too many requests" },
+});
 
-    if (user) {
-      req.user = user;
-      console.log(" USER:", user._id || user.id || user.sub);
-    } else {
-      console.warn("⚠️ JWT failed or missing");
-    }
-
+const aAuth = (req, _res, next) => {
+  passport.authenticate("jwt", { session: false }, (_err, user) => {
+    if (user) req.user = user;
     next();
-  })(req, res, next);
+  })(req, _res, next);
 };
 
+router.use(transcriptLimiter);
 
-router.post(
-  "/",
-  optionalAuth,
-  ctrl.createTranscript
-);
-
-router.get(
-  "/",
-  optionalAuth,
-  ctrl.listTranscripts 
-);
-
-router.get(
-  "/:id",
-  optionalAuth,
-  ctrl.getTranscript 
-);
+router.post("/", aAuth, ctrl.createTranscript);
+router.get("/", aAuth, ctrl.listTranscripts);
+router.get("/:id", aAuth, ctrl.getTranscript);
 
 export default router;

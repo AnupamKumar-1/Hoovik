@@ -91,6 +91,7 @@ meetingSchema.methods.addParticipant = async function (participant) {
         participant.userId = participant.meta.userId;
       }
     }
+    participant.userId = String(participant.userId);
   }
 
   let idx = -1;
@@ -283,7 +284,7 @@ meetingSchema.statics.cleanupOldMeetings = async function (maxAgeHours = 24) {
     updatedAt: { $lt: cutoff },
   });
   if (result.deletedCount > 0) {
-    console.log(`🧹 Cleaned up ${result.deletedCount} inactive meeting(s)`);
+    console.log(`Cleaned up ${result.deletedCount} inactive meeting(s)`);
   }
 };
 

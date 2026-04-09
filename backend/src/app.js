@@ -21,6 +21,7 @@ const app = express();
 const server = createServer(app);
 
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || "http://localhost:3000";
+
 const corsOptions = {
   origin: CLIENT_ORIGIN,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
@@ -29,18 +30,18 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
+
 app.use(passport.initialize());
-app.use(express.json({ limit: process.env.REQUEST_JSON_LIMIT || "4mb" }));
-app.use(express.urlencoded({
-  limit: process.env.REQUEST_URLENCODED_LIMIT || "4mb",
-  extended: true,
-}));
+
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/rooms", roomsRoutes);
 app.use("/api/v1/transcript", transcriptRoutes);
 app.use("/api/v1/emotion", emotionRoutes);
 app.use("/api/v1/meetings", meetingsRoutes);
+
 app.post("/api/v1/auth/logout", logout);
 
 app.use("/api", (req, res) => {

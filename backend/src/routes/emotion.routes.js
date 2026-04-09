@@ -102,7 +102,7 @@ router.post("/proxy-test", ensureAuth, upload.single("file"), async (req, res) =
     try {
       fs.unlinkSync(req.file.path);
     } catch (e) {
-      
+
     }
 
     return res.json({ ok: true, result });

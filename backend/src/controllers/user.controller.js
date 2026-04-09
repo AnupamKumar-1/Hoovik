@@ -19,7 +19,7 @@ const getUserId = (user) => {
 
 const logout = async (req, res) => {
   try {
-    
+
     const refreshToken = req.cookies ? req.cookies.refreshToken : null;
 
 
@@ -62,7 +62,6 @@ const login = async (req, res) => {
     if (!user) {
       return sendError(res, httpStatus.NOT_FOUND, "User not found.");
     }
-    console.log("LOGIN SECRET:", process.env.JWT_SECRET);
     const isPasswordCorrect = await bcrypt.compare(password, user.password);
     if (!isPasswordCorrect) {
       return sendError(res, httpStatus.UNAUTHORIZED, "Invalid username or password.");
@@ -127,9 +126,18 @@ const objectUserId = userId ? new mongoose.Types.ObjectId(userId) : null;
     const query = {
       $or: [
         { host: objectUserId },
-         { ownerId: objectUserId },
-        { "participants.meta.userId": String(userId) },
-        { "participants.userId": String(userId) },
+        { ownerId: objectUserId },
+        {
+          participants: {
+            $elemMatch: {
+              $or: [
+                { "meta.userId": String(userId) },
+                { userId: objectUserId },
+                { userId: String(userId) }
+              ]
+            }
+          }
+        }
       ],
     };
 
@@ -203,24 +211,25 @@ const objectUserId = userId ? new mongoose.Types.ObjectId(userId) : null;
     const participantEntry = {
       socketId: synthSocketId,
       name: req.user?.name || req.user?.username || "Host",
+      userId: String(userId),
       meta: { userId: String(userId) },
       joinedAt: new Date(),
     };
 
     const newMeeting = new Meeting({
-  meetingCode: meeting_code,
-  link,
-  host: new mongoose.Types.ObjectId(userId),
-ownerId: new mongoose.Types.ObjectId(userId),
+      meetingCode: meeting_code,
+      link,
+      host: new mongoose.Types.ObjectId(userId),
+      ownerId: new mongoose.Types.ObjectId(userId),
 
-  participants: [participantEntry]
-});
+      participants: [participantEntry]
+    });
     await newMeeting.save();
 
     res.status(httpStatus.CREATED).json({ success: true, message: "Meeting created and saved to history.", meeting: newMeeting });
-  } catch (error) {
-    console.error("addToHistory error:", error.stack || error);
-    sendError(res, httpStatus.INTERNAL_SERVER_ERROR, `Something went wrong: ${error.message}`);
+      } catch (error) {
+      console.error("addToHistory error:", error.stack || error);
+      sendError(res, httpStatus.INTERNAL_SERVER_ERROR, `Something went wrong: ${error.message}`);
   }
 };
 
@@ -257,6 +266,7 @@ const objectUserId = userId ? new mongoose.Types.ObjectId(userId) : null;
       meeting.participants.push({
         socketId: synthSocketId,
         name: participantName,
+        userId: String(userId),
         meta: { userId: String(userId) },
         joinedAt: new Date(),
       });
@@ -281,10 +291,10 @@ await meeting.save();
 };
 
 
-const getMeetings = async (req, res) => {
+  const getMeetings = async (req, res) => {
   try {
     const userId = getUserId(req.user);
-const objectUserId = userId ? new mongoose.Types.ObjectId(userId) : null;
+    const objectUserId = userId ? new mongoose.Types.ObjectId(userId) : null;
     const mineOnly = String(req.query?.mine || "false").toLowerCase() === "true";
 
     let filter = {};
@@ -297,17 +307,17 @@ const objectUserId = userId ? new mongoose.Types.ObjectId(userId) : null;
     ],
       };
     } else if (userId) {
-  filter = {
-    $or: [
-      { host: objectUserId },
-      { ownerId: objectUserId },
-      { "participants.meta.userId": String(userId) },
-      { active: true }
-    ],
-  };
-} else {
-      filter = { active: true };
-    }
+        filter = {
+          $or: [
+          { host: objectUserId },
+          { ownerId: objectUserId },
+          { "participants.meta.userId": String(userId) },
+          { active: true }
+          ],
+        };
+      } else {
+          filter = { active: true };
+        }
 
     const meetings = await Meeting.find(filter)
       .sort({ lastActivityAt: -1, createdAt: -1 })
@@ -389,6 +399,29 @@ const upsertMeeting = async (req, res) => {
   }
 };
 
+const getMe = async (req, res) => {
+  try {
+    const userId = getUserId(req.user);
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    const user = await User.findById(userId).select("_id username name");
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    return res.status(200).json({
+      success: true,
+      user,
+    });
+  } catch (err) {
+    console.error("getMe error:", err);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
 
 export {
   login,
@@ -399,4 +432,5 @@ export {
   getMeetings,
   upsertMeeting,
   logout,
+  getMe,
 }

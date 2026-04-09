@@ -249,15 +249,8 @@ export function connectToSocket(
           await broadcastParticipants(code, io);
 
           setTimeout(() => {
-            if (!meetingParticipants[code]) return;
-
-            const participants = Array.from(meetingParticipants[code].values()).map((p) => ({
-              id: p.socketId,
-              meta: p.meta || {},
-            }));
-
-            io.in(`meeting:${code}`).emit("participants-updated", participants);
-          }, 300);
+            broadcastParticipants(code, io);
+          }, 200);
 
           console.log(`[socket] ${name} (${socket.id}) joined ${code} — polite:${politeRole}`);
 
@@ -265,6 +258,44 @@ export function connectToSocket(
       } catch (err) {
         console.error("[socket][join-call]", err);
         socket.emit("error", "Failed to join call");
+      }
+    });
+
+    socket.on("update-participant-state", async (data = {}) => {
+      try {
+        const code = socket.data?.meetingCode;
+
+        if (!code) return;
+
+        console.log("VALID STATE UPDATE:", data);
+
+        const { muted, screen } = data;
+
+        const metaUpdate = {};
+        if (muted !== undefined) metaUpdate.muted = !!muted;
+        if (screen !== undefined) metaUpdate.screen = !!screen;
+
+        socket.data.meta = {
+          ...(socket.data.meta || {}),
+          ...metaUpdate,
+        };
+
+        const meeting = await Meeting.findOne({ meetingCode: code });
+        if (meeting) {
+          await meeting.updateParticipantMeta(socket.id, socket.data.meta);
+        }
+
+        if (meetingParticipants[code]?.has(socket.data.userId)) {
+          meetingParticipants[code].get(socket.data.userId).meta = socket.data.meta;
+        }
+
+        io.in(`meeting:${code}`).emit("update-participant-state", {
+          peerId: socket.id,
+          muted: socket.data.meta.muted === true,
+        });
+
+      } catch (err) {
+        console.error("[socket][update-participant-state]", err);
       }
     });
 
