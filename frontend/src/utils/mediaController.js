@@ -18,10 +18,6 @@ import {
 
 const TOGGLE_TIMEOUT_MS = 15_000;
 
-// ─── Module-level state ───────────────────────────────────────────────────────
-// All state lives here so it survives across React re-renders but is fully
-// reset by resetMediaController() on unmount (Bug 2).
-
 let localStream = null;
 let socketRef = null;
 let pcsRef = {};
@@ -42,10 +38,6 @@ let externalCleaners = {
   prevLocalStreamRef: null,
 };
 
-// ─── Internal helpers ─────────────────────────────────────────────────────────
-
-// Bug 9: provide a getter instead of snapshotting localStream at call time,
-// so track-end handlers always read the current stream reference.
 function _getLocalStream() {
   return localStream;
 }
@@ -69,9 +61,6 @@ function _safeEmit(event, payload) {
   } catch { }
 }
 
-// Bug 18: wraps a getUserMedia call with an AbortController-backed timeout.
-// If the permission dialog is never resolved, the toggle guard is released
-// after TOGGLE_TIMEOUT_MS and the UI becomes responsive again.
 async function _getUserMediaWithTimeout(constraints) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), TOGGLE_TIMEOUT_MS);
@@ -83,7 +72,6 @@ async function _getUserMediaWithTimeout(constraints) {
   }
 }
 
-// ─── Public setters ───────────────────────────────────────────────────────────
 
 export function setExternalCleaners(refs = {}) {
   externalCleaners.recordersRef = refs.recordersRef ?? null;
@@ -113,8 +101,6 @@ export function setLocalMirrorEnabled(enabled) {
   enforceVideoMirrorBehavior(localVideoEl, { mirror: localMirrorEnabled });
 }
 
-// Bug 3: always use syncPreview so placeholder is never overwritten by a raw
-// srcObject assignment racing with an async toggleVideo.
 export function setLocalStream(stream) {
   localStream = stream ?? null;
   if (!localVideoEl) return;
@@ -141,8 +127,6 @@ export function setLocalStream(stream) {
   }
 }
 
-// Bug 16: guard against re-registering the same element so StrictMode double
-// invocation and ref re-fires don't interrupt active playback.
 export function setVideoElement(videoEl) {
   if (videoEl && videoEl === localVideoEl) return;
   localVideoEl = videoEl ?? null;
@@ -171,31 +155,19 @@ export function setVideoElement(videoEl) {
   }
 }
 
-// ─── initMediaController ──────────────────────────────────────────────────────
-// Bug 1: guard each assignment individually — only overwrite when the value
-// has actually changed. This silences the spurious re-init warning that fired
-// whenever the parent hook re-ran with the same arguments.
-
 export function initMediaController(
   stream,
   socket,
   peerConnections = {},
   videoElement = null
 ) {
-  const incomingStream = stream ?? null;
-  const incomingSocket = socket ?? null;
-  const incomingPcs = peerConnections ?? {};
-  const incomingEl = videoElement ?? null;
+  localStream = stream ?? localStream;
+  socketRef = socket ?? socketRef;
+  pcsRef = peerConnections ?? pcsRef;
 
-  if (localStream && localStream !== incomingStream) {
-    console.warn(
-      "[mediaController] re-initializing with a different stream — previous state overwritten"
-    );
-  }
-
-  if (localStream !== incomingStream) localStream = incomingStream;
-  if (socketRef !== incomingSocket) socketRef = incomingSocket;
-  if (pcsRef !== incomingPcs) pcsRef = incomingPcs;
+  localStream = stream ?? null;
+  socketRef = socket ?? null;
+  pcsRef = peerConnections ?? {};
 
   if (process.env.NODE_ENV !== "production") {
     window.__MEDIA_CTRL = {
@@ -205,30 +177,10 @@ export function initMediaController(
     };
   }
 
-  // Bug 16: re-use setVideoElement's same-element guard
-  if (incomingEl !== localVideoEl) {
-    setVideoElement(incomingEl);
-  } else if (localVideoEl) {
-    syncPreview({
-      localVideoEl,
-      localStream,
-      placeholderStream: _placeholderStream,
-      localMirrorEnabled,
-    });
-    if (isSafari()) {
-      refreshSafariPreview({
-        localVideoEl,
-        localStream,
-        placeholderStream: _placeholderStream,
-        localMirrorEnabled,
-      });
-    }
+  if (videoElement) {
+    setVideoElement(videoElement);
   }
 }
-
-// ─── resetMediaController ─────────────────────────────────────────────────────
-// Bug 2: call this from the React hook's cleanup so stale module-level state
-// does not leak into a subsequent mount.
 
 export function resetMediaController() {
   if (_placeholderTrack) {
@@ -252,8 +204,6 @@ export function resetMediaController() {
     prevLocalStreamRef: null,
   };
 }
-
-// ─── Remote video elements ────────────────────────────────────────────────────
 
 export function registerRemoteVideoElement(peerId, videoEl) {
   if (!peerId || !videoEl) return;
@@ -298,23 +248,16 @@ export function attachRemoteStream(peerId, stream) {
   }
 }
 
-// ─── toggleAudio ─────────────────────────────────────────────────────────────
 
 export async function toggleAudio(currentMuted) {
   if (togglingAudio) return currentMuted;
   togglingAudio = true;
   try {
     const newMuted = !currentMuted;
-
-    if (!navigator?.mediaDevices || !localStream) {
-      _safeEmit("update-participant-state", { muted: newMuted });
-      return newMuted;
-    }
-
     if (newMuted) {
       stopAndRemoveTracks("audio", _ctx());
       runExternalCleaners("audio", { externalCleaners, localStream });
-      _safeEmit("update-participant-state", { muted: true });
+      // _safeEmit("update-participant-state", { muted: true });
       if (isSafari()) {
         refreshSafariPreview({
           localVideoEl,
@@ -346,7 +289,7 @@ export async function toggleAudio(currentMuted) {
     try {
       await replaceTrackInPeers(newTrack, "audio", { pcsRef, localStream });
       replaceLocalTrack(newTrack, "audio", _ctx());
-      _safeEmit("update-participant-state", { muted: false });
+      //_safeEmit("update-participant-state", { muted: false });
       if (isSafari()) {
         refreshSafariPreview({
           localVideoEl,
@@ -371,7 +314,6 @@ export async function toggleAudio(currentMuted) {
   }
 }
 
-// ─── toggleVideo ─────────────────────────────────────────────────────────────
 
 export async function toggleVideo(currentVideoOff, { usePlaceholder = false } = {}) {
   if (togglingVideo) return currentVideoOff;
@@ -394,8 +336,6 @@ export async function toggleVideo(currentVideoOff, { usePlaceholder = false } = 
   }
 }
 
-// ─── _turnVideoOff ────────────────────────────────────────────────────────────
-
 async function _turnVideoOff({ usePlaceholder }) {
   // Bug 17: guard against null localStream
   if (!localStream) {
@@ -409,7 +349,6 @@ async function _turnVideoOff({ usePlaceholder }) {
     _placeholderStream = null;
   }
 
-  // Bug 4: createPlaceholderVideoTrack may return null — use null (not undefined)
   _placeholderTrack = createPlaceholderVideoTrack();
   _placeholderStream = _placeholderTrack?.__placeholderStream ?? null;
 
@@ -461,8 +400,6 @@ async function _turnVideoOff({ usePlaceholder }) {
   return true;
 }
 
-// ─── _turnVideoOn ─────────────────────────────────────────────────────────────
-
 async function _turnVideoOn(currentVideoOff) {
   let acquired = null;
   try {
@@ -488,8 +425,7 @@ async function _turnVideoOn(currentVideoOff) {
     }
     _placeholderStream = null;
 
-    // Bug 5: build the merged stream BEFORE calling replaceTrackInPeers so the
-    // stream reference passed to _replaceViaAddTrack is the final live one.
+
     let mergedStream;
     try {
       if (localStream?.getAudioTracks?.().length > 0) {
@@ -536,8 +472,7 @@ async function _turnVideoOn(currentVideoOff) {
         } catch { }
       });
 
-    // Bug 6: use syncPreview once — do not assign srcObject again after this.
-    // setLocalStream calls syncPreview internally.
+
     setLocalStream(localStream);
 
     if (isSafari()) {
@@ -563,8 +498,6 @@ async function _turnVideoOn(currentVideoOff) {
   }
 }
 
-// ─── _safariMicSwap ───────────────────────────────────────────────────────────
-
 async function _safariMicSwap() {
   if (!localStream?.getAudioTracks?.().length) return;
   let acquired = null;
@@ -584,10 +517,6 @@ async function _safariMicSwap() {
     });
   }
 }
-
-// ─── stopAllVideoAndCleanup ───────────────────────────────────────────────────
-// Bug 13: removed document.querySelectorAll("video") — that kills remote streams.
-// Only stop the local stream's video tracks and null the local preview element.
 
 function _stopAllVideoTracks() {
   try {
@@ -622,10 +551,6 @@ export function stopAllVideoAndCleanup() {
   _stopAllVideoTracks();
 }
 
-// ─── forceReleaseEverything ───────────────────────────────────────────────────
-// Bug 12: delete pcsRef entries after closing so subsequent replaceTrackInPeers
-// calls don't iterate closed PCs.
-
 export function forceReleaseEverything() {
   try {
     Object.entries(pcsRef ?? {}).forEach(([peerId, pc]) => {
@@ -646,7 +571,6 @@ export function forceReleaseEverything() {
 
   runExternalCleaners("video", { externalCleaners, localStream });
 
-  // Bug 13: only null the local preview element, not all <video> in document
   if (localVideoEl) {
     try {
       localStream?.getTracks?.().forEach((t) => {

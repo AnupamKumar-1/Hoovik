@@ -1,10 +1,7 @@
-// ─── Constants declared first (before any function that uses them) ────────────
 const PLACEHOLDER_WIDTH = 16;
 const PLACEHOLDER_HEIGHT = 12;
 const PLACEHOLDER_FPS = 1;
 const SAFARI_PREVIEW_REFRESH_DELAY_MS = 16; // one rAF frame, not 0
-
-// ─── Environment helpers ──────────────────────────────────────────────────────
 
 export function isSafari() {
     return (
@@ -32,11 +29,6 @@ export function enforceVideoMirrorBehavior(el, { mirror = false } = {}) {
     }
 }
 
-// ─── syncPreview ──────────────────────────────────────────────────────────────
-// Single authoritative function for updating the local preview srcObject.
-// Always call this instead of setting srcObject directly — it prevents
-// the placeholder-overwrite race (Bug 3).
-
 export function syncPreview({
     localVideoEl,
     localStream,
@@ -53,8 +45,6 @@ export function syncPreview({
         console.warn("[mediaControllerUtils] syncPreview failed:", err);
     }
 }
-
-// ─── Placeholder track ────────────────────────────────────────────────────────
 
 export function createPlaceholderVideoTrack() {
     try {
@@ -100,11 +90,6 @@ export function stopAndCleanupPlaceholder(track) {
     } catch { }
 }
 
-// ─── attachTrackEndHandler ────────────────────────────────────────────────────
-// Bug 9: handler must not close over `localStream` at creation time because the
-// module-level localStream reference changes when tracks are replaced.
-// Instead, accept a `getLocalStream` getter so it reads the live reference.
-
 export function attachTrackEndHandler(
     track,
     kind,
@@ -130,8 +115,6 @@ export function attachTrackEndHandler(
         try { track.onended = handler; } catch { }
     }
 }
-
-// ─── replaceTrackInPeers ──────────────────────────────────────────────────────
 
 async function _replaceViaSender(pc, track, kind) {
     const sender =
@@ -265,9 +248,6 @@ export async function restoreOutgoingVideoToPeers(realTrack, { pcsRef }) {
     }
 }
 
-// ─── replaceLocalTrack ────────────────────────────────────────────────────────
-// Bug 9 fix applied: accepts getLocalStream instead of localStream snapshot.
-
 export function replaceLocalTrack(
     newTrack,
     kind,
@@ -326,8 +306,6 @@ export function replaceLocalTrack(
         });
     }
 }
-
-// ─── stopAndRemoveTracks ──────────────────────────────────────────────────────
 
 export function stopAndRemoveTracks(
     kind,
@@ -394,8 +372,6 @@ export function stopAndRemoveTracks(
     enforceVideoMirrorBehavior(localVideoEl, { mirror: !!localMirrorEnabled });
 }
 
-// ─── clearPreviewIfNoTracks ───────────────────────────────────────────────────
-
 export function clearPreviewIfNoTracks({ localStream, localVideoEl }) {
     if (!isSafari() || !localStream || !localVideoEl) return;
     try {
@@ -405,11 +381,6 @@ export function clearPreviewIfNoTracks({ localStream, localVideoEl }) {
         }
     } catch { }
 }
-
-// ─── refreshSafariPreview ─────────────────────────────────────────────────────
-// Bug 15: setTimeout(0) races with any srcObject writes that happen between
-// the null and the restore. Use a named timer token so callers can cancel it,
-// and use a slightly longer delay (one rAF frame) to let the browser flush.
 
 export function refreshSafariPreview({
     localVideoEl,
@@ -431,13 +402,6 @@ export function refreshSafariPreview({
         return token;
     } catch { }
 }
-
-// ─── runExternalCleaners ──────────────────────────────────────────────────────
-// Bug 10: original stopped ALL recorders regardless of `kind`.
-// Recorders are keyed by peerId and not inherently audio/video — stopping all
-// of them when toggling audio kills video recordings. The recorder lifecycle
-// should be managed by the recording hook, not here. We only touch audio context
-// and analyzer which are audio-specific, and prevLocalStreamRef always.
 
 export function runExternalCleaners(kind, { externalCleaners, localStream }) {
     if (kind === "audio") {

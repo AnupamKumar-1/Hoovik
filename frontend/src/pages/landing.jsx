@@ -7,7 +7,7 @@ export default function LandingPage() {
 
   return (
     <div className="lp-root">
-      
+
       <div className="lp-bg-mesh" aria-hidden />
       <header className="lp-nav" role="navigation" aria-label="Main navigation">
         <div className="lp-brand" onClick={() => navigate("/")}>
@@ -170,7 +170,6 @@ export default function LandingPage() {
         </aside>
       </main>
 
-      {/* ── FOOTER ── */}
       <footer className="lp-foot">
         <p>
           Built with ❤️ - <strong>SkyMeetAI</strong> — Intelligent real-time

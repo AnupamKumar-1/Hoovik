@@ -39,7 +39,6 @@ export default function Authentication() {
     }
   };
 
-  // Auto-dismiss snack
   React.useEffect(() => {
     if (!open) return;
     const t = setTimeout(() => setOpen(false), 4000);
@@ -50,10 +49,9 @@ export default function Authentication() {
 
   return (
     <div className="au-root">
-      {/* Mesh background */}
+
       <div className="au-bg" aria-hidden />
 
-      {/* ── LEFT HERO ── */}
       <aside className="au-hero" aria-hidden>
         <div className="au-hero-inner">
           <div className="au-hero-logo">
@@ -96,7 +94,6 @@ export default function Authentication() {
             </div>
           </div>
 
-          {/* Decorative glass card */}
           <div className="au-hero-card" aria-hidden>
             <div className="au-hero-card-top">
               <span className="au-hero-card-label">AI POWERED SESSION</span>
@@ -123,7 +120,6 @@ export default function Authentication() {
       <main className="au-panel">
         <div className="au-form-card">
 
-          {/* Brand mark */}
           <div className="au-form-brand">
             <div className="au-form-brand-icon">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
@@ -265,7 +261,6 @@ export default function Authentication() {
         </div>
       </main>
 
-      {/* Snackbar */}
       {open && (
         <div className="au-snack" role="status" aria-live="polite">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden>

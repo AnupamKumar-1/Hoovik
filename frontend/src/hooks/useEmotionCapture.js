@@ -8,6 +8,7 @@ export default function useEmotionCapture({
   roomId,
   isHost,
   DEBUG_SHOW_EMOTION_FOR_EVERYONE,
+  activeSpeakerIdRef,
 }) {
   const recordingState = useRef(new Map());
   const emoIntervalHandleRef = useRef(null);
@@ -51,10 +52,9 @@ export default function useEmotionCapture({
 
       socket.emit("emotion.frame", {
         meetingId: (meetingId || "").toUpperCase(),
-        participantId: participantId,
+        participantId,
         buffer: arrayBuffer,
       });
-
     } catch (e) {
       console.warn("emotion capture failed", e);
     } finally {
@@ -75,12 +75,18 @@ export default function useEmotionCapture({
     if (!isHost && !DEBUG_SHOW_EMOTION_FOR_EVERYONE) return;
 
     const doCapturePass = async () => {
+      const activeSpeakerId = activeSpeakerIdRef?.current;
+      if (!activeSpeakerId || activeSpeakerId === myId) return;
+
       const streamsMap = remoteStreamsRef.current || {};
-      for (const [participantId, stream] of Object.entries(streamsMap)) {
-        if (!participantId || participantId === myId) continue;
-        if (!stream) continue;
-        recordAndSendClip({ stream, meetingId: roomId, participantId });
-      }
+      const stream = streamsMap[activeSpeakerId];
+      if (!stream) return;
+
+      recordAndSendClip({
+        stream,
+        meetingId: roomId,
+        participantId: activeSpeakerId,
+      });
     };
 
     doCapturePass();

@@ -4,12 +4,14 @@ import {
   toggleVideo as mediaToggleVideo,
   setLocalStream,
   setVideoElement,
+  replaceTrackInPeers,
 } from "../utils/mediaController";
 
 export default function useMediaControls({
   localStreamRef,
   localVideoRef,
   pcsRef,
+  myUserId,
   socketRef,
   createAnalyzerForStream,
   removeAnalyzer,
@@ -18,17 +20,14 @@ export default function useMediaControls({
   startPeriodicEmotionCapture,
 }) {
   const videoOffRef = useRef(false);
+  const screenTrackRef = useRef(null);
 
-  // CENTRALIZED ANALYZER RESET
-  function resetLocalAnalyzer() {
+  function syncAnalyzer(stream) {
     try {
       removeAnalyzer("local");
-      if (localStreamRef.current) {
-        createAnalyzerForStream("local", localStreamRef.current);
-      }
-    } catch {}
+      if (stream) createAnalyzerForStream("local", stream);
+    } catch { }
   }
-
 
   async function toggleMute(
     muted,
@@ -43,37 +42,24 @@ export default function useMediaControls({
       setMuted(newMuted);
       if (mutedRef) mutedRef.current = newMuted;
 
-      if (newMuted) {
+      const stream = localStreamRef.current;
 
-        if (TRANSCRIPTS_ENABLED) {
-          try { window.stopTranscription?.(); } catch {}
-        }
-
-        try {
-          const rec = recordersRef.current?.["local"];
-          if (rec?.recorder && rec.recorder.state !== "inactive") {
-            rec.recorder.stop();
-          }
-          delete recordersRef.current?.["local"];
-        } catch {}
-      } else {
-        // UNMUTED
-        if (TRANSCRIPTS_ENABLED) {
-          try {
-            window.startTranscription?.(localStreamRef.current);
-          } catch {}
-        }
-
-        try {
-          window.startRecording?.("audio", localStreamRef.current);
-        } catch {}
+      if (!newMuted && stream) {
+        syncAnalyzer(stream);
+        try { startRecordingForStream("local", stream); } catch { }
       }
+
+
+      if (socketRef.current?.connected && socketRef.current?.id) {
+        socketRef.current.emit("update-participant-state", {
+          muted: newMuted,
+        });
+      }
+
     } catch (err) {
       console.error("toggleMute error:", err);
-      if (mutedRef) mutedRef.current = muted;
     }
   }
-
 
   async function toggleVideo(videoOff, setVideoOff) {
     try {
@@ -82,38 +68,33 @@ export default function useMediaControls({
       setVideoOff(newVideoOff);
       videoOffRef.current = newVideoOff;
 
+      const stream = localStreamRef.current;
+
       if (newVideoOff) {
-
-        try { stopPeriodicEmotionCapture(); } catch {}
-        try { removeAnalyzer("local"); } catch {}
-        try { window.stopRecording?.("video"); } catch {}
+        stopPeriodicEmotionCapture();
+        removeAnalyzer("local");
       } else {
-
-        resetLocalAnalyzer();
-
-        try {
-          startRecordingForStream("local", localStreamRef.current);
-        } catch {}
-
-        try { startPeriodicEmotionCapture(); } catch {}
+        syncAnalyzer(stream);
+        try { startRecordingForStream("local", stream); } catch { }
+        startPeriodicEmotionCapture();
       }
+
     } catch (err) {
       console.error("toggleVideo error:", err);
-      videoOffRef.current = videoOff;
     }
   }
 
-  // SCREEN SHARE
   async function startScreenShare(prevLocalStreamRef) {
     try {
       const screenStream = await navigator.mediaDevices.getDisplayMedia({
         video: true,
-        audio: true,
       });
 
       const screenTrack = screenStream.getVideoTracks()[0];
+      if (!screenTrack) return;
 
-      // PRESERVE MIC
+      screenTrackRef.current = screenTrack;
+
       const audioTracks =
         localStreamRef.current?.getAudioTracks?.() || [];
 
@@ -124,106 +105,78 @@ export default function useMediaControls({
 
       prevLocalStreamRef.current = localStreamRef.current;
       localStreamRef.current = mergedStream;
+
       setLocalStream(mergedStream);
 
-      // LOCAL PREVIEW
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = mergedStream;
         setVideoElement(localVideoRef.current);
       }
 
-      // REPLACE TRACK IN PEERS
-      Object.values(pcsRef.current).forEach((pc) => {
-        const sender = pc
-          .getSenders()
-          .find((s) => s.track?.kind === "video");
-
-        if (sender) {
-          try { sender.replaceTrack(screenTrack); } catch {}
-        }
-      });
-
-      // FORCE NEGOTIATION
-      Object.values(pcsRef.current).forEach((pc) => {
-        try {
-          pc.dispatchEvent(new Event("negotiationneeded"));
-        } catch {}
+      await replaceTrackInPeers(screenTrack, "video", {
+        pcsRef: pcsRef.current,
+        localStream: mergedStream,
       });
 
       socketRef.current?.emit("update-participant-state", {
         screen: true,
       });
 
+      syncAnalyzer(mergedStream);
 
       screenTrack.onended = async () => {
-        try {
-          let camStream = prevLocalStreamRef.current;
-
-          if (!camStream) {
-            try {
-              camStream =
-                await navigator.mediaDevices.getUserMedia({
-                  video: true,
-                  audio: true,
-                });
-            } catch {}
-          }
-
-          if (camStream) {
-            localStreamRef.current = camStream;
-            setLocalStream(camStream);
-
-            const camTrack = camStream.getVideoTracks()[0];
-
-            if (camTrack) {
-              Object.values(pcsRef.current).forEach((pc) => {
-                const sender = pc
-                  .getSenders()
-                  .find((s) => s.track?.kind === "video");
-
-                if (sender) {
-                  try { sender.replaceTrack(camTrack); } catch {}
-                }
-              });
-            }
-
-            // RESET ANALYZER + RECORDING
-            resetLocalAnalyzer();
-            startRecordingForStream("local", camStream);
-
-            // LOCAL PREVIEW
-            if (localVideoRef.current) {
-              localVideoRef.current.srcObject = camStream;
-              setVideoElement(localVideoRef.current);
-            }
-          } else {
-            // fallback
-            if (localVideoRef.current) {
-              localVideoRef.current.srcObject = null;
-            }
-            localStreamRef.current = null;
-            setLocalStream(null);
-          }
-
-          socketRef.current?.emit("update-participant-state", {
-            screen: false,
-          });
-        } finally {
-          prevLocalStreamRef.current = null;
-
-          try {
-            screenStream.getTracks().forEach((t) => {
-              if (t.readyState !== "ended") t.stop();
-            });
-          } catch {}
-        }
+        await stopScreenShare(prevLocalStreamRef);
       };
+
     } catch (err) {
-      if (err.name === "NotAllowedError") {
-        console.log("User cancelled screen share");
-      } else {
-        console.error("Screen share error:", err);
+      console.error("Screen share error:", err);
+    }
+  }
+
+  async function stopScreenShare(prevLocalStreamRef) {
+    try {
+      let camStream = prevLocalStreamRef.current;
+
+      if (!camStream) {
+        camStream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: true,
+        });
       }
+
+      localStreamRef.current = camStream;
+      setLocalStream(camStream);
+
+      const camTrack = camStream.getVideoTracks()[0];
+
+      if (camTrack) {
+        await replaceTrackInPeers(camTrack, "video", {
+          pcsRef: pcsRef.current,
+          localStream: camStream,
+        });
+      }
+
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = camStream;
+        setVideoElement(localVideoRef.current);
+      }
+
+      syncAnalyzer(camStream);
+      startRecordingForStream("local", camStream);
+
+      socketRef.current?.emit("update-participant-state", {
+        screen: false,
+      });
+
+    } catch (err) {
+      console.error("stop screen share error:", err);
+    } finally {
+      try {
+        screenTrackRef.current?.stop();
+      } catch { }
+
+      screenTrackRef.current = null;
+      prevLocalStreamRef.current = null;
     }
   }
 

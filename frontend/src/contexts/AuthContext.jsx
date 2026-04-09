@@ -18,8 +18,6 @@ const apiClient = axios.create({
 const SUPPORTS_GLOBAL_MEETINGS =
   process.env.REACT_APP_SUPPORTS_GLOBAL_MEETINGS === "false" ? false : true;
 
-// Auth token helpers
-
 function readToken() {
   const t = localStorage.getItem("token")?.trim();
   return t && t !== "undefined" && t !== "null" ? t : null;
@@ -30,7 +28,6 @@ function authHeader() {
   return t ? { Authorization: `Bearer ${t}` } : {};
 }
 
-
 apiClient.interceptors.request.use((config) => {
   const token = readToken();
   if (token) {
@@ -39,7 +36,6 @@ apiClient.interceptors.request.use((config) => {
   }
   return config;
 });
-
 
 function extractArray(body) {
   if (!body) return null;
@@ -50,8 +46,24 @@ function extractArray(body) {
   return found ?? null;
 }
 
+function decodeTokenUser(token) {
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    if (payload.exp && payload.exp * 1000 < Date.now()) return null;
+    return {
+      _id: payload.sub ?? payload.id ?? payload._id ?? null,
+      username: payload.username ?? payload.user ?? null,
+      email: payload.email ?? null,
+      name: payload.name ?? payload.display ?? null,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export const AuthProvider = ({ children }) => {
   const [userData, setUserData] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const router = useNavigate();
 
   const logout = useCallback(
@@ -87,6 +99,38 @@ export const AuthProvider = ({ children }) => {
     [router]
   );
 
+  useEffect(() => {
+    const token = readToken();
+
+    if (!token) {
+      setAuthLoading(false);
+      return;
+    }
+
+    apiClient
+      .get("/users/me")
+      .then((resp) => {
+        const user = resp.data?.user ?? resp.data ?? null;
+        if (user && (user._id || user.id || user.username)) {
+          setUserData(user);
+        } else {
+          const decoded = decodeTokenUser(token);
+          if (decoded) setUserData(decoded);
+        }
+      })
+      .catch((err) => {
+        const status = err?.response?.status;
+        if (status === 401) {
+          localStorage.removeItem("token");
+        } else {
+          const decoded = decodeTokenUser(token);
+          if (decoded) setUserData(decoded);
+        }
+      })
+      .finally(() => {
+        setAuthLoading(false);
+      });
+  }, []);
 
   useEffect(() => {
     const clientReqId = client.interceptors.request.use(
@@ -106,7 +150,6 @@ export const AuthProvider = ({ children }) => {
       (resp) => resp,
       (err) => {
         if (err?.response?.status === 401) {
-          console.warn("logout: 401 received on client axios, logging out");
           logout(true, false);
         }
         return Promise.reject(err);
@@ -117,7 +160,6 @@ export const AuthProvider = ({ children }) => {
       (resp) => resp,
       (err) => {
         if (err?.response?.status === 401) {
-          console.warn("logout: 401 received on apiClient, logging out");
           logout(true, false);
         }
         return Promise.reject(err);
@@ -130,7 +172,6 @@ export const AuthProvider = ({ children }) => {
       apiClient.interceptors.response.eject(apiResId);
     };
   }, [logout]);
-
 
   const handleRegister = async (name, username, password) => {
     const resp = await client.post("/register", { name, username, password });
@@ -161,6 +202,9 @@ export const AuthProvider = ({ children }) => {
 
       if (resp.data?.user) {
         setUserData(resp.data.user);
+      } else if (token) {
+        const decoded = decodeTokenUser(token);
+        if (decoded) setUserData(decoded);
       }
 
       router("/home");
@@ -169,7 +213,6 @@ export const AuthProvider = ({ children }) => {
 
     return null;
   };
-
 
   const getHistoryOfUser = async () => {
     const isAuth = !!readToken();
@@ -221,7 +264,6 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-
   const addToUserHistory = async (meetingPayload) => {
     const payloadObj =
       typeof meetingPayload === "string"
@@ -244,7 +286,6 @@ export const AuthProvider = ({ children }) => {
           : null),
     };
 
-    const isAuth = !!readToken();
     const headers = { "Content-Type": "application/json", ...authHeader() };
 
     if (SUPPORTS_GLOBAL_MEETINGS) {
@@ -348,6 +389,7 @@ export const AuthProvider = ({ children }) => {
       value={{
         userData,
         setUserData,
+        authLoading,
         logout,
         addToUserHistory,
         getHistoryOfUser,
@@ -362,3 +404,4 @@ export const AuthProvider = ({ children }) => {
 };
 
 export { apiClient };
+

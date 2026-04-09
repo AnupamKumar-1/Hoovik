@@ -4,6 +4,7 @@ import {
   initMediaController,
   setExternalCleaners,
 } from "../utils/mediaController";
+import { notifyLocalStreamReady } from "./useWebRTC";
 
 export default function useMeetingLifecycle({
   roomId,
@@ -30,7 +31,6 @@ export default function useMeetingLifecycle({
   setRemoteStreams,
   recordersRef,
   SOCKET_SERVER_URL,
-  flushPendingPeers,
 }) {
   const participantsMetaRef = useRef(participantsMeta);
   const isHostRef = useRef(isHost);
@@ -161,6 +161,8 @@ export default function useMeetingLifecycle({
       createAnalyzerForStream("local", stream);
       startRecordingForStream("local", stream);
 
+      notifyLocalStreamReady(stream);
+
       const socket = io(SOCKET_SERVER_URL, { autoConnect: false });
       socketRef.current = socket;
 
@@ -203,20 +205,49 @@ export default function useMeetingLifecycle({
         });
       } catch { }
 
-      if (localStreamRef.current) {
-        flushPendingPeers?.();
+      const token =
+        localStorage.getItem("token") ||
+        localStorage.getItem("accessToken");
+
+      let uid = null;
+
+      if (token) {
+        try {
+          const payload = JSON.parse(atob(token.split(".")[1]));
+          uid = payload._id || payload.sub;
+        } catch { }
       }
 
-      let uid = localStorage.getItem("userId");
       if (!uid) {
-        uid = crypto.randomUUID();
-        localStorage.setItem("userId", uid);
+        uid = localStorage.getItem("userId");
+        if (!uid) {
+          uid = crypto.randomUUID();
+          localStorage.setItem("userId", uid);
+        }
       }
+
+      const displayName =
+        localStorage.getItem("displayName") || "Guest";
 
       socketRef.current.emit("join-call", roomId, {
-        name: localStorage.getItem("displayName") || "Guest",
+        name: displayName,
         userId: uid,
       });
+
+      try {
+        await fetch(`${API_BASE}/addParticipant`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
+            meetingCode: roomId,
+            name: displayName,
+          }),
+        });
+      } catch { }
+
     } catch (err) {
       console.error(err);
       alert("Unable to access camera/mic or connect.");

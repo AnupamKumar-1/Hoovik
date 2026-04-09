@@ -21,6 +21,7 @@ export default function useSocket({
   persistHistorySnapshot,
   handleIncomingMessage,
   handleAck,
+  notifyPcsChanged,
 }) {
   const h = useRef({});
   h.current = {
@@ -42,6 +43,7 @@ export default function useSocket({
     persistHistorySnapshot,
     handleIncomingMessage,
     handleAck,
+    notifyPcsChanged,
   };
 
   useEffect(() => {
@@ -95,6 +97,24 @@ export default function useSocket({
     };
     socket.on("participants-updated", onParticipantsUpdated);
 
+    const onParticipantStateUpdate = ({ peerId, muted }) => {
+      if (!peerId) return;
+      h.current.setParticipantsMeta((prev) =>
+        prev.map((p) =>
+          p.id === peerId
+            ? {
+              ...p,
+              meta: {
+                ...p.meta,
+                muted: muted === true,
+              },
+            }
+            : p
+        )
+      );
+    };
+    socket.on("update-participant-state", onParticipantStateUpdate);
+
     const setupPeer = (p) => {
       if (!p?.id || p.id === socket.id) return;
 
@@ -130,6 +150,7 @@ export default function useSocket({
       });
 
       normalized.forEach(setupPeer);
+      h.current.notifyPcsChanged?.();
     };
     socket.on("existing-participants", onExistingParticipants);
 
@@ -143,6 +164,7 @@ export default function useSocket({
       });
 
       setupPeer(peer);
+      h.current.notifyPcsChanged?.();
     };
     socket.on("user-joined", onUserJoined);
 
@@ -199,7 +221,7 @@ export default function useSocket({
           h.current.cleanupAll();
           h.current.navigate("/home");
         }
-      }, 3000);
+      }, 8000);
     };
     socket.on("disconnect", onDisconnect);
 
@@ -218,24 +240,30 @@ export default function useSocket({
       if (!emotion) return;
 
       if (emotion.label) {
-        h.current.setEmotionsMap((prev) => ({
-          ...prev,
-          [participantId]: {
-            label: emotion.label,
-            score: emotion.score ?? 1,
-          },
-        }));
+        h.current.setEmotionsMap((prev) => {
+          const existing = prev[participantId] || [];
+          return {
+            ...prev,
+            [participantId]: [
+              ...existing,
+              { label: emotion.label, score: emotion.score ?? 1, ts: Date.now() },
+            ].slice(-20),
+          };
+        });
         return;
       }
 
       if (emotion.emotion) {
-        h.current.setEmotionsMap((prev) => ({
-          ...prev,
-          [participantId]: {
-            label: emotion.emotion,
-            score: emotion.confidence ?? 1,
-          },
-        }));
+        h.current.setEmotionsMap((prev) => {
+          const existing = prev[participantId] || [];
+          return {
+            ...prev,
+            [participantId]: [
+              ...existing,
+              { label: emotion.emotion, score: emotion.confidence ?? 1, ts: Date.now() },
+            ].slice(-20),
+          };
+        });
         return;
       }
 
@@ -244,10 +272,16 @@ export default function useSocket({
           (max, curr) => (curr[1] > max[1] ? curr : max),
           ["neutral/calm", 0]
         );
-        h.current.setEmotionsMap((prev) => ({
-          ...prev,
-          [participantId]: { label: topLabel, score: topScore },
-        }));
+        h.current.setEmotionsMap((prev) => {
+          const existing = prev[participantId] || [];
+          return {
+            ...prev,
+            [participantId]: [
+              ...existing,
+              { label: topLabel, score: topScore, ts: Date.now() },
+            ].slice(-20),
+          };
+        });
       }
     };
 
@@ -274,6 +308,7 @@ export default function useSocket({
       socket.off("emotion.result", emotionHandler);
       socket.off("emotion.update", emotionHandler);
       socket.off("emotion", emotionHandler);
+      socket.off("update-participant-state", onParticipantStateUpdate);
     };
   }, [socketRef.current]);
 }

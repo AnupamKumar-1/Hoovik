@@ -9,16 +9,14 @@ export default function useMediaBridge({
   recordersRef,
   startPeriodicEmotionCapture,
   stopPeriodicEmotionCapture,
-  flushPendingPeers,
+
 }) {
   useEffect(() => {
+    
     const setupVolumeAnalyzer = (stream) => {
       try {
         if (stream) {
           localStreamRef.current = stream;
-          if (typeof flushPendingPeers === "function") {
-            flushPendingPeers();
-          }
         }
 
         const s = stream || localStreamRef.current;
@@ -86,7 +84,7 @@ export default function useMediaBridge({
       } catch { }
     };
 
-    const bridge = {
+    window.__MEDIA_BRIDGE__ = {
       setupVolumeAnalyzer,
       stopVolumeAnalyzer,
       startTranscription,
@@ -96,8 +94,6 @@ export default function useMediaBridge({
       startEmotion,
       stopEmotion,
     };
-
-    window.__MEDIA_BRIDGE__ = bridge;
 
     return () => {
       try {
@@ -113,6 +109,5 @@ export default function useMediaBridge({
     recordersRef,
     startPeriodicEmotionCapture,
     stopPeriodicEmotionCapture,
-    flushPendingPeers,
   ]);
 }

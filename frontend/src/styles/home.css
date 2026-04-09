@@ -17,7 +17,6 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-/* ── ROOT ── */
 .hm-root {
   min-height: 100vh;
   background: var(--hm-bg);
@@ -32,7 +31,6 @@
   position: relative;
 }
 
-/* ── BACKGROUND MESH ── */
 .hm-bg {
   position: fixed;
   inset: 0;
@@ -52,7 +50,6 @@
   background-size: 48px 48px;
 }
 
-/* ── TOPBAR ── */
 .hm-topbar {
   position: relative;
   z-index: 10;
@@ -133,7 +130,6 @@
 }
 .hm-logout-btn:hover { background: rgba(239, 68, 68, 0.14); border-color: rgba(239, 68, 68, 0.4); }
 
-/* ── WELCOME ── */
 .hm-welcome {
   position: relative;
   z-index: 1;
@@ -174,7 +170,6 @@
   font-weight: 300;
 }
 
-/* ── GRID ── */
 .hm-grid {
   position: relative;
   z-index: 1;
@@ -188,14 +183,12 @@
   .hm-grid { grid-template-columns: 1fr; }
 }
 
-/* ── LEFT COLUMN ── */
 .hm-left {
   display: flex;
   flex-direction: column;
   gap: 20px;
 }
 
-/* ── CARD ── */
 .hm-card {
   border-radius: 18px;
   background: rgba(7, 13, 26, 0.7);
@@ -244,7 +237,6 @@
   margin: 14px 0 0;
 }
 
-/* ── FORM FIELD ── */
 .hm-field {
   display: flex;
   flex-direction: column;
@@ -280,7 +272,6 @@
   box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
 }
 
-/* ── BUTTONS ── */
 .hm-btn-row {
   display: flex;
   gap: 10px;
@@ -347,7 +338,6 @@
 .hm-btn-full:hover { transform: translateY(-1px); box-shadow: 0 0 32px rgba(14, 165, 233, 0.32); }
 .hm-btn-full:active { transform: translateY(1px); }
 
-/* ── TIP ROW ── */
 .hm-tip-row {
   display: flex;
   align-items: flex-start;
@@ -367,7 +357,6 @@
   font-weight: 300;
 }
 
-/* ── TRANSCRIPTS RIGHT CARD ── */
 .hm-transcripts { animation-delay: 0.15s; }
 
 .hm-tx-badge {
@@ -383,7 +372,6 @@
   white-space: nowrap;
 }
 
-/* Notice box */
 .hm-tx-notice {
   display: flex;
   align-items: flex-start;
@@ -399,7 +387,6 @@
 .hm-tx-notice p:first-child { font-weight: 600; margin-bottom: 2px; }
 .hm-tx-notice-sub { color: var(--hm-muted-bright); font-size: 0.74rem; }
 
-/* Empty state */
 .hm-tx-empty {
   padding: 32px 20px;
   display: flex;
@@ -428,7 +415,6 @@
   font-weight: 300;
 }
 
-/* Transcript item */
 .hm-tx-item { border-bottom: 1px solid var(--hm-border); }
 .hm-tx-item:last-child { border-bottom: none; }
 
@@ -467,7 +453,6 @@
 
 .hm-tx-chevron-open { transform: rotate(180deg); }
 
-/* Transcript body (expanded) */
 .hm-tx-body {
   padding: 0 20px 16px;
   display: flex;
@@ -489,12 +474,10 @@
   white-space: pre-wrap;
 }
 
-/* scrollbar */
 .hm-tx-preview::-webkit-scrollbar { width: 4px; }
 .hm-tx-preview::-webkit-scrollbar-track { background: transparent; }
 .hm-tx-preview::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 2px; }
 
-/* Segment rows */
 .hm-tx-segment {
   margin-bottom: 6px;
   color: rgba(232, 242, 255, 0.7);
@@ -512,7 +495,6 @@
   margin: 0 4px;
 }
 
-/* Transcript action buttons */
 .hm-tx-actions { display: flex; gap: 8px; }
 
 .hm-tx-btn {
@@ -535,7 +517,6 @@
 }
 .hm-tx-btn-dl:hover { background: rgba(14, 165, 233, 0.16); }
 
-/* ── SNACKBAR ── */
 .hm-snack {
   position: fixed;
   bottom: 24px;
@@ -576,7 +557,6 @@
   border-color: rgba(245, 158, 11, 0.25);
 }
 
-/* ── KEYFRAMES ── */
 @keyframes hm-fadeDown {
   from { opacity: 0; transform: translateY(-12px); }
   to   { opacity: 1; transform: none; }
@@ -587,7 +567,6 @@
   to   { opacity: 1; transform: none; }
 }
 
-/* ── ACCESSIBILITY ── */
 .hm-btn-p:focus,
 .hm-btn-g:focus,
 .hm-btn-full:focus,

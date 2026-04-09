@@ -1,6 +1,5 @@
 
 :root {
-  /* Core palette */
   --vm-bg:              #030609;
   --vm-bg1:             #060d18;
   --vm-bg2:             #0a1628;
@@ -26,7 +25,6 @@
   --vm-green:           #22c55e;
   --vm-green-dim:       rgba(34, 197, 94, 0.14);
 
-  /* Typography */
   --vm-font-display:    'Syne', sans-serif;
   --vm-font-body:       'DM Sans', sans-serif;
 
@@ -197,13 +195,11 @@
   transition: box-shadow 160ms ease;
 }
 
-/* Speaking states */
 .participantCardSpeaking {
   border-color: rgba(14, 165, 233, 0.48) !important;
   box-shadow: var(--vm-shadow-speak) !important;
 }
 
-/* Video fill */
 .participantCard video {
   width: 100%;
   height: 100%;
@@ -328,7 +324,6 @@
   animation: vmBlink 1.2s ease infinite;
 }
 
-/* Shift pill up when status bar present */
 .participantCard:has(.activeSpeakerBar) .namePill,
 .spotlight:has(.activeSpeakerBar) .namePill {
   bottom: 54px;
@@ -464,7 +459,6 @@
   transform: scaleX(-1);
 }
 
-/* "You" badge */
 .youBadge {
   position: absolute;
   left: 7px;
@@ -481,7 +475,6 @@
   pointer-events: none;
 }
 
-/* Preview mini-controls */
 .previewControls {
   position: absolute;
   right: 7px;

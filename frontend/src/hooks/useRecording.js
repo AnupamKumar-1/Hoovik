@@ -3,7 +3,7 @@ import { useRef } from "react";
 export default function useRecording({
   isHost,
   roomId,
-  participantsMeta,
+  participantsMetaRef,
   TRANSCRIPTS_ENABLED,
   TRANSCRIPT_ENDPOINT,
 }) {
@@ -15,18 +15,13 @@ export default function useRecording({
 
     try {
       const audioTracks = stream.getAudioTracks();
-      if (!audioTracks?.length) {
-        console.warn(`[recorder] no audio tracks for ${id}`);
-        return;
-      }
+      if (!audioTracks?.length) return;
 
       const audioStream = new MediaStream([audioTracks[0]]);
 
       let mimeType = "audio/webm;codecs=opus";
       if (!MediaRecorder.isTypeSupported(mimeType)) {
-        mimeType = MediaRecorder.isTypeSupported("audio/webm")
-          ? "audio/webm"
-          : "";
+        mimeType = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "";
       }
 
       const recorder = new MediaRecorder(
@@ -35,17 +30,13 @@ export default function useRecording({
       );
 
       const chunks = [];
-
       recorder.ondataavailable = (ev) => {
         if (ev.data?.size > 0) chunks.push(ev.data);
       };
 
       recorder.start(1000);
       recordersRef.current[id] = { recorder, chunks };
-
-    } catch (err) {
-      console.warn(`[recorder] failed for ${id}:`, err);
-    }
+    } catch { }
   }
 
   function stopAllRecorders() {
@@ -54,21 +45,18 @@ export default function useRecording({
         if (rec?.recorder?.state !== "inactive") {
           rec.recorder.stop();
         }
-      } catch {}
+      } catch { }
     });
   }
 
   function getHostSecretForRoom(code) {
     if (!code) return null;
-
     try {
       const raw = localStorage.getItem(`host:${code.toUpperCase()}`);
       if (!raw) return null;
-
       const parsed = JSON.parse(raw);
       return parsed?.hostSecret || null;
-    } catch (e) {
-      console.warn("Failed to read host secret", e);
+    } catch {
       return null;
     }
   }
@@ -77,14 +65,12 @@ export default function useRecording({
     if (!isHost) return null;
 
     if (!TRANSCRIPTS_ENABLED) {
-      console.warn("[transcript] disabled");
       stopAllRecorders();
       recordersRef.current = {};
       return null;
     }
 
     if (!TRANSCRIPT_ENDPOINT) {
-      console.warn("[transcript] missing endpoint");
       stopAllRecorders();
       recordersRef.current = {};
       return null;
@@ -95,99 +81,71 @@ export default function useRecording({
       await new Promise((r) => setTimeout(r, 1200));
 
       const code = (roomId || "").toUpperCase();
-
-      if (!code) {
-        console.error("INVALID ROOM ID");
-        return null;
-      }
-
-
+      if (!code) return null;
 
       const hostSecret = getHostSecretForRoom(code);
-
-      if (!hostSecret) {
-        console.error("NO HOST SECRET FOUND → aborting");
-        return null;
-      }
+      if (!hostSecret) return null;
 
       const fd = new FormData();
       fd.append("meeting_code", code);
 
       const speakerMap = {};
 
-      participantsMeta?.forEach((p) => {
+      const currentMeta = participantsMetaRef?.current || [];
+      currentMeta.forEach((p) => {
         const name =
           p?.meta?.name ||
           p?.meta?.displayName ||
+          p?.name ||
           `Guest-${(p.id || "").slice(0, 6)}`;
-
-        speakerMap[p.id] = name;
+        if (p.id) speakerMap[p.id] = name;
       });
 
-      speakerMap["local"] =
-        localStorage.getItem("displayName") || "Host";
+      speakerMap["local"] = localStorage.getItem("displayName") || "Host";
 
       fd.append("speaker_map", JSON.stringify(speakerMap));
 
       let fileCount = 0;
-
       for (const [id, rec] of Object.entries(recordersRef.current)) {
         const chunks = rec?.chunks;
-
         if (!chunks?.length) continue;
-
         const blob = new Blob(chunks, { type: "audio/webm" });
         fd.append("audio_files", blob, `${id}.webm`);
         fileCount++;
       }
 
-      if (fileCount === 0) {
-        console.warn("[transcript] no audio recorded");
+      if (fileCount === 0) return null;
+
+      let resp;
+      try {
+        resp = await fetch(TRANSCRIPT_ENDPOINT, {
+          method: "POST",
+          headers: { "x-host-secret": hostSecret },
+          body: fd,
+        });
+      } catch {
         return null;
       }
 
-      const resp = await fetch(TRANSCRIPT_ENDPOINT, {
-        method: "POST",
-        headers: {
-          "x-host-secret": hostSecret,
-        },
-        body: fd,
-      });
-
-      if (!resp.ok) {
-        const errText = await resp.text();
-        console.error("upload failed:", errText);
-        return null;
-      }
+      if (!resp || !resp.ok) return null;
 
       const data = await resp.json();
-
-      if (!data?.success) {
-        console.error(" transcript failed:", data);
-        return null;
-      }
-
-      const payload = {
-        meeting_code: code,
-        transcript: data.transcript_text || "",
-        createdAt: new Date().toISOString(),
-      };
+      if (!data?.success) return null;
 
       try {
         localStorage.setItem(
           `transcript:${code}`,
-          JSON.stringify(payload)
+          JSON.stringify({
+            meeting_code: code,
+            transcript: data.transcript_text || "",
+            createdAt: new Date().toISOString(),
+          })
         );
-      } catch {}
-
-      console.log("TRANSCRIPT SUCCESS");
+      } catch { }
 
       return data;
-
-    } catch (err) {
-      console.error("upload error:", err);
+    } catch {
       return null;
-
     } finally {
       recordersRef.current = {};
     }

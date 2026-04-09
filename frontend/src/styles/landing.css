@@ -15,7 +15,6 @@
   --lp-font-body: 'DM Sans', sans-serif;
 }
 
-/* ── ROOT ── */
 .lp-root {
   min-height: 100vh;
   background: var(--lp-bg);
@@ -143,7 +142,6 @@
     0 8px 20px rgba(0, 0, 0, 0.3);
 }
 
-/* ── HERO ── */
 .lp-hero {
   position: relative;
   z-index: 1;
@@ -162,7 +160,6 @@
   }
 }
 
-/* ── HERO LEFT ── */
 .lp-hero-left {
   display: flex;
   flex-direction: column;
@@ -310,7 +307,6 @@
   font-weight: 400;
 }
 
-/* ── HERO RIGHT — GLASS CARD ── */
 .lp-hero-right {
   animation: lp-fadeUp 0.6s 0.2s ease both;
 }
@@ -488,7 +484,6 @@
 .lp-chip-gold { background: rgba(245,158,11,0.1); color: #fbbf24; border: 1px solid rgba(245,158,11,0.2); }
 .lp-chip-green{ background: rgba(34,197,94,0.1);  color: #4ade80; border: 1px solid rgba(34,197,94,0.2); }
 
-/* ── FOOTER ── */
 .lp-foot {
   position: relative;
   z-index: 1;
@@ -526,7 +521,6 @@
   animation: lp-pulse 2s ease infinite;
 }
 
-/* ── KEYFRAMES ── */
 @keyframes lp-fadeDown {
   from { opacity: 0; transform: translateY(-12px); }
   to   { opacity: 1; transform: none; }
