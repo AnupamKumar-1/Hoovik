@@ -180,7 +180,7 @@ class EmotionPredictor:
             xf, xa, fm, am = coerce(xf, xa, fm, am)
             validate_inputs(xf, xa, fm, am)
 
-            # ANOMALY FIRST 
+            # ANOMALY FIRST
             X = build_anomaly_features(xf, xa, fm, am)
             X = self.anomaly_scaler.transform(X)
 

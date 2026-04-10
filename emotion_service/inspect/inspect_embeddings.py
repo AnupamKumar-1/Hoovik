@@ -1,6 +1,4 @@
 """
-inspect_embeddings.py
-
 Sanity checks for the extracted dataset.npz before training.
 
 Catches common issues early:

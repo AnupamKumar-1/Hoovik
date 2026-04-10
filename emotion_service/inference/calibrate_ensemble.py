@@ -175,7 +175,7 @@ def main():
 
     (w_modal, w_xgb), acc = calibrate(p_modal, p_xgb, y)
 
-    print(f"\n🔥 BEST: modal={w_modal:.2f}, xgb={w_xgb:.2f}, acc={acc:.4f}")
+    print(f"\n BEST: modal={w_modal:.2f}, xgb={w_xgb:.2f}, acc={acc:.4f}")
 
     save_dir = BASE_DIR / "models" / "ensemble"
     save_dir.mkdir(parents=True, exist_ok=True)
