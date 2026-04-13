@@ -1,4 +1,4 @@
-export const IS_PROD = false;
+export const IS_PROD = true;
 
 export const SERVER = IS_PROD
   ? "https://skymeetai-production.up.railway.app"
