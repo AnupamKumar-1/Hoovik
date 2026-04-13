@@ -26,8 +26,8 @@ const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || "http://localhost:3000";
 
 const corsOptions = {
   origin: [
+    process.env.CLIENT_ORIGIN,
     "http://localhost:3000",
-    "http://192.168.1.15:3000"
   ],
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   credentials: true,
