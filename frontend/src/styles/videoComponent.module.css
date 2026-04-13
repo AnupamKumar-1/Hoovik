@@ -188,7 +188,7 @@
   border-color: var(--vm-border-bright);
 }
 
-/* Compact variant */
+
 .participantCardCompact {
   border-radius: var(--vm-r-md);
   overflow: hidden;
@@ -575,7 +575,7 @@
   box-shadow: none;
 }
 
-/* Active (toggled) — mic/camera off */
+
 .iconButton.active {
   background: var(--vm-danger-dim);
   border-color: var(--vm-danger-border);
@@ -588,14 +588,14 @@
   border-color: rgba(239, 68, 68, 0.48);
 }
 
-/* Chat active */
+
 .iconButtonChatActive {
   border-color: rgba(14, 165, 233, 0.38) !important;
   background: rgba(14, 165, 233, 0.1) !important;
   color: var(--vm-sky-bright) !important;
 }
 
-/* Leave / End button */
+
 .leaveButton {
   background: linear-gradient(135deg, #ef4444, #dc2626) !important;
   border-color: transparent !important;
@@ -762,7 +762,7 @@
 .msgStatusSent    { color: var(--vm-green); }
 .msgStatusFailed  { color: #f87171; cursor: pointer; font-weight: 700; font-size: 11px; }
 
-/* Chat input area */
+
 .chattingArea {
   border-top: 1px solid var(--vm-border);
   padding: 10px 12px;

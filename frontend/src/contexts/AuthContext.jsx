@@ -218,32 +218,32 @@ export const AuthProvider = ({ children }) => {
     const isAuth = !!readToken();
     const headers = { "Content-Type": "application/json", ...authHeader() };
 
-    if (SUPPORTS_GLOBAL_MEETINGS) {
-      try {
-        const resp = await apiClient.get(
-          isAuth ? "/meetings?mine=true" : "/meetings",
-          { headers }
-        );
-        const items = extractArray(resp?.data);
-        if (items) return items;
-      } catch (err) {
-        const status = err?.response?.status;
-        if (status !== 404) {
-          console.warn("getHistoryOfUser: /meetings failed", status ?? err.message);
-        }
-      }
-    }
+    // if (SUPPORTS_GLOBAL_MEETINGS) {
+    //   try {
+    //     const resp = await apiClient.get(
+    //       isAuth ? "/meetings?mine=true" : "/meetings",
+    //       { headers }
+    //     );
+    //     const items = extractArray(resp?.data);
+    //     if (items) return items;
+    //   } catch (err) {
+    //     const status = err?.response?.status;
+    //     if (status !== 404) {
+    //       console.warn("getHistoryOfUser: /meetings failed", status ?? err.message);
+    //     }
+    //   }
+    // }
 
-    try {
-      const resp = await apiClient.get(
-        isAuth ? "/users/meetings?mine=true" : "/users/meetings",
-        { headers }
-      );
-      const items = extractArray(resp?.data);
-      if (items) return items;
-    } catch (err) {
-      console.warn("getHistoryOfUser: /users/meetings failed", err?.response?.status ?? err.message);
-    }
+    // try {
+    //   const resp = await apiClient.get(
+    //     isAuth ? "/users/meetings?mine=true" : "/users/meetings",
+    //     { headers }
+    //   );
+    //   const items = extractArray(resp?.data);
+    //   if (items) return items;
+    // } catch (err) {
+    //   console.warn("getHistoryOfUser: /users/meetings failed", err?.response?.status ?? err.message);
+    // }
 
     try {
       const resp = await client.get("/get_all_activity");

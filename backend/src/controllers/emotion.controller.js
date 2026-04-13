@@ -1,208 +1,97 @@
+import { sendToEmotionService } from "../services/emotion.service.js";
+import { safeUnlink } from "../utils/helpers.utils.js";
+import { makeLogger } from "../utils/redis.utils.js";
+import cfg from "../config/config.json" assert { type: "json" };
 
-import axios from "axios";
-import FormData from "form-data";
-import fs from "fs";
-import path from "path";
-import os from "os";
+const DEFAULT_TYPE = cfg.emotion?.defaultType ?? "audio";
+const EMOTION_MAX_FILE_BYTES = parseInt(process.env.EMOTION_MAX_FILE_BYTES || `${200 * 1024 * 1024}`, 10);
+const ALLOWED_TYPES = ["audio", "video"];
 
-const EMOTION_SERVICE_URL =
-  process.env.EMOTION_SERVICE_URL || "http://localhost:5002/analyze";
+const log = makeLogger("emotion");
 
-
-function buildForm(meetingId, participantId, fileOrBuffer, type = "audio", opts = {}) {
-  const form = new FormData();
-  form.append("meeting_id", meetingId);
-  form.append("participant_id", participantId);
-  form.append("type", type);
-
-  const mime = opts.mime || "";
-  let filename = opts.filename || "";
-
-  if (Buffer.isBuffer(fileOrBuffer)) {
-    if (!filename) {
-      const ext = type === "audio" ? "webm" : "mp4";
-      filename = `${participantId}.${ext}`;
-    }
-    const opt = {};
-    if (mime) opt.contentType = mime;
-    opt.filename = filename;
-    form.append("file", fileOrBuffer, opt);
-  } else if (typeof fileOrBuffer === "string") {
-    const resolved = fileOrBuffer;
-    const base = path.basename(resolved);
-    filename = filename || base;
-
-    if (mime) {
-      form.append("file", fs.createReadStream(resolved), {
-        filename,
-        contentType: mime,
-      });
-    } else {
-      form.append("file", fs.createReadStream(resolved), { filename });
-    }
-  } else if (fileOrBuffer && typeof fileOrBuffer.pipe === "function") {
-    if (!filename) {
-      const ext = type === "audio" ? "webm" : "mp4";
-      filename = `${participantId}.${ext}`;
-    }
-    if (mime) {
-      form.append("file", fileOrBuffer, { filename, contentType: mime });
-    } else {
-      form.append("file", fileOrBuffer, { filename });
-    }
-  } else {
-    throw new Error("fileOrBuffer must be a Buffer, file path string, or readable stream");
-  }
-
-  return form;
-}
-
-function getFormLength(form) {
-  return new Promise((resolve, reject) => {
-    form.getLength((err, length) => {
-      if (err) return reject(err);
-      resolve(length);
-    });
-  });
-}
-
-async function postForm(form, timeoutMs = 120000) {
-  const headers = form.getHeaders();
-
-  try {
-    const length = await getFormLength(form);
-    if (typeof length === "number") {
-      headers["Content-Length"] = length;
-    }
-  } catch (lenErr) {
-    console.warn("[EmotionService] could not compute form length:", lenErr?.message || lenErr);
-  }
-
-  return axios.post(EMOTION_SERVICE_URL, form, {
-    headers,
-    timeout: timeoutMs,
-    maxContentLength: Infinity,
-    maxBodyLength: Infinity,
-  });
-}
-
-
-export async function sendToEmotionService(
-  meetingId,
-  participantId,
-  fileOrBuffer,
-  type = "audio",
-  opts = {}
-) {
-  if (!meetingId || !participantId || !fileOrBuffer) {
-    throw new Error("meetingId, participantId and fileOrBuffer are required");
-  }
-
-  if (type === "frame") {
-    throw new Error("Frame type is no longer supported via HTTP. Use socket instead.");
-  }
-
-  const timeoutMs = typeof opts.timeoutMs === "number" ? opts.timeoutMs : 120000;
-
-  let cleanupTemp = null;
-
-  try {
-    const isStream =
-      fileOrBuffer &&
-      typeof fileOrBuffer === "object" &&
-      typeof fileOrBuffer.pipe === "function";
-
-    if (isStream) {
-      if (fileOrBuffer.path && typeof fileOrBuffer.path === "string") {
-        fileOrBuffer = String(fileOrBuffer.path);
-      } else {
-        const tmpName = path.join(
-          os.tmpdir(),
-          `emotion_upload_${Date.now()}_${Math.random().toString(36).slice(2)}`
-        );
-
-        await new Promise((resolve, reject) => {
-          const out = fs.createWriteStream(tmpName);
-          fileOrBuffer.pipe(out);
-          out.on("finish", resolve);
-          out.on("error", reject);
-        });
-
-        fileOrBuffer = tmpName;
-        cleanupTemp = tmpName;
-      }
-    }
-
-    let form = buildForm(meetingId, participantId, fileOrBuffer, type, opts);
-
-    console.log(`[EmotionService] Posting ${type} → ${EMOTION_SERVICE_URL}`);
-
-    try {
-      const res = await postForm(form, timeoutMs);
-      return res.data;
-    } catch (err) {
-      const transient =
-        !err.response &&
-        ["ECONNREFUSED", "ETIMEDOUT", "EPIPE", "ECONNRESET"].includes(err.code);
-
-      if (transient) {
-        console.log("[EmotionService] retrying...");
-        form = buildForm(meetingId, participantId, fileOrBuffer, type, opts);
-        const retryRes = await postForm(form, timeoutMs);
-        return retryRes.data;
-      }
-
-      throw err;
-    }
-  } finally {
-    if (cleanupTemp) {
-      try {
-        fs.unlinkSync(cleanupTemp);
-      } catch { }
-    }
-  }
-}
-
+export { sendToEmotionService };
 
 export async function uploadEmotionFileHandler(req, res) {
   try {
     const meetingId = req.body?.meeting_id || req.body?.meetingId;
+
     const participantId = req.body?.participant_id || req.body?.participantId;
-    const type = req.body?.type || "audio";
+
+    const type = req.body?.type || DEFAULT_TYPE;
+
     const file = req.file;
 
     if (!meetingId || !participantId || !file) {
+
       return res.status(400).json({
         ok: false,
-        error: "meeting_id, participant_id and file are required",
+        error: "meeting_id, participant_id and file are required"
       });
     }
 
     if (type === "frame") {
+
       return res.status(400).json({
         ok: false,
-        error: "Frame upload not allowed via HTTP. Use socket.",
+        error: "Frame upload not allowed via HTTP. Use socket."
       });
     }
 
-    const emotionResult = await sendToEmotionService(
-      meetingId,
-      participantId,
-      file.path,
-      type,
-      {
-        mime: file.mimetype,
-        filename: file.originalname,
-      }
-    );
+    if (!ALLOWED_TYPES.includes(type)) {
 
-    return res.json({ ok: true, result: emotionResult });
-  } catch (err) {
-    console.error("[Emotion] error:", err);
-    return res.status(500).json({ ok: false, error: err.message });
-  } finally {
-    if (req.file?.path) {
-      fs.unlink(req.file.path, () => { });
+      return res.status(400).json({
+        ok: false,
+        error: `Invalid type. Must be one of: ${ALLOWED_TYPES.join(", ")}`
+
+      });
+
     }
+
+    if (file.size > EMOTION_MAX_FILE_BYTES) {
+
+      return res.status(413).json({
+        ok: false,
+        error: "File too large" });
+    }
+
+    const result = await sendToEmotionService(meetingId, participantId, file.path, type, {
+
+      mime: file.mimetype,
+      filename: file.originalname,
+    });
+
+    if (result === null) {
+
+      return res.status(202).json({
+        ok: true,
+        result: null,
+        reason: "skipped"
+      });
+    }
+
+    if (result?.error === true) {
+      return res.status(503).json({
+
+        ok: false,
+        error: result.reason || "service_failure"
+      });
+    }
+
+    return res.json({ ok: true, result });
+
+  } catch (err) {
+
+    log.error("handler error",
+      {
+        err: err.message
+      });
+
+    return res.status(500).json({
+      ok: false,
+      error: "Emotion service unavailable" });
+  } finally {
+
+    if (req.file?.path) await safeUnlink(req.file.path);
+
   }
 }

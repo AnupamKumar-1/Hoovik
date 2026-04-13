@@ -1,25 +1,28 @@
-
 import express from "express";
 import crypto from "crypto";
-import { Meeting } from "../models/meeting.model.js";
+import { startTimer, endTimer } from "../observability/latency/latency.service.js";
+import { LATENCY_LABELS } from "../observability/latency/latency.constants.js";
+import {
+  findMeetingByCode,
+  findActiveMeetingByCode,
+  createMeetingRoom,
+  findRoomsByOwner,
+} from "../data-access/rooms.repository.js";
 
 const router = express.Router();
 
-
 function generateHostSecretPair() {
-  
   const hostSecret = crypto.randomBytes(32).toString("hex");
   const hostSecretHash = crypto.createHash("sha256").update(hostSecret).digest("hex");
   return { hostSecret, hostSecretHash };
 }
 
-
 function generateRoomCode() {
   return crypto.randomBytes(4).toString("hex").toUpperCase();
 }
 
-
 router.post("/", async (req, res) => {
+  const start = startTimer();
   try {
     const { hostName } = req.body;
 
@@ -32,16 +35,14 @@ router.post("/", async (req, res) => {
     const maxTries = 5;
     do {
       roomCode = generateRoomCode();
-      const existing = await Meeting.findOne({ meetingCode: roomCode }).lean();
+      const existing = await findMeetingByCode(roomCode);
       if (!existing) break;
       tries += 1;
     } while (tries < maxTries);
 
     if (tries >= maxTries) {
-
       return res.status(500).json({ error: "Failed to generate unique room code, try again" });
     }
-
 
     const { hostSecret, hostSecretHash } = generateHostSecretPair();
 
@@ -61,7 +62,12 @@ router.post("/", async (req, res) => {
       meetingPayload.ownerId = req.user.id;
     }
 
-    const meeting = await Meeting.create(meetingPayload);
+    const meeting = await createMeetingRoom(meetingPayload);
+
+    endTimer(LATENCY_LABELS.SOCKET_JOIN, start, {
+      route: "POST /rooms",
+      roomCode,
+    });
 
     console.log(`[Room Created] ${roomCode} by ${hostName} ${meetingPayload.ownerId ? `(ownerId=${meetingPayload.ownerId})` : ""}`);
     res.status(201).json({
@@ -71,11 +77,11 @@ router.post("/", async (req, res) => {
       owner: !!meetingPayload.ownerId,
     });
   } catch (err) {
+    endTimer(LATENCY_LABELS.SOCKET_JOIN, start, { route: "POST /rooms", error: true });
     console.error("Error creating room:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
-
 
 router.get("/:roomCode", async (req, res) => {
   try {
@@ -85,10 +91,7 @@ router.get("/:roomCode", async (req, res) => {
       return res.status(400).json({ error: "Room code is required" });
     }
 
-    const meeting = await Meeting.findOne({
-      meetingCode: roomCode.toUpperCase(),
-      active: true,
-    }).lean();
+    const meeting = await findActiveMeetingByCode(roomCode);
 
     if (!meeting) {
       return res.status(404).json({ error: "Room not found" });
@@ -107,19 +110,13 @@ router.get("/:roomCode", async (req, res) => {
   }
 });
 
-
 router.get("/mine", async (req, res) => {
   try {
     if (!req.user || !req.user.id) {
       return res.status(401).json({ error: "Authentication required" });
     }
 
-    const ownerId = req.user.id;
-    const rooms = await Meeting.find({ ownerId })
-      .sort({ createdAt: -1 })
-      .select("meetingCode hostName createdAt active")
-      .lean();
-
+    const rooms = await findRoomsByOwner(req.user.id);
     res.json({ rooms });
   } catch (err) {
     console.error("Error fetching owner rooms:", err);

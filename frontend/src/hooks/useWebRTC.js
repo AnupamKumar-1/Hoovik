@@ -34,6 +34,7 @@ export default function useWebRTC({
   const pendingSignalsRef = useRef({});
   const pendingPeerQueueRef = useRef([]);
   const handleSignalRef = useRef(null);
+  const streamMapRef = useRef({});
 
   const teardown = useCallback(
     (peerId) => {
@@ -54,6 +55,7 @@ export default function useWebRTC({
       delete isSettingRemoteAnswerPending.current[peerId];
       delete analyzerAttachedRef.current[peerId];
       delete pendingSignalsRef.current[peerId];
+      delete streamMapRef.current[peerId];
 
       removeAnalyzer(peerId);
 
@@ -67,17 +69,14 @@ export default function useWebRTC({
     [pcsRef, setRemoteStreams, removeAnalyzer]
   );
 
-
   const attachAnalyzerWhenReady = useCallback(
     (peerId, stream, pcId) => {
       if (analyzerAttachedRef.current[peerId]) return;
 
       const tryAttach = () => {
-
         const pcNow = pcsRef.current[peerId];
         if (!pcNow || pcNow.__id !== pcId) return;
         if (analyzerAttachedRef.current[peerId]) return;
-
         analyzerAttachedRef.current[peerId] = true;
         createAnalyzerForStream(peerId, stream);
       };
@@ -94,7 +93,6 @@ export default function useWebRTC({
       };
 
       stream.addEventListener("addtrack", onAddTrack);
-
       stream.addEventListener(
         "inactive",
         () => stream.removeEventListener("addtrack", onAddTrack),
@@ -103,7 +101,6 @@ export default function useWebRTC({
     },
     [pcsRef, createAnalyzerForStream]
   );
-
 
   const createPeerConnection = useCallback(
     (peerId) => {
@@ -116,6 +113,15 @@ export default function useWebRTC({
 
       const existing = pcsRef.current[peerId];
       if (existing) {
+        const state = existing.connectionState;
+        if (state === "connected" || state === "connecting" || state === "new") {
+          return existing;
+        }
+        existing.ontrack = null;
+        existing.onicecandidate = null;
+        existing.onnegotiationneeded = null;
+        existing.onconnectionstatechange = null;
+        existing.oniceconnectionstatechange = null;
         safeClose(existing);
         delete pcsRef.current[peerId];
       }
@@ -124,8 +130,10 @@ export default function useWebRTC({
       const pcId = Symbol();
       pc.__id = pcId;
 
-      const myId = socketRef.current?.id;
-      politeRef.current[peerId] = myId && peerId ? myId > peerId : false;
+      if (politeRef.current[peerId] === undefined) {
+        const myId = socketRef.current?.id;
+        politeRef.current[peerId] = myId && peerId ? myId > peerId : false;
+      }
 
       makingOfferRef.current[peerId] = false;
       ignoreOfferRef.current[peerId] = false;
@@ -137,7 +145,9 @@ export default function useWebRTC({
         const ls = localStreamRef.current;
         if (ls) {
           ls.getTracks().forEach((track) => {
-            const sender = pc.getSenders().find((s) => s.track?.kind === track.kind);
+            const sender = pc
+              .getSenders()
+              .find((s) => s.track?.kind === track.kind);
             if (sender) {
               sender.replaceTrack(track);
             } else {
@@ -152,34 +162,65 @@ export default function useWebRTC({
 
       pcsRef.current[peerId] = pc;
 
-
       pc.ontrack = (ev) => {
-        const stream = ev.streams?.[0];
-        if (!stream) return;
+        let stream = ev.streams?.[0];
 
-        const syncStream = () => {
+        if (!stream) {
+          const existing = streamMapRef.current[peerId]?.stream;
+          if (existing) {
+            existing.addTrack(ev.track);
+            stream = existing;
+          } else {
+            stream = new MediaStream([ev.track]);
+          }
+        }
+
+        const prevEntry = streamMapRef.current[peerId];
+        const newTrackCount = stream.getTracks().length;
+
+        if (prevEntry && prevEntry.stream === stream && prevEntry.trackCount === newTrackCount) {
+          return;
+        }
+
+        streamMapRef.current[peerId] = { stream, trackCount: newTrackCount };
+
+        setRemoteStreams((prev) => {
+          const prevVal = prev[peerId];
+          if (prevVal && prevVal.stream === stream && prevVal.trackCount === newTrackCount) return prev;
+          return { ...prev, [peerId]: { stream, trackCount: newTrackCount } };
+        });
+
+        const onTrackChange = () => {
+          const currentPc = pcsRef.current[peerId];
+          if (!currentPc || currentPc.__id !== pcId) {
+            stream.removeEventListener("addtrack", onTrackChange);
+            stream.removeEventListener("removetrack", onTrackChange);
+            return;
+          }
+          const updatedCount = stream.getTracks().length;
+          const cached = streamMapRef.current[peerId];
+          if (cached && cached.stream === stream && cached.trackCount === updatedCount) return;
+          streamMapRef.current[peerId] = { stream, trackCount: updatedCount };
           setRemoteStreams((prev) => {
-            const existing = prev[peerId];
-            const trackCount = stream.getTracks().length;
+            const prevVal = prev[peerId];
             if (
-              existing &&
-              existing.stream === stream &&
-              existing.trackCount === trackCount
-            ) {
+              prevVal &&
+              prevVal.stream === stream &&
+              prevVal.trackCount === updatedCount
+            )
               return prev;
-            }
-            return { ...prev, [peerId]: { stream, trackCount } };
+            return { ...prev, [peerId]: { stream, trackCount: updatedCount } };
           });
         };
 
-        syncStream();
-        stream.addEventListener("addtrack", syncStream);
-        stream.addEventListener("removetrack", syncStream);
+        if (!prevEntry || prevEntry.stream !== stream) {
+          stream.addEventListener("addtrack", onTrackChange);
+          stream.addEventListener("removetrack", onTrackChange);
+        }
 
         attachAnalyzerWhenReady(peerId, stream, pcId);
       };
 
-      // ICE candidate
       pc.onicecandidate = (ev) => {
         if (!ev.candidate) return;
         socketRef.current?.emit(
@@ -189,7 +230,6 @@ export default function useWebRTC({
         );
       };
 
-      // Negotiation
       pc.onnegotiationneeded = async () => {
         if (
           makingOfferRef.current[peerId] ||
@@ -206,12 +246,12 @@ export default function useWebRTC({
             peerId,
             JSON.stringify({ description: pc.localDescription })
           );
-        } catch { } finally {
+        } catch { }
+        finally {
           makingOfferRef.current[peerId] = false;
         }
       };
 
-      // Connection state
       pc.onconnectionstatechange = () => {
         const state = pc.connectionState;
 
@@ -232,19 +272,22 @@ export default function useWebRTC({
           }, DISCONNECTED_TIMEOUT_MS);
         }
 
-        if (state === "failed" || state === "closed") {
-          teardown(peerId);
+        if (state === "failed") {
+          const current = pcsRef.current[peerId];
+          if (current && current.__id === pcId) {
+            teardown(peerId);
+          }
         }
       };
 
-      // ICE restart on failure
       pc.oniceconnectionstatechange = () => {
         if (pc.iceConnectionState === "failed") {
-          try { pc.restartIce(); } catch { }
+          try {
+            pc.restartIce();
+          } catch { }
         }
       };
 
-      
       const queued = pendingSignalsRef.current[peerId];
       if (queued?.length) {
         delete pendingSignalsRef.current[peerId];
@@ -271,6 +314,10 @@ export default function useWebRTC({
   }, [createPeerConnection]);
 
   useEffect(() => {
+    if (localStreamRef.current) {
+      flushPendingPeers();
+    }
+
     const onLocalStreamReady = (ev) => {
       if (ev.detail?.stream) {
         localStreamRef.current = ev.detail.stream;
@@ -279,9 +326,9 @@ export default function useWebRTC({
     };
 
     window.addEventListener("localstream:ready", onLocalStreamReady);
-    return () => window.removeEventListener("localstream:ready", onLocalStreamReady);
+    return () =>
+      window.removeEventListener("localstream:ready", onLocalStreamReady);
   }, [flushPendingPeers, localStreamRef]);
-
 
   const handleSignal = useCallback(
     async (fromId, messageStr) => {
@@ -296,9 +343,9 @@ export default function useWebRTC({
       }
 
       if (!pcsRef.current[fromId]) {
-        createPeerConnection(fromId);
         pendingSignalsRef.current[fromId] ||= [];
         pendingSignalsRef.current[fromId].push(messageStr);
+        createPeerConnection(fromId);
         return;
       }
 
@@ -322,7 +369,9 @@ export default function useWebRTC({
           if (ignoreOfferRef.current[fromId]) return;
 
           if (isOffer && offerCollision) {
-            try { await pc.setLocalDescription({ type: "rollback" }); } catch { }
+            try {
+              await pc.setLocalDescription({ type: "rollback" });
+            } catch { }
           }
 
           if (isAnswer && pc.signalingState !== "have-local-offer") return;
@@ -334,7 +383,9 @@ export default function useWebRTC({
           const pending = pendingCandidatesRef.current[fromId] || [];
           pendingCandidatesRef.current[fromId] = [];
           for (const candidate of pending) {
-            try { await pc.addIceCandidate(candidate); } catch { }
+            try {
+              await pc.addIceCandidate(candidate);
+            } catch { }
           }
 
           if (isOffer) {
@@ -350,7 +401,9 @@ export default function useWebRTC({
             pendingCandidatesRef.current[fromId] || [];
 
           if (pc.remoteDescription) {
-            try { await pc.addIceCandidate(msg.candidate); } catch { }
+            try {
+              await pc.addIceCandidate(msg.candidate);
+            } catch { }
           } else {
             pendingCandidatesRef.current[fromId].push(msg.candidate);
           }
@@ -368,6 +421,7 @@ export default function useWebRTC({
     teardown,
     politeRef,
     pendingCandidatesRef,
+    makingOfferRef,
     flushPendingPeers,
   };
 }

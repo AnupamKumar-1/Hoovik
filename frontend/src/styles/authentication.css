@@ -16,7 +16,7 @@
   --au-font-b:        'DM Sans', sans-serif;
 }
 
-/* ── RESET ── */
+
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 html, body, #root {
@@ -57,7 +57,6 @@ html, body, #root {
   background-size: 48px 48px;
 }
 
-/* ── LEFT HERO PANEL ── */
 .au-hero {
   position: relative;
   z-index: 1;
@@ -81,7 +80,7 @@ html, body, #root {
   gap: 40px;
 }
 
-/* Brand mark in hero */
+
 .au-hero-logo {
   display: flex;
   align-items: center;
@@ -95,7 +94,7 @@ html, body, #root {
 
 .au-hero-logo svg { flex-shrink: 0; }
 
-/* Hero text block */
+
 .au-hero-content {
   display: flex;
   flex-direction: column;
@@ -180,7 +179,7 @@ html, body, #root {
   font-weight: 400;
 }
 
-/* Decorative glass card */
+
 .au-hero-card {
   border-radius: 18px;
   background: rgba(7, 13, 26, 0.7);
@@ -262,7 +261,7 @@ html, body, #root {
 .au-chip-sky  { background: rgba(14,165,233,0.1); color: var(--au-sky-bright); border: 1px solid rgba(14,165,233,0.2); }
 .au-chip-gold { background: rgba(245,158,11,0.1); color: #fbbf24; border: 1px solid rgba(245,158,11,0.2); }
 
-/* ── RIGHT AUTH PANEL ── */
+
 .au-panel {
   position: relative;
   z-index: 1;
@@ -273,7 +272,6 @@ html, body, #root {
   padding: 32px 24px;
 }
 
-/* Form card */
 .au-form-card {
   width: 100%;
   max-width: 440px;
@@ -291,7 +289,7 @@ html, body, #root {
   gap: 0;
 }
 
-/* Brand inside form */
+
 .au-form-brand {
   display: flex;
   align-items: center;
@@ -320,7 +318,7 @@ html, body, #root {
   color: var(--au-text);
 }
 
-/* Title */
+
 .au-form-title {
   font-family: var(--au-font-d);
   font-size: 1.75rem;
@@ -339,7 +337,8 @@ html, body, #root {
   line-height: 1.5;
 }
 
-/* ── TABS ── */
+
+
 .au-tabs {
   display: flex;
   gap: 0;
@@ -376,7 +375,7 @@ html, body, #root {
   box-shadow: 0 0 20px rgba(14, 165, 233, 0.3);
 }
 
-/* ── FORM ── */
+
 .au-form {
   display: flex;
   flex-direction: column;
@@ -424,7 +423,7 @@ html, body, #root {
   box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
 }
 
-/* Error */
+
 .au-error {
   display: flex;
   align-items: center;
@@ -441,7 +440,10 @@ html, body, #root {
 
 .au-error svg { flex-shrink: 0; }
 
-/* Submit button */
+
+
+
+
 .au-submit {
   width: 100%;
   margin-top: 6px;
@@ -482,7 +484,9 @@ html, body, #root {
   outline-offset: 2px;
 }
 
-/* Spinner inside submit */
+
+
+
 .au-spinner {
   width: 18px;
   height: 18px;
@@ -493,7 +497,7 @@ html, body, #root {
   display: inline-block;
 }
 
-/* Footer link */
+
 .au-form-foot {
   margin-top: 20px;
   text-align: center;
@@ -523,7 +527,7 @@ html, body, #root {
   text-decoration-color: rgba(56, 189, 248, 0.4);
 }
 
-/* ── SNACKBAR ── */
+
 .au-snack {
   position: fixed;
   bottom: 28px;
@@ -547,7 +551,7 @@ html, body, #root {
   animation: au-snackIn 0.3s ease both;
 }
 
-/* ── KEYFRAMES ── */
+
 @keyframes au-fadeUp {
   from { opacity: 0; transform: translateY(16px); }
   to   { opacity: 1; transform: none; }
@@ -572,7 +576,7 @@ html, body, #root {
   to   { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 
-/* ── RESPONSIVE ── */
+
 @media (max-width: 600px) {
   .au-form-card {
     padding: 28px 22px;

@@ -337,7 +337,7 @@ export async function toggleVideo(currentVideoOff, { usePlaceholder = false } = 
 }
 
 async function _turnVideoOff({ usePlaceholder }) {
-  // Bug 17: guard against null localStream
+
   if (!localStream) {
     _safeEmit("update-participant-state", { video: false });
     return true;

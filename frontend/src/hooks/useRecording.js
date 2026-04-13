@@ -6,6 +6,7 @@ export default function useRecording({
   participantsMetaRef,
   TRANSCRIPTS_ENABLED,
   TRANSCRIPT_ENDPOINT,
+  API_BASE,
 }) {
   const recordersRef = useRef({});
 
@@ -90,7 +91,6 @@ export default function useRecording({
       fd.append("meeting_code", code);
 
       const speakerMap = {};
-
       const currentMeta = participantsMetaRef?.current || [];
       currentMeta.forEach((p) => {
         const name =
@@ -100,7 +100,6 @@ export default function useRecording({
           `Guest-${(p.id || "").slice(0, 6)}`;
         if (p.id) speakerMap[p.id] = name;
       });
-
       speakerMap["local"] = localStorage.getItem("displayName") || "Host";
 
       fd.append("speaker_map", JSON.stringify(speakerMap));
@@ -116,11 +115,16 @@ export default function useRecording({
 
       if (fileCount === 0) return null;
 
+      const token = localStorage.getItem("token");
+
       let resp;
       try {
         resp = await fetch(TRANSCRIPT_ENDPOINT, {
           method: "POST",
-          headers: { "x-host-secret": hostSecret },
+          headers: {
+            "x-host-secret": hostSecret,
+            ...(token ? { "x-user-token": token } : {}),
+          },
           body: fd,
         });
       } catch {
@@ -133,12 +137,14 @@ export default function useRecording({
       if (!data?.success) return null;
 
       try {
+        const existingRaw = localStorage.getItem(`host:${code}`);
+        const existing = existingRaw ? JSON.parse(existingRaw) : {};
         localStorage.setItem(
-          `transcript:${code}`,
+          `host:${code}`,
           JSON.stringify({
-            meeting_code: code,
-            transcript: data.transcript_text || "",
-            createdAt: new Date().toISOString(),
+            ...existing,
+            meetingCode: code,
+            lastTranscriptAt: new Date().toISOString(),
           })
         );
       } catch { }

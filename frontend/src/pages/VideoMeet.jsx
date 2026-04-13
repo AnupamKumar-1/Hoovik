@@ -42,7 +42,6 @@ import useAudioAnalyzer from "../hooks/useAudioAnalyzer";
 import useEmotionCapture from "../hooks/useEmotionCapture";
 
 const HOST_ONLY_EMOTION = true;
-const SPEAKER_DEBOUNCE_MS = 700;
 
 function isValidStream(s) {
   return (
@@ -176,7 +175,8 @@ function ChatPanel({
                 </div>
               )}
               <div
-                className={`${styles.msgBubble} ${isOwn ? styles.msgBubbleOwn : styles.msgBubbleOther}`}
+                className={`${styles.msgBubble} ${isOwn ? styles.msgBubbleOwn : styles.msgBubbleOther
+                  }`}
               >
                 {m.text}
               </div>
@@ -277,6 +277,9 @@ export default function VideoMeet() {
   const cleanupRef = useRef(null);
   const speakerTimerRef = useRef(null);
   const activeSpeakerIdRef = useRef(null);
+  const spotlightPeerRef = useRef(null);
+  const ignoreOfferRef = useRef({});
+  const isSettingRemoteAnswerPending = useRef({});
 
   const [remoteStreams, setRemoteStreams] = useState({});
   const [connecting, setConnecting] = useState(true);
@@ -284,6 +287,8 @@ export default function VideoMeet() {
   const [videoOff, setVideoOff] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [participantsMeta, setParticipantsMeta] = useState([]);
+  const [socketReady, setSocketReady] = useState(0);
+  const [spotlightPeerId, setSpotlightPeerId] = useState(null);
 
   const participantsMetaRef = useRef([]);
   useEffect(() => {
@@ -389,6 +394,7 @@ export default function VideoMeet() {
     handleSignal,
     politeRef,
     pendingCandidatesRef,
+    makingOfferRef,
   } = useWebRTC({
     socketRef,
     localStreamRef,
@@ -404,6 +410,7 @@ export default function VideoMeet() {
     useEmotionCapture({
       socketRef,
       remoteStreamsRef,
+      participantsMetaRef,
       myId,
       roomId,
       isHost,
@@ -449,7 +456,13 @@ export default function VideoMeet() {
       setParticipantsMeta,
       setRemoteStreams,
       recordersRef,
+      makingOfferRef,
+      politeRef,
+      pendingCandidatesRef,
+      ignoreOfferRef,
+      isSettingRemoteAnswerPending,
       SOCKET_SERVER_URL,
+      onSocketReady: () => setSocketReady((n) => n + 1),
     });
 
   useEffect(() => {
@@ -490,7 +503,14 @@ export default function VideoMeet() {
         delete next[peerId];
         return next;
       });
+
       setStableSpeakerId((prev) => (prev === peerId ? null : prev));
+
+      setSpotlightPeerId((prev) => {
+        if (prev !== peerId) return prev;
+        spotlightPeerRef.current = null;
+        return null;
+      });
     },
     [pcsRef, recordersRef, removeAnalyzer, notifyPcsChanged]
   );
@@ -523,12 +543,10 @@ export default function VideoMeet() {
     const onKeyDown = (e) => {
       const tag = (e.target?.tagName || "").toUpperCase();
       const isEditable =
-        tag === "INPUT" ||
-        tag === "TEXTAREA" ||
-        e.target?.isContentEditable;
+        tag === "INPUT" || tag === "TEXTAREA" || e.target?.isContentEditable;
       if (isEditable) return;
       if (e.key === "m" || e.key === "M") {
-        toggleMute(mutedRef.current, setMuted, mutedRef, TRANSCRIPTS_ENABLED, recordersRef);
+        toggleMute(muted, setMuted, mutedRef, TRANSCRIPTS_ENABLED, recordersRef);
       } else if (e.key === "v" || e.key === "V") {
         toggleVideo(videoOffRef.current, setVideoOff);
       } else if (e.key === "c" || e.key === "C") {
@@ -567,6 +585,8 @@ export default function VideoMeet() {
     handleIncomingMessage,
     handleAck,
     notifyPcsChanged,
+    makingOfferRef,
+    socketReady,
   });
 
   const remoteEntries = useMemo(() => {
@@ -578,14 +598,29 @@ export default function VideoMeet() {
       .sort(([a], [b]) => a.localeCompare(b));
   }, [unwrappedRemoteStreams, myId]);
 
-  const activeEntry =
-    remoteEntries.find(([id]) => id === stableSpeakerId) ||
-    remoteEntries[0] ||
-    null;
+  const effectiveSpotlightId = useMemo(() => {
+    if (remoteEntries.length === 0) return null;
 
-  const otherEntries = remoteEntries.filter(
-    ([id]) => id !== activeEntry?.[0]
-  );
+    if (spotlightPeerId && remoteEntries.some(([id]) => id === spotlightPeerId)) {
+      return spotlightPeerId;
+    }
+
+    if (stableSpeakerId && remoteEntries.some(([id]) => id === stableSpeakerId)) {
+      return stableSpeakerId;
+    }
+
+    return remoteEntries[0][0];
+  }, [remoteEntries, spotlightPeerId, stableSpeakerId]);
+
+  const activeEntry = useMemo(() => {
+    if (!effectiveSpotlightId) return null;
+    return remoteEntries.find(([id]) => id === effectiveSpotlightId) || null;
+  }, [remoteEntries, effectiveSpotlightId]);
+
+  const otherEntries = useMemo(() => {
+    if (!activeEntry) return remoteEntries;
+    return remoteEntries.filter(([id]) => id !== activeEntry[0]);
+  }, [remoteEntries, activeEntry]);
 
   const participantMap = useMemo(() => {
     const map = {};
@@ -652,6 +687,7 @@ export default function VideoMeet() {
               <div style={{ flex: 1 }}>
                 {activeEntry && (
                   <SpotlightCard
+                    key={activeEntry[0]}
                     id={activeEntry[0]}
                     stream={activeEntry[1]}
                     meta={participantMap[activeEntry[0]]}
@@ -660,7 +696,7 @@ export default function VideoMeet() {
                         ? socketEmotionMap[activeEntry[0]]?.at(-1)
                         : undefined
                     }
-                    isActive={stableSpeakerId === activeEntry?.[0]}
+                    isActive={stableSpeakerId === activeEntry[0]}
                     isHost={isHost}
                   />
                 )}
@@ -681,6 +717,10 @@ export default function VideoMeet() {
                     isActive={stableSpeakerId === peerId}
                     isHost={isHost}
                     compact
+                    onClick={() => {
+                      spotlightPeerRef.current = peerId;
+                      setSpotlightPeerId(peerId);
+                    }}
                   />
                 ))}
               </div>
@@ -741,13 +781,7 @@ export default function VideoMeet() {
           <button
             className={`${styles.iconButton} ${muted ? styles.active : ""}`}
             onClick={() =>
-              toggleMute(
-                muted,
-                setMuted,
-                mutedRef,
-                TRANSCRIPTS_ENABLED,
-                recordersRef
-              )
+              toggleMute(muted, setMuted, mutedRef, TRANSCRIPTS_ENABLED, recordersRef)
             }
             aria-label={muted ? "Unmute" : "Mute"}
             title={muted ? "Unmute" : "Mute"}
@@ -769,16 +803,8 @@ export default function VideoMeet() {
               className={`${styles.iconButton} ${shareEmotion ? styles.active : ""}`}
               onClick={() => setShareEmotion((v) => !v)}
               aria-pressed={shareEmotion}
-              aria-label={
-                shareEmotion
-                  ? "Stop emotion detection"
-                  : "Start emotion detection"
-              }
-              title={
-                shareEmotion
-                  ? "Stop emotion detection"
-                  : "Start emotion detection (host only)"
-              }
+              aria-label={shareEmotion ? "Stop emotion detection" : "Start emotion detection"}
+              title={shareEmotion ? "Stop emotion detection" : "Start emotion detection (host only)"}
               style={{ minWidth: 30, minHeight: 30, fontSize: 13, padding: 6 }}
             >
               😊
@@ -810,13 +836,7 @@ export default function VideoMeet() {
         <button
           className={`${styles.iconButton} ${muted ? styles.active : ""}`}
           onClick={() =>
-            toggleMute(
-              muted,
-              setMuted,
-              mutedRef,
-              TRANSCRIPTS_ENABLED,
-              recordersRef
-            )
+            toggleMute(muted, setMuted, mutedRef, TRANSCRIPTS_ENABLED, recordersRef)
           }
           aria-label={muted ? "Unmute microphone" : "Mute microphone"}
           title={muted ? "Unmute (M)" : "Mute (M)"}
@@ -862,16 +882,8 @@ export default function VideoMeet() {
             className={`${styles.iconButton} ${shareEmotion ? styles.active : ""}`}
             onClick={() => setShareEmotion((v) => !v)}
             aria-pressed={shareEmotion}
-            aria-label={
-              shareEmotion
-                ? "Stop emotion detection"
-                : "Start emotion detection"
-            }
-            title={
-              shareEmotion
-                ? "Stop emotion detection"
-                : "Start emotion detection (host only)"
-            }
+            aria-label={shareEmotion ? "Stop emotion detection" : "Start emotion detection"}
+            title={shareEmotion ? "Stop emotion detection" : "Start emotion detection (host only)"}
           >
             😊
           </button>
@@ -882,9 +894,7 @@ export default function VideoMeet() {
         <button
           className={`${styles.iconButton} ${styles.leaveButton}`}
           onClick={isHost ? endMeeting : leaveCall}
-          aria-label={
-            isHost ? "End meeting for everyone" : "Leave call"
-          }
+          aria-label={isHost ? "End meeting for everyone" : "Leave call"}
           title={isHost ? "End meeting" : "Leave call"}
         >
           <FaPhoneSlash />
@@ -893,7 +903,7 @@ export default function VideoMeet() {
 
       {isHost && (
         <EmotionServicePanel
-          emotionsMap={emotionsMap}
+          emotionsMap={socketEmotionMap}
           participantsMeta={participantsMeta}
           isHost={isHost}
           DEBUG_SHOW_EMOTION_FOR_EVERYONE={false}

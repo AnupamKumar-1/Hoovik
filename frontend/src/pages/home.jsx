@@ -2,7 +2,6 @@ import React, { useEffect, useState, useContext, useRef, useCallback } from "rea
 import { useNavigate } from "react-router-dom";
 import "../styles/home.css";
 import { AuthContext } from "../contexts/AuthContext";
-import { apiClient } from "../contexts/AuthContext";
 import { TRANSCRIPTS_ENABLED } from "../environment";
 
 const SERVER_BASE = process.env.REACT_APP_SERVER_URL || "http://localhost:8000";
@@ -50,12 +49,16 @@ async function createRoomAndGetLink(name) {
   const code = roomCode.toUpperCase();
   const link = `${window.location.origin}/room/${code}`;
 
+  if (!hostSecret) {
+    throw new Error("Server did not return a hostSecret — transcript fetch will not work");
+  }
+
   localStorage.setItem("displayName", name.trim());
   localStorage.setItem(
     `host:${code}`,
     JSON.stringify({
       hostName: name.trim(),
-      hostSecret: hostSecret || null,
+      hostSecret,
       meetingCode: code,
       createdAt: new Date().toISOString(),
     })
@@ -123,17 +126,17 @@ function setCachedTranscripts(data) {
   } catch { }
 }
 
-function getUniqueHostSecrets() {
-  const secrets = new Set();
-  for (const key of Object.keys(localStorage)) {
-    if (!key.startsWith("host:")) continue;
-    try {
-      const parsed = JSON.parse(localStorage.getItem(key));
-      const s = parsed?.hostSecret;
-      if (s && typeof s === "string" && s.length >= 8) secrets.add(s);
-    } catch { }
-  }
-  return [...secrets];
+function cleanInvalidHosts() {
+  Object.keys(localStorage)
+    .filter((k) => k.startsWith("host:"))
+    .forEach((k) => {
+      try {
+        const v = JSON.parse(localStorage.getItem(k));
+        if (!v?.hostSecret) localStorage.removeItem(k);
+      } catch {
+        localStorage.removeItem(k);
+      }
+    });
 }
 
 function Snack({ msg, severity, open }) {
@@ -165,50 +168,70 @@ export default function Home() {
   const [snackOpen, setSnackOpen] = useState(false);
   const [snackMsg, setSnackMsg] = useState("");
   const [snackSeverity, setSnackSeverity] = useState("success");
+  const isFetchingRef = useRef(false);
 
-  const didFetch = useRef(false);
-
-  const loadTranscripts = useCallback(async () => {
+  const loadTranscripts = useCallback(async (bustCache = false) => {
     if (!TRANSCRIPTS_ENABLED) return;
+    if (isFetchingRef.current) return;
 
-    const cached = getCachedTranscripts();
-    if (cached) {
-      setTranscripts(cached);
+    if (!bustCache) {
+      const cached = getCachedTranscripts();
+      if (cached) {
+        setTranscripts(cached);
+        return;
+      }
+    } else {
+      sessionStorage.removeItem(TRANSCRIPT_CACHE_KEY);
     }
 
-    const keys = Object.keys(localStorage)
-      .filter(k => k.startsWith("host:"))
-      .map(k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } })
-      .filter(Boolean)
-      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-
-    const recentSecrets = keys.map(k => k.hostSecret).filter(Boolean).slice(0, 5);
-
-    if (recentSecrets.length === 0) return;
+    isFetchingRef.current = true;
 
     try {
-      const allTranscripts = [];
+      const token = localStorage.getItem("token");
 
-      for (const secret of recentSecrets) {
-        const res = await fetch(`${API_BASE}/transcript?limit=200`, {
-          headers: { "x-host-secret": secret }
-        });
-        const data = await res.json();
-        if (data?.success) allTranscripts.push(...(data.transcripts || []));
+      const res = await fetch(`${API_BASE}/transcripts?limit=200`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+
+      if (!res.ok) {
+        console.error("Transcript fetch failed:", res.status);
+        throw new Error(`HTTP ${res.status}`);
       }
 
-      const normalized = allTranscripts.map(normalizeTranscript).filter(Boolean);
-      const deduped = dedupeByCode(normalized);
+      const data = await res.json();
 
-      setCachedTranscripts(deduped);
-      setTranscripts(deduped);
-    } catch { }
+      if (data?.success) {
+        const normalized = (data.transcripts || [])
+          .map(normalizeTranscript)
+          .filter(Boolean);
+
+        const deduped = dedupeByCode(normalized);
+
+        if (deduped.length > 0) {
+          setCachedTranscripts(deduped);
+        }
+
+        setTranscripts(deduped);
+      }
+    } catch (err) {
+      console.error("loadTranscripts error:", err);
+    } finally {
+      isFetchingRef.current = false;
+    }
   }, []);
 
   useEffect(() => {
-    if (didFetch.current) return;
-    didFetch.current = true;
+    cleanInvalidHosts();
+  }, []);
+
+  useEffect(() => {
     loadTranscripts();
+  }, [loadTranscripts]);
+
+  useEffect(() => {
+    const handleFocus = () => loadTranscripts(true);
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
   }, [loadTranscripts]);
 
   function showSnack(message, severity = "success") {
@@ -320,17 +343,7 @@ export default function Home() {
             title="History"
             aria-label="Open history"
           >
-            <svg
-              width="17"
-              height="17"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden
-            >
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <path d="M3 3v5h5" />
               <path d="M21 12a9 9 0 1 1-9-9" />
               <path d="M12 7v6l4 2" />
@@ -343,9 +356,7 @@ export default function Home() {
       </header>
 
       <div className="hm-welcome">
-        <div className="hm-welcome-avatar" aria-hidden>
-          {displayInitial}
-        </div>
+        <div className="hm-welcome-avatar" aria-hidden>{displayInitial}</div>
         <div className="hm-welcome-text">
           <h2>Welcome back{name ? `, ${name.split(" ")[0]}` : ""}!</h2>
           <p>Ready to connect? Create or join a room below.</p>
@@ -364,57 +375,24 @@ export default function Home() {
             <div className="hm-card-body">
               <div className="hm-field">
                 <label htmlFor="hm-name">Your display name</label>
-                <input
-                  id="hm-name"
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Anupam Kumar"
-                />
+                <input id="hm-name" type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Anupam Kumar" />
               </div>
               <div className="hm-btn-row">
                 <button className="hm-btn-p" onClick={createRoom}>
-                  <svg
-                    width="15"
-                    height="15"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    aria-hidden
-                  >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
                     <path d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.89L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" />
                   </svg>
                   Start Meeting
                 </button>
                 <button className="hm-btn-g" onClick={copyLink}>
-                  <svg
-                    width="15"
-                    height="15"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                    aria-hidden
-                  >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
                     <path d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
                   </svg>
                   Create &amp; Copy Link
                 </button>
               </div>
               <div className="hm-tip-row">
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="#38bdf8"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  aria-hidden
-                >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" strokeWidth="2" strokeLinecap="round" aria-hidden>
                   <circle cx="12" cy="12" r="10" />
                   <path d="M12 16v-4M12 8h.01" />
                 </svg>
@@ -433,26 +411,10 @@ export default function Home() {
             <div className="hm-card-body">
               <div className="hm-field">
                 <label htmlFor="hm-room">Room code or link</label>
-                <input
-                  id="hm-room"
-                  type="text"
-                  value={room}
-                  onChange={(e) => setRoom(e.target.value)}
-                  placeholder="e.g. XKCD42 or https://…"
-                  onKeyDown={(e) => e.key === "Enter" && joinRoom()}
-                />
+                <input id="hm-room" type="text" value={room} onChange={(e) => setRoom(e.target.value)} placeholder="e.g. XKCD42 or https://…" onKeyDown={(e) => e.key === "Enter" && joinRoom()} />
               </div>
               <button className="hm-btn-full" onClick={joinRoom}>
-                <svg
-                  width="15"
-                  height="15"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  aria-hidden
-                >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
                   <path d="M15 3h6v6M14 10l6.1-6.1M9 21H3v-6M10 14l-6.1 6.1" />
                 </svg>
                 Join Room
@@ -468,7 +430,7 @@ export default function Home() {
               <div className="hm-card-sub">From your hosted meetings</div>
             </div>
             {transcripts.length > 0 && (
-              <span className="hm-tx-badge">{transcripts.length} saved</span>
+              <span className="hm-tx-badge">{transcripts.length} meetings analyzed</span>
             )}
           </div>
 
@@ -476,25 +438,14 @@ export default function Home() {
 
           {!TRANSCRIPTS_ENABLED && (
             <div className="hm-tx-notice hm-tx-notice-warn">
-              <svg
-                width="15"
-                height="15"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                aria-hidden
-              >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
                 <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
                 <line x1="12" y1="9" x2="12" y2="13" />
                 <line x1="12" y1="17" x2="12.01" y2="17" />
               </svg>
               <div>
                 <p>Transcript service unavailable on this build.</p>
-                <p className="hm-tx-notice-sub">
-                  Meetings still work — local recording runs in your browser.
-                </p>
+                <p className="hm-tx-notice-sub">Meetings still work — local recording runs in your browser.</p>
               </div>
             </div>
           )}
@@ -502,15 +453,7 @@ export default function Home() {
           {transcripts.length === 0 && TRANSCRIPTS_ENABLED && (
             <div className="hm-tx-empty">
               <div className="hm-tx-empty-icon" aria-hidden>
-                <svg
-                  width="22"
-                  height="22"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="#64748b"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                >
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="1.5" strokeLinecap="round">
                   <path d="M9 12h6M9 16h6M7 4H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V6a2 2 0 00-2-2h-2" />
                   <path d="M15 2H9a1 1 0 00-1 1v2a1 1 0 001 1h6a1 1 0 001-1V3a1 1 0 00-1-1z" />
                 </svg>
@@ -528,34 +471,17 @@ export default function Home() {
               <div key={key} className="hm-tx-item">
                 <div
                   className="hm-tx-head"
-                  onClick={() =>
-                    setExpandedTranscripts((prev) => ({ ...prev, [key]: !prev[key] }))
-                  }
+                  onClick={() => setExpandedTranscripts((prev) => ({ ...prev, [key]: !prev[key] }))}
                   role="button"
                   aria-expanded={isExpanded}
                   tabIndex={0}
-                  onKeyDown={(e) =>
-                    e.key === "Enter" &&
-                    setExpandedTranscripts((prev) => ({ ...prev, [key]: !prev[key] }))
-                  }
+                  onKeyDown={(e) => e.key === "Enter" && setExpandedTranscripts((prev) => ({ ...prev, [key]: !prev[key] }))}
                 >
                   <div>
                     <div className="hm-tx-code">{t.meetingCode}</div>
-                    <div className="hm-tx-date">
-                      {t.createdAt ? new Date(t.createdAt).toLocaleString() : "Unknown date"}
-                    </div>
+                    <div className="hm-tx-date">{t.createdAt ? new Date(t.createdAt).toLocaleString() : "Unknown date"}</div>
                   </div>
-                  <svg
-                    className={`hm-tx-chevron ${isExpanded ? "hm-tx-chevron-open" : ""}`}
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    aria-hidden
-                  >
+                  <svg className={`hm-tx-chevron ${isExpanded ? "hm-tx-chevron-open" : ""}`} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
                     <path d="M6 9l6 6 6-6" />
                   </svg>
                 </div>
@@ -568,9 +494,7 @@ export default function Home() {
                           <div key={idx} className="hm-tx-segment">
                             <span className="hm-tx-speaker">{s.speaker}</span>
                             {s.emoji && <span>{s.emoji}</span>}
-                            {s.emotion && (
-                              <span className="hm-tx-emotion">({s.emotion})</span>
-                            )}
+                            {s.emotion && <span className="hm-tx-emotion">({s.emotion})</span>}
                             <span>: {s.text}</span>
                           </div>
                         ))
@@ -582,9 +506,7 @@ export default function Home() {
                       <button
                         className="hm-tx-btn hm-tx-btn-dl"
                         onClick={() => {
-                          const blob = new Blob([t.transcriptText || ""], {
-                            type: "text/plain",
-                          });
+                          const blob = new Blob([t.transcriptText || ""], { type: "text/plain" });
                           const url = URL.createObjectURL(blob);
                           const a = document.createElement("a");
                           a.href = url;
@@ -593,16 +515,7 @@ export default function Home() {
                           URL.revokeObjectURL(url);
                         }}
                       >
-                        <svg
-                          width="13"
-                          height="13"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          aria-hidden
-                        >
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
                           <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
                         </svg>
                         Download .txt

@@ -40,7 +40,7 @@ export default function LandingPage() {
       </header>
 
       <main className="lp-hero">
-        {/* Left */}
+
         <section className="lp-hero-left">
           <div className="lp-badge" aria-label="AI features">
             <div className="lp-badge-dot" />
@@ -58,7 +58,7 @@ export default function LandingPage() {
           </h1>
 
           <p className="lp-lead">
-            Experience next-generation video meetings powered by AI. Analyze
+            Understand how people feel, not just what they say. Analyze
             emotions in real-time, generate speaker-aware transcripts, and gain
             deeper insights from every conversation.
           </p>
@@ -98,21 +98,23 @@ export default function LandingPage() {
 
           <div className="lp-stats-row">
             <div className="lp-stat">
-              <span className="lp-stat-val">WebRTC</span>
-              <span className="lp-stat-label">Low-latency P2P streaming</span>
+              <span className="lp-stat-val">Instant</span>
+              <span className="lp-stat-label">WebRTC real-time streaming</span>
             </div>
+
             <div className="lp-stat">
-              <span className="lp-stat-val">&lt;80ms</span>
-              <span className="lp-stat-label">Emotion inference latency</span>
+              <span className="lp-stat-val">Live AI</span>
+              <span className="lp-stat-label">Emotion insights updated every second</span>
             </div>
+
             <div className="lp-stat">
-              <span className="lp-stat-val">Whisper AI</span>
-              <span className="lp-stat-label">Accurate meeting transcripts</span>
+              <span className="lp-stat-val">Whisper</span>
+              <span className="lp-stat-label">Accurate speaker-aware transcripts</span>
             </div>
           </div>
         </section>
 
-        {/* Right */}
+
         <aside className="lp-hero-right" aria-label="Live meeting preview">
           <div className="lp-glass-card">
             <div className="lp-card-top">
@@ -129,7 +131,7 @@ export default function LandingPage() {
                 <div className="lp-speaking-ring" />
                 <div className="lp-vid-avatar">
                   <div className="lp-avatar-ring lp-av1">A</div>
-                  <span className="lp-vid-name">Arjun K.</span>
+                  <span className="lp-vid-name">Anupam K.</span>
                 </div>
                 <div className="lp-vid-bar">
                   <div className="lp-live-dot" />
@@ -148,15 +150,15 @@ export default function LandingPage() {
 
               <div className="lp-vid-tile">
                 <div className="lp-vid-avatar">
-                  <div className="lp-avatar-ring lp-av2">P</div>
-                  <span className="lp-vid-name">Priya M.</span>
+                  <div className="lp-avatar-ring lp-av2">K</div>
+                  <span className="lp-vid-name">Kumar</span>
                 </div>
               </div>
 
               <div className="lp-vid-tile">
                 <div className="lp-vid-avatar">
-                  <div className="lp-avatar-ring lp-av3">R</div>
-                  <span className="lp-vid-name">Rahul S.</span>
+                  <div className="lp-avatar-ring lp-av3">A</div>
+                  <span className="lp-vid-name">Anup K.</span>
                 </div>
               </div>
             </div>
@@ -172,8 +174,7 @@ export default function LandingPage() {
 
       <footer className="lp-foot">
         <p>
-          Built with ❤️ - <strong>SkyMeetAI</strong> — Intelligent real-time
-          meeting platform.
+          Made with ❤️ at <strong>SkyMeetAI</strong> — where meetings become smarter in real time.
         </p>
         <span className="lp-foot-status">
           Emotion & transcription services active

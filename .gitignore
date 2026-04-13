@@ -1,19 +1,18 @@
 
-# Python virtual environments
+
 emotion-venv/
 venv/
 .venv/
 env/
 
-# App-generated outputs
-
-
 uploads/
 outputs/
 data/
+backend/logs
 emotion_service/extracted_dataset/dataset.npz
+emotion_service/test_videos
+emotion_service/test_embeddings
 
-# Node.js dependencies
 
 node_modules/
 .pnp/
@@ -22,11 +21,9 @@ node_modules/
 coverage/
 build/
 
-# Python cache
 __pycache__/
 *.py[cod]
 
-# Environment / secrets
 
 .env
 .env.local
@@ -35,13 +32,11 @@ __pycache__/
 .env.test.local
 .env.production.local
 
-# Logs
 
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Junk files
 
 .DS_Store
 Thumbs.db

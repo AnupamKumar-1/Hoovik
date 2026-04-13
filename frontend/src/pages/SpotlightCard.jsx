@@ -40,7 +40,7 @@ function getLiveVideoTrack(stream) {
 }
 
 function isTrackActive(t) {
-  return !!t && t.readyState === "live" && !t.muted;
+  return !!t && t.readyState === "live";
 }
 
 const WAVE_DELAYS = [0.55, 0.4, 0.7, 0.5, 0.62, 0.48, 0.75];
@@ -67,18 +67,17 @@ function SpotlightCard({
   style,
 }) {
   const videoRef = useRef(null);
+  const streamRef = useRef(null);
   const unmountedRef = useRef(false);
+  const pollTimerRef = useRef(null);
+  const trackCleanupRef = useRef([]);
 
   const name = useMemo(() => deriveName(meta, emotion, id), [meta, emotion, id]);
   const initial = useMemo(() => (name[0] ?? "?").toUpperCase(), [name]);
   const avatarColor = useMemo(() => getAvatarColor(initial), [initial]);
 
-  const [videoActive, setVideoActive] = useState(() =>
-    isTrackActive(getLiveVideoTrack(stream))
-  );
+  const [videoActive, setVideoActive] = useState(false);
   const [debouncedIsActive, setDebouncedIsActive] = useState(isActive);
-
-  const showVideo = videoActive;
 
   const safeSetVideoActive = useCallback((val) => {
     if (!unmountedRef.current) setVideoActive(val);
@@ -86,7 +85,12 @@ function SpotlightCard({
 
   useEffect(() => {
     unmountedRef.current = false;
-    return () => { unmountedRef.current = true; };
+    return () => {
+      unmountedRef.current = true;
+      if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+      trackCleanupRef.current.forEach((fn) => fn());
+      trackCleanupRef.current = [];
+    };
   }, []);
 
   useEffect(() => {
@@ -96,53 +100,137 @@ function SpotlightCard({
     return () => clearTimeout(timer);
   }, [isActive]);
 
-  useEffect(() => {
-    if (!stream) {
-      safeSetVideoActive(false);
-      return;
-    }
-
-    const sync = () => safeSetVideoActive(isTrackActive(getLiveVideoTrack(stream)));
-    stream.addEventListener("addtrack", sync);
-    stream.addEventListener("removetrack", sync);
-    sync();
-
-    return () => {
-      stream.removeEventListener("addtrack", sync);
-      stream.removeEventListener("removetrack", sync);
-    };
-  }, [stream, safeSetVideoActive]);
-
-  useEffect(() => {
-    const videoTrack = getLiveVideoTrack(stream);
-    if (!videoTrack) return;
-
-    const onMute = () => safeSetVideoActive(false);
-    const onUnmute = () => safeSetVideoActive(true);
-    const onEnded = () => safeSetVideoActive(false);
-
-    videoTrack.addEventListener("mute", onMute);
-    videoTrack.addEventListener("unmute", onUnmute);
-    videoTrack.addEventListener("ended", onEnded);
-
-    return () => {
-      videoTrack.removeEventListener("mute", onMute);
-      videoTrack.removeEventListener("unmute", onUnmute);
-      videoTrack.removeEventListener("ended", onEnded);
-    };
-  }, [stream, safeSetVideoActive]);
-
-  useEffect(() => {
+  const attachStream = useCallback((s) => {
     const el = videoRef.current;
     if (!el) return;
-    if (stream) {
-      if (el.srcObject !== stream) el.srcObject = stream;
+    if (el.srcObject !== s) {
+      el.srcObject = s || null;
+    }
+    if (s) {
       const p = el.play();
       if (p) p.catch(() => { });
     } else {
-      el.srcObject = null;
+      try { el.pause(); } catch { }
     }
-  }, [stream]);
+  }, []);
+
+  const attachVideoTrackListeners = useCallback((track, currentStream) => {
+    const onMute = () => {
+      if (streamRef.current !== currentStream) return;
+      const stillLive = getLiveVideoTrack(currentStream);
+      safeSetVideoActive(isTrackActive(stillLive));
+    };
+    const onUnmute = () => {
+      if (streamRef.current !== currentStream) return;
+      safeSetVideoActive(true);
+      attachStream(currentStream);
+    };
+    const onEnded = () => {
+      if (streamRef.current !== currentStream) return;
+      const stillLive = getLiveVideoTrack(currentStream);
+      safeSetVideoActive(isTrackActive(stillLive));
+    };
+
+    track.addEventListener("mute", onMute);
+    track.addEventListener("unmute", onUnmute);
+    track.addEventListener("ended", onEnded);
+
+    return () => {
+      track.removeEventListener("mute", onMute);
+      track.removeEventListener("unmute", onUnmute);
+      track.removeEventListener("ended", onEnded);
+    };
+  }, [safeSetVideoActive, attachStream]);
+
+  useEffect(() => {
+    streamRef.current = stream;
+
+    if (pollTimerRef.current) {
+      clearInterval(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
+
+    trackCleanupRef.current.forEach((fn) => fn());
+    trackCleanupRef.current = [];
+
+    if (!stream) {
+      safeSetVideoActive(false);
+      attachStream(null);
+      return;
+    }
+
+    attachStream(stream);
+
+    const evalVideoActive = () => {
+      const track = getLiveVideoTrack(stream);
+      return isTrackActive(track);
+    };
+
+    const active = evalVideoActive();
+    safeSetVideoActive(active);
+
+    const videoTrack = getLiveVideoTrack(stream);
+    if (videoTrack) {
+      const cleanup = attachVideoTrackListeners(videoTrack, stream);
+      trackCleanupRef.current.push(cleanup);
+    }
+
+    const onAddTrack = (evt) => {
+      if (streamRef.current !== stream) return;
+
+      if (evt.track && evt.track.kind === "video") {
+        const newActive = isTrackActive(evt.track);
+        safeSetVideoActive(newActive);
+        if (newActive) attachStream(stream);
+
+        const cleanup = attachVideoTrackListeners(evt.track, stream);
+        trackCleanupRef.current.push(cleanup);
+      }
+
+      const currentActive = evalVideoActive();
+      safeSetVideoActive(currentActive);
+      if (currentActive) attachStream(stream);
+    };
+
+    const onRemoveTrack = () => {
+      if (streamRef.current !== stream) return;
+      safeSetVideoActive(evalVideoActive());
+    };
+
+    stream.addEventListener("addtrack", onAddTrack);
+    stream.addEventListener("removetrack", onRemoveTrack);
+
+    if (!active) {
+      let attempts = 0;
+      pollTimerRef.current = setInterval(() => {
+        attempts++;
+        if (streamRef.current !== stream || unmountedRef.current) {
+          clearInterval(pollTimerRef.current);
+          pollTimerRef.current = null;
+          return;
+        }
+        const nowActive = evalVideoActive();
+        if (nowActive) {
+          safeSetVideoActive(true);
+          attachStream(stream);
+          clearInterval(pollTimerRef.current);
+          pollTimerRef.current = null;
+          return;
+        }
+        if (attempts >= 40) {
+          clearInterval(pollTimerRef.current);
+          pollTimerRef.current = null;
+        }
+      }, 250);
+    }
+
+    return () => {
+      stream.removeEventListener("addtrack", onAddTrack);
+      stream.removeEventListener("removetrack", onRemoveTrack);
+      trackCleanupRef.current.forEach((fn) => fn());
+      trackCleanupRef.current = [];
+    };
+  }, [stream, safeSetVideoActive, attachStream, attachVideoTrackListeners]);
 
   useEffect(() => {
     const el = videoRef.current;
@@ -188,11 +276,11 @@ function SpotlightCard({
           width: "100%",
           height: "100%",
           objectFit: "cover",
-          display: showVideo ? "block" : "none",
+          display: videoActive ? "block" : "none",
         }}
       />
 
-      {!showVideo && (
+      {!videoActive && (
         <div className={styles.cameraOffPlaceholder}>
           <div className={styles.avatarStack}>
             <div

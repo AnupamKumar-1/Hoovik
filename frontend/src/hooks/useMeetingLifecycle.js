@@ -30,7 +30,13 @@ export default function useMeetingLifecycle({
   setParticipantsMeta,
   setRemoteStreams,
   recordersRef,
+  makingOfferRef,
+  politeRef,
+  pendingCandidatesRef,
+  ignoreOfferRef,
+  isSettingRemoteAnswerPending,
   SOCKET_SERVER_URL,
+  onSocketReady,
 }) {
   const participantsMetaRef = useRef(participantsMeta);
   const isHostRef = useRef(isHost);
@@ -70,7 +76,9 @@ export default function useMeetingLifecycle({
       socketRef.current?.removeAllListeners?.();
       socketRef.current?.disconnect();
     } catch { }
-    socketRef.current = null;
+    if (socketRef && "current" in socketRef) {
+      socketRef.current = null;
+    }
 
     try {
       window.myId = null;
@@ -115,6 +123,20 @@ export default function useMeetingLifecycle({
 
     pcsRef.current = {};
 
+    const resetRef = (ref) => {
+      if (!ref) return;
+      if (typeof ref !== "object") return;
+      if (!("current" in ref)) return;
+      ref.current = {};
+    };
+
+    resetRef(makingOfferRef);
+    resetRef(politeRef);
+    resetRef(pendingCandidatesRef);
+    resetRef(ignoreOfferRef);
+    resetRef(isSettingRemoteAnswerPending);
+    resetRef(recordersRef);
+
     setRemoteStreams({});
     setParticipantsMeta([]);
 
@@ -129,6 +151,7 @@ export default function useMeetingLifecycle({
       });
       tmp.getTracks().forEach((t) => t.stop());
     } catch { }
+    startedRef.current = false;
   }, [
     socketRef,
     localStreamRef,
@@ -143,6 +166,20 @@ export default function useMeetingLifecycle({
   async function start() {
     try {
       setConnecting(true);
+      pcsRef.current = {};
+      const resetRef = (ref) => {
+        if (!ref) return;
+        if (typeof ref !== "object") return;
+        if (!("current" in ref)) return;
+        ref.current = {};
+      };
+
+      pcsRef.current = {};
+      resetRef(makingOfferRef);
+      resetRef(politeRef);
+      resetRef(pendingCandidatesRef);
+      resetRef(ignoreOfferRef);
+      resetRef(isSettingRemoteAnswerPending);
 
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: true,
@@ -163,6 +200,12 @@ export default function useMeetingLifecycle({
 
       notifyLocalStreamReady(stream);
 
+      if (socketRef.current) {
+        try {
+          socketRef.current.removeAllListeners();
+          socketRef.current.disconnect();
+        } catch { }
+      }
       const socket = io(SOCKET_SERVER_URL, { autoConnect: false });
       socketRef.current = socket;
 
@@ -190,6 +233,8 @@ export default function useMeetingLifecycle({
         socket.connect();
       });
 
+      onSocketReady?.();
+
       initMediaController(
         localStreamRef.current,
         socketRef.current,
@@ -206,8 +251,7 @@ export default function useMeetingLifecycle({
       } catch { }
 
       const token =
-        localStorage.getItem("token") ||
-        localStorage.getItem("accessToken");
+        localStorage.getItem("token") || localStorage.getItem("accessToken");
 
       let uid = null;
 
@@ -226,28 +270,21 @@ export default function useMeetingLifecycle({
         }
       }
 
-      const displayName =
-        localStorage.getItem("displayName") || "Guest";
+      const displayName = localStorage.getItem("displayName") || "Guest";
+      const code = (roomId || "").toUpperCase();
 
       socketRef.current.emit("join-call", roomId, {
         name: displayName,
         userId: uid,
       });
 
-      try {
-        await fetch(`${API_BASE}/addParticipant`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          body: JSON.stringify({
-            meetingCode: roomId,
-            name: displayName,
-          }),
-        });
-      } catch { }
-
+      if (isHostRef.current) {
+        setTimeout(() => {
+          if (socketRef.current?.connected) {
+            socketRef.current.emit("declare-host", code);
+          }
+        }, 200);
+      }
     } catch (err) {
       console.error(err);
       alert("Unable to access camera/mic or connect.");
@@ -264,7 +301,10 @@ export default function useMeetingLifecycle({
       }
     } catch { }
     await cleanupAll();
-    navigate("/home");
+
+    setTimeout(() => {
+      navigate("/home");
+    }, 50);
   }
 
   async function endMeeting() {
@@ -304,7 +344,10 @@ export default function useMeetingLifecycle({
       }
     } catch { }
     await cleanupAll();
-    navigate("/home");
+
+    setTimeout(() => {
+      navigate("/home");
+    }, 50);
   }
 
   useEffect(() => {

@@ -5,13 +5,17 @@
   "main": "src/app.js",
   "type": "module",
   "scripts": {
-    "dev": "nodemon src/app.js",
-    "start": "node src/app.js",
-    "prod": "pm2 start src/app.js --name backend"
-  },
+  "dev": "nodemon src/app.js",
+  "start": "node src/app.js",
+  "prod": "pm2 start ecosystem.config.cjs",
+  "restart": "pm2 restart ecosystem.config.cjs",
+  "stop": "pm2 delete all",
+  "deploy": "pm2 delete all || true && pm2 start ecosystem.config.cjs && pm2 save && pm2 list"
+},
   "author": "Anupam Kumar",
   "license": "ISC",
   "dependencies": {
+    "@socket.io/redis-adapter": "^8.3.0",
     "axios": "^1.11.0",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
@@ -25,6 +29,7 @@
     "multer": "^2.0.2",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
+    "redis": "^5.11.0",
     "sanitize-html": "^2.17.0",
     "socket.io": "^4.7.3",
     "socket.io-client": "^4.8.3"

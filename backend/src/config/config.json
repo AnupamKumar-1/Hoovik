@@ -1,0 +1,68 @@
+{
+  "upload": {
+    "baseDir": "meet_uploads",
+    "maxChunks": 5000,
+    "chunkSeqMin": 0
+  },
+
+  "sanitize": {
+    "maxNameLength": 200,
+    "maxChatLength": 2000,
+    "maxTranscriptionChunkLength": 500,
+    "maxKeywordLength": 100,
+    "defaultName": "Guest"
+  },
+
+  "socket": {
+    "transports": ["websocket", "polling"],
+    "allowEIO3": true
+  },
+
+  "redisKeys": {
+    "meetingStatePrefix": "meeting:state:",
+    "meetingParticipantsPrefix": "meeting:participants:",
+    "partialPrefix": "partial:",
+    "partialMetaPrefix": "partial:meta:"
+  },
+
+  "emotionClients": {
+    "reconnectionAttempts": 5,
+    "reconnectionDelay": 1000
+  },
+
+  "emotion": {
+    "retryAttempts": 3,
+    "retryTransientCodes": ["ECONNREFUSED", "ETIMEDOUT", "EPIPE", "ECONNRESET"],
+    "retryBaseDelayMs": 500,
+    "defaultType": "audio",
+    "defaultFileExtensions": {
+      "audio": "webm",
+      "video": "mp4"
+    },
+    "redisKeys": {
+      "cachePrefix": "emotion:result:",
+      "lockPrefix": "lock:emotion:",
+      "inProgressPrefix": "emotion:processing:",
+      "cooldownPrefix": "emotion:cooldown:",
+      "failBlockPrefix": "emotion:fail:",
+      "ratePrefix": "emotion:rate:",
+      "metricTotal": "emotion:requests:total",
+      "metricSkipped": "emotion:requests:skipped",
+      "metricCached": "emotion:requests:cached",
+      "metricFailed": "emotion:requests:failed"
+    }
+  },
+
+  "transcript": {
+    "listDefaultLimit": 50,
+    "listMaxLimit": 200
+  },
+
+  "user": {
+    "bcryptSaltRounds": 10,
+    "jwtExpiresIn": "1h",
+    "meetingsQueryLimit": 200,
+    "hostPopulateFields": "name username",
+    "mePopulateFields": "_id username name"
+  }
+}

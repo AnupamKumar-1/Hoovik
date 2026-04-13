@@ -1,7 +1,7 @@
 const PLACEHOLDER_WIDTH = 16;
 const PLACEHOLDER_HEIGHT = 12;
 const PLACEHOLDER_FPS = 1;
-const SAFARI_PREVIEW_REFRESH_DELAY_MS = 16; // one rAF frame, not 0
+const SAFARI_PREVIEW_REFRESH_DELAY_MS = 16;
 
 export function isSafari() {
     return (

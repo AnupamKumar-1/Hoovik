@@ -114,10 +114,12 @@ export default function History() {
       const meetingCode = m?.meetingCode || m?.code || m?.room || m?.meeting_code || '';
       const createdAt = m?.createdAt || m?.created_at || m?.date || m?.created || m?.timestamp || '';
       const hostName =
-        (m?.host && (m.host.name || m.host.display)) ||
-        m?.hostName || m?.host_name ||
+        m?.hostInfo?.name ||
+        m?.hostName ||
+        m?.host_name ||
+        (m?.host && typeof m.host === 'object' && (m.host.name || m.host.username || m.host.email)) ||
         (typeof m?.host === 'string' ? m.host : null) ||
-        (m?.host && typeof m.host === 'object' && (m.host.username || m.host.email)) || 'Unknown';
+        'Unknown';
       const participants = normalizeParticipants(m?.participants || m?.attendees || m?.people || []);
       const link = m?.link || (meetingCode
         ? `${window.location.origin}/room/${encodeURIComponent(String(meetingCode).trim().toUpperCase())}`
@@ -224,7 +226,7 @@ export default function History() {
     const hostId = m.hostId || (m.raw && (m.raw.host?._id || m.raw.host?.id || m.raw.hostId || m.raw.host_id));
     if (hostId && userData._id && String(hostId) === String(userData._id)) return true;
     const rawHost = m.raw?.host;
-    if (typeof rawHost === 'object') {
+    if (rawHost && typeof rawHost === 'object') {
       if (rawHost.username && userData.username && String(rawHost.username).toLowerCase() === String(userData.username).toLowerCase()) return true;
       if (rawHost.email && userData.email && String(rawHost.email).toLowerCase() === String(userData.email).toLowerCase()) return true;
     }

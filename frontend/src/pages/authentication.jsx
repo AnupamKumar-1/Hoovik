@@ -80,16 +80,18 @@ export default function Authentication() {
 
             <div className="au-hero-stats">
               <div className="au-hero-stat">
-                <span className="au-stat-val">WebRTC</span>
-                <span className="au-stat-label">P2P streaming</span>
+                <span className="au-stat-val">Instant</span>
+                <span className="au-stat-label">WebRTC real-time streaming</span>
               </div>
+
               <div className="au-hero-stat">
-                <span className="au-stat-val">&lt;80ms</span>
-                <span className="au-stat-label">Emotion AI</span>
+                <span className="au-stat-val">Live AI</span>
+                <span className="au-stat-label">Emotion insights (~1s updates)</span>
               </div>
+
               <div className="au-hero-stat">
                 <span className="au-stat-val">Whisper</span>
-                <span className="au-stat-label">Transcription</span>
+                <span className="au-stat-label">Accurate transcripts</span>
               </div>
             </div>
           </div>

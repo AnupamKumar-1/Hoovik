@@ -1,4 +1,3 @@
-
 import express from "express";
 import multer from "multer";
 import path from "path";
@@ -7,14 +6,14 @@ import {
   uploadEmotionFileHandler,
   sendToEmotionService,
 } from "../controllers/emotion.controller.js";
+import { startTimer, endTimer } from "../observability/latency/latency.service.js";
+import { LATENCY_LABELS } from "../observability/latency/latency.constants.js";
 
 const router = express.Router();
 
 function ensureAuth(req, res, next) {
-
   return next();
 }
-
 
 const TMP_UPLOAD_DIR = process.env.EMOTION_UPLOAD_TMP_DIR || "/tmp/emotion_uploads";
 
@@ -37,7 +36,6 @@ const storage = multer.diskStorage({
   },
 });
 
-
 function fileFilter(req, file, cb) {
   const mime = file.mimetype || "";
   if (
@@ -55,22 +53,26 @@ const upload = multer({
   storage,
   fileFilter,
   limits: {
-
     fileSize: parseInt(process.env.EMOTION_MAX_FILE_BYTES || String(6 * 1024 * 1024), 10),
   },
 });
-
 
 router.post(
   "/upload",
   ensureAuth,
   upload.single("file"),
   async (req, res, next) => {
+    const start = startTimer();
     try {
-
-      return await uploadEmotionFileHandler(req, res);
+      const result = await uploadEmotionFileHandler(req, res);
+      endTimer(LATENCY_LABELS.EMOTION_API, start, {
+        route: "/upload",
+        meetingId: req.body?.meeting_id || req.body?.meetingId,
+        participantId: req.body?.participant_id || req.body?.participantId,
+      });
+      return result;
     } catch (err) {
-
+      endTimer(LATENCY_LABELS.EMOTION_API, start, { route: "/upload", error: true });
       console.error("[emotion.routes] /upload handler error:", err);
       return res.status(500).json({ ok: false, error: err.message || "internal error" });
     }
@@ -85,28 +87,33 @@ router.get("/status", (req, res) => {
   });
 });
 
-
 router.post("/proxy-test", ensureAuth, upload.single("file"), async (req, res) => {
+  const start = startTimer();
   try {
     const meetingId = req.body?.meeting_id || req.body?.meetingId;
     const participantId = req.body?.participant_id || req.body?.participantId;
     const type = req.body?.type || "frame";
+
     if (!meetingId || !participantId || !req.file) {
       return res.status(400).json({ ok: false, error: "meeting_id, participant_id and file required" });
     }
 
-
     const result = await sendToEmotionService(meetingId, participantId, req.file.path, type);
 
+    endTimer(LATENCY_LABELS.EMOTION_PIPELINE, start, {
+      route: "/proxy-test",
+      meetingId,
+      participantId,
+      type,
+    });
 
     try {
       fs.unlinkSync(req.file.path);
-    } catch (e) {
-
-    }
+    } catch (e) { }
 
     return res.json({ ok: true, result });
   } catch (err) {
+    endTimer(LATENCY_LABELS.EMOTION_PIPELINE, start, { route: "/proxy-test", error: true });
     console.error("[emotion.routes] /proxy-test error:", err);
     return res.status(500).json({ ok: false, error: err.message || "internal error" });
   }

@@ -22,6 +22,8 @@ export default function useSocket({
   handleIncomingMessage,
   handleAck,
   notifyPcsChanged,
+  makingOfferRef,
+  socketReady,
 }) {
   const h = useRef({});
   h.current = {
@@ -44,6 +46,7 @@ export default function useSocket({
     handleIncomingMessage,
     handleAck,
     notifyPcsChanged,
+    makingOfferRef,
   };
 
   useEffect(() => {
@@ -63,6 +66,10 @@ export default function useSocket({
       } catch { }
     };
     socket.on("connect", onConnect);
+
+    if (socket.connected) {
+      onConnect();
+    }
 
     const onChatHistory = (history = []) => {
       const seen = h.current.seenMsgIdsRef.current;
@@ -102,13 +109,7 @@ export default function useSocket({
       h.current.setParticipantsMeta((prev) =>
         prev.map((p) =>
           p.id === peerId
-            ? {
-              ...p,
-              meta: {
-                ...p.meta,
-                muted: muted === true,
-              },
-            }
+            ? { ...p, meta: { ...p.meta, muted: muted === true } }
             : p
         )
       );
@@ -127,8 +128,7 @@ export default function useSocket({
       pendingCandidatesRef.current[p.id] =
         pendingCandidatesRef.current[p.id] || [];
 
-      const pc = createPeerConnection(p.id);
-      if (!pc) return;
+      createPeerConnection(p.id);
     };
 
     const onExistingParticipants = (existing) => {
@@ -185,6 +185,9 @@ export default function useSocket({
 
     const onSignal = async (fromId, messageStr) => {
       if (!fromId || !messageStr) return;
+      if (h.current.politeRef.current[fromId] === undefined) {
+        h.current.politeRef.current[fromId] = true;
+      }
       try {
         await h.current.handleSignal(fromId, messageStr);
       } catch { }
@@ -225,6 +228,16 @@ export default function useSocket({
     };
     socket.on("disconnect", onDisconnect);
 
+    const VALID_EMOTIONS = new Set([
+      "angry",
+      "fearful",
+      "disgust",
+      "happy",
+      "sad",
+      "neutral/calm",
+      "neutral",
+    ]);
+
     const emotionHandler = (payload) => {
       const participantId =
         payload.participant_id ||
@@ -239,49 +252,42 @@ export default function useSocket({
 
       if (!emotion) return;
 
-      if (emotion.label) {
+      const tryPushEntry = (label, score) => {
+        if (!label || typeof label !== "string") return false;
+        const normalized = label.trim().toLowerCase();
+        if (!VALID_EMOTIONS.has(normalized)) return false;
+        if (typeof score === "number" && score < 0.01) return false;
         h.current.setEmotionsMap((prev) => {
           const existing = prev[participantId] || [];
           return {
             ...prev,
             [participantId]: [
               ...existing,
-              { label: emotion.label, score: emotion.score ?? 1, ts: Date.now() },
+              { label: normalized, score: score ?? 1, ts: Date.now() },
             ].slice(-20),
           };
         });
+        return true;
+      };
+
+      if (emotion.label) {
+        tryPushEntry(emotion.label, emotion.score);
         return;
       }
 
       if (emotion.emotion) {
-        h.current.setEmotionsMap((prev) => {
-          const existing = prev[participantId] || [];
-          return {
-            ...prev,
-            [participantId]: [
-              ...existing,
-              { label: emotion.emotion, score: emotion.confidence ?? 1, ts: Date.now() },
-            ].slice(-20),
-          };
-        });
+        tryPushEntry(emotion.emotion, emotion.confidence);
         return;
       }
 
       if (emotion.probs) {
-        const [topLabel, topScore] = Object.entries(emotion.probs).reduce(
+        const entries = Object.entries(emotion.probs);
+        if (!entries.length) return;
+        const [topLabel, topScore] = entries.reduce(
           (max, curr) => (curr[1] > max[1] ? curr : max),
-          ["neutral/calm", 0]
+          ["", 0]
         );
-        h.current.setEmotionsMap((prev) => {
-          const existing = prev[participantId] || [];
-          return {
-            ...prev,
-            [participantId]: [
-              ...existing,
-              { label: topLabel, score: topScore, ts: Date.now() },
-            ].slice(-20),
-          };
-        });
+        tryPushEntry(topLabel, topScore);
       }
     };
 
@@ -294,6 +300,7 @@ export default function useSocket({
         clearTimeout(disconnectTimer);
         disconnectTimer = null;
       }
+
       socket.off("connect", onConnect);
       socket.off("chat-history", onChatHistory);
       socket.off("participants-updated", onParticipantsUpdated);
@@ -310,5 +317,5 @@ export default function useSocket({
       socket.off("emotion", emotionHandler);
       socket.off("update-participant-state", onParticipantStateUpdate);
     };
-  }, [socketRef.current]);
+  }, [socketReady]);
 }

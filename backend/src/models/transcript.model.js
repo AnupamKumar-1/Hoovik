@@ -15,7 +15,7 @@ const TranscriptSchema = new mongoose.Schema(
   }
 );
 
-TranscriptSchema.index({ meetingCode: 1, createdAt: -1 });
+TranscriptSchema.index({ meetingCode: 1 }, { unique: true });
 TranscriptSchema.index({ ownerId: 1, createdAt: -1 });
 TranscriptSchema.index({ hostSecretHash: 1, createdAt: -1 });
 

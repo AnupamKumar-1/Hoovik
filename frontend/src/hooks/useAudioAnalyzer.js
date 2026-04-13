@@ -142,6 +142,7 @@ export default function useAudioAnalyzer({
     }
 
     activeCandidates.sort((a, b) => b.score - a.score);
+
     const topSpeakers = activeCandidates
       .slice(0, MAX_ACTIVE_SPEAKERS)
       .map((s) => s.id);

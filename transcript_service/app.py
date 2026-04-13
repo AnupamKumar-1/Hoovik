@@ -37,9 +37,11 @@ def process_meeting():
     host_secret = request.headers.get("x-host-secret", "") or request.form.get(
         "hostSecret", ""
     )
-
+    print("HOST SECRET RECEIVED IN FLASK:", host_secret)
     if not host_secret:
         print("process_meeting: host_secret missing from request")
+
+    user_token = request.headers.get("x-user-token", "")
 
     results = {}
     created_files = []
@@ -91,10 +93,19 @@ def process_meeting():
             400,
         )
 
-    node_ok = False
+    transcript_saved = False
     node_error = None
 
     try:
+        print("CALLING NODE API:", NODE_API)
+
+        node_headers = {
+            "Content-Type": "application/json",
+            "x-host-secret": host_secret,
+        }
+        if user_token:
+            node_headers["Authorization"] = f"Bearer {user_token}"
+
         res = requests.post(
             NODE_API,
             json={
@@ -102,15 +113,13 @@ def process_meeting():
                 "transcriptText": transcript_text,
                 "metadata": {"segments": merged},
             },
-            headers={
-                "Content-Type": "application/json",
-                "x-host-secret": host_secret,
-            },
+            headers=node_headers,
             timeout=5,
         )
-
+        print(" NODE RESPONSE STATUS:", res.status_code)
+        print(" NODE RESPONSE BODY:", res.text[:300])
         if res.status_code in (200, 201):
-            node_ok = True
+            transcript_saved = True
             print(f"process_meeting: transcript saved for meeting {meeting_code}")
         else:
             node_error = f"Node rejected with status {res.status_code}"
@@ -128,7 +137,7 @@ def process_meeting():
 
     schedule_file_cleanup(created_files, CLEANUP_DELAY_SEC)
 
-    if not node_ok:
+    if not transcript_saved:
         return (
             jsonify(
                 {

@@ -14,8 +14,9 @@ import roomsRoutes from "./routes/rooms.js";
 import meetingsRoutes from "./routes/meetings.routes.js";
 import transcriptRoutes from "./routes/transcripts.js";
 import emotionRoutes from "./routes/emotion.routes.js";
-import { connectToSocket } from "./controllers/socketManager.js";
+import { connectToSocket } from "./controllers/socket.controller.js";
 import { logout } from "./controllers/user.controller.js";
+import { connectRedis, redisPub, redisSub } from "./infra/redis.js";
 
 const app = express();
 const server = createServer(app);
@@ -23,9 +24,13 @@ const server = createServer(app);
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || "http://localhost:3000";
 
 const corsOptions = {
-  origin: CLIENT_ORIGIN,
+  origin: [
+    "http://localhost:3000",
+    "http://192.168.1.15:3000"
+  ],
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   credentials: true,
+  allowedHeaders: ["Content-Type", "Authorization", "x-host-secret"],
 };
 
 app.use(cors(corsOptions));
@@ -38,7 +43,7 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/rooms", roomsRoutes);
-app.use("/api/v1/transcript", transcriptRoutes);
+app.use("/api/v1/transcripts", transcriptRoutes);
 app.use("/api/v1/emotion", emotionRoutes);
 app.use("/api/v1/meetings", meetingsRoutes);
 
@@ -71,11 +76,19 @@ const start = async () => {
     process.exit(1);
   }
 
-  server.listen(app.get("port"), () => {
+  try {
+    await connectRedis();
+    console.info("server: Redis connected");
+  } catch (err) {
+    console.error("server: Redis connection failed —", err.message);
+    process.exit(1);
+  }
+
+  server.listen(app.get("port"), "0.0.0.0", () => {
     console.info(`server: listening on port ${app.get("port")}`);
 
     try {
-      connectToSocket(server, corsOptions);
+      connectToSocket(server, corsOptions, redisPub, redisSub);
       console.info("server: socket manager initialized");
     } catch (err) {
       console.error("server: socket manager failed to initialize —", err.message);
@@ -86,7 +99,7 @@ const start = async () => {
     console.error("server: HTTP server error —", err.message);
   });
 };
-
+console.log("SERVER PORT:", process.env.PORT);
 process.on("unhandledRejection", (reason) => {
   console.error("server: unhandled promise rejection —", reason?.message ?? reason);
 });
