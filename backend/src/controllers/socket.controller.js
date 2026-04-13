@@ -24,7 +24,11 @@ import { startTimer, endTimer } from "../observability/latency/latency.service.j
 
 import { LATENCY_LABELS } from "../observability/latency/latency.constants.js";
 import { updateMeetingAnalytics } from "../data-access/socket.repository.js";
-import cfg from "../config/config.json" assert { type: "json" };
+import fs from "fs";
+
+const cfg = JSON.parse(
+  fs.readFileSync(new URL("../config/config.json", import.meta.url))
+);
 
 const EMOTION_SOCKET_URL = process.env.EMOTION_SOCKET_URL || "http://localhost:5002";
 const SOCKET_MAX_HTTP_BUFFER = parseInt(process.env.SOCKET_MAX_HTTP_BUFFER || `${100 * 1024 * 1024}`, 10);

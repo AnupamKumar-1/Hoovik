@@ -19,7 +19,11 @@ import {
 
 import { startTimer, endTimer } from "../observability/latency/latency.service.js";
 import { LATENCY_LABELS } from "../observability/latency/latency.constants.js";
-import cfg from "../config/config.json" assert { type: "json" };
+import fs from "fs";
+
+const cfg = JSON.parse(
+    fs.readFileSync(new URL("../config/config.json", import.meta.url))
+);
 
 
 const PARTIAL_UPLOAD_MAX_BYTES = parseInt(process.env.PARTIAL_UPLOAD_MAX_BYTES || `${200 * 1024 * 1024}`, 10);

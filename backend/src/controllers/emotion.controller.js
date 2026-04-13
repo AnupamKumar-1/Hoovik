@@ -1,8 +1,11 @@
 import { sendToEmotionService } from "../services/emotion.service.js";
 import { safeUnlink } from "../utils/helpers.utils.js";
 import { makeLogger } from "../utils/redis.utils.js";
-import cfg from "../config/config.json" assert { type: "json" };
+import fs from "fs";
 
+const cfg = JSON.parse(
+  fs.readFileSync(new URL("../config/config.json", import.meta.url))
+);
 const DEFAULT_TYPE = cfg.emotion?.defaultType ?? "audio";
 const EMOTION_MAX_FILE_BYTES = parseInt(process.env.EMOTION_MAX_FILE_BYTES || `${200 * 1024 * 1024}`, 10);
 const ALLOWED_TYPES = ["audio", "video"];

@@ -1,4 +1,8 @@
-import cfg from "../config/config.json" assert { type: "json" };
+import fs from "fs";
+
+const cfg = JSON.parse(
+    fs.readFileSync(new URL("../config/config.json", import.meta.url))
+);
 import { makeLogger, safeRedisGet, safeRedisSet, safeRedisDel, safeRedisIncr, safeRedisExpire } from "../utils/redis.utils.js";
 import { sha256Hex } from "../utils/helpers.utils.js";
 

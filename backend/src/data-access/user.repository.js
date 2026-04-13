@@ -2,7 +2,11 @@
 import mongoose from "mongoose";
 import { User } from "../models/user.model.js";
 import { Meeting } from "../models/meeting.model.js";
-import cfg from "../config/config.json" assert { type: "json" };
+import fs from "fs";
+
+const cfg = JSON.parse(
+    fs.readFileSync(new URL("../config/config.json", import.meta.url))
+);
 
 const HOST_POPULATE_FIELDS = cfg.user?.hostPopulateFields ?? "name username";
 const ME_POPULATE_FIELDS = cfg.user?.mePopulateFields ?? "_id username name";
