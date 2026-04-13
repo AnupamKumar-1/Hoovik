@@ -3,6 +3,7 @@ dotenv.config();
 
 import express from "express";
 import { createServer } from "node:http";
+import fs from "fs";
 import mongoose from "mongoose";
 import cors from "cors";
 import passport from "passport";
