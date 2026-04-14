@@ -1,8 +1,9 @@
-flask
-flask-cors
+fastapi
+uvicorn[standard]
+python-multipart
 werkzeug
 pydub
 openai-whisper @ git+https://github.com/openai/whisper.git
 transformers
 torch
-gunicorn
+requests

@@ -6,8 +6,9 @@ import os
 import json
 import requests
 
-from flask import Flask, request, jsonify
-from flask_cors import CORS
+from fastapi import FastAPI, File, Form, Header, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from werkzeug.utils import secure_filename
 
 from config import *
@@ -19,34 +20,39 @@ from services.processing_service import merge_segments, build_transcript_text
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
-app = Flask(__name__)
-CORS(app)
+app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
-@app.route("/process_meeting", methods=["POST"])
-def process_meeting():
-    files = request.files.getlist("audio_files")
-    meeting_code = request.form.get("meeting_code", "UNKNOWN").upper()
-    speaker_map_raw = request.form.get("speaker_map", "{}")
+@app.post("/process_meeting")
+async def process_meeting(
+    audio_files: list[UploadFile] = File(...),
+    meeting_code: str = Form(default="UNKNOWN"),
+    speaker_map: str = Form(default="{}"),
+    host_secret: str = Header(default="", alias="x-host-secret"),
+    user_token: str = Header(default="", alias="x-user-token"),
+):
+    meeting_code = meeting_code.upper()
 
     try:
-        speaker_map = json.loads(speaker_map_raw)
+        speaker_map_dict = json.loads(speaker_map)
     except Exception:
-        speaker_map = {}
+        speaker_map_dict = {}
 
-    host_secret = request.headers.get("x-host-secret", "") or request.form.get(
-        "hostSecret", ""
-    )
-    print("HOST SECRET RECEIVED IN FLASK:", host_secret)
+    print("HOST SECRET RECEIVED IN FASTAPI:", host_secret)
     if not host_secret:
         print("process_meeting: host_secret missing from request")
-
-    user_token = request.headers.get("x-user-token", "")
 
     results = {}
     created_files = []
 
-    for f in files:
+    for f in audio_files:
         if not (f and allowed_file(f.filename, ALLOWED_EXT)):
             continue
 
@@ -54,7 +60,9 @@ def process_meeting():
         base = os.path.splitext(filename)[0]
 
         save_path = os.path.join(UPLOAD_FOLDER, filename)
-        f.save(save_path)
+        contents = await f.read()
+        with open(save_path, "wb") as out:
+            out.write(contents)
         created_files.append(save_path)
 
         wav_path = os.path.join(UPLOAD_FOLDER, f"{base}.wav")
@@ -71,7 +79,7 @@ def process_meeting():
         segments = transcribe_and_emotion(wav_path)
 
         results[base] = {
-            "speaker": clean_speaker(speaker_map.get(base, base)),
+            "speaker": clean_speaker(speaker_map_dict.get(base, base)),
             "segments": segments,
         }
 
@@ -81,16 +89,14 @@ def process_meeting():
     if not merged:
         print(f"process_meeting: no valid audio segments for meeting {meeting_code}")
         schedule_file_cleanup(created_files, CLEANUP_DELAY_SEC)
-        return (
-            jsonify(
-                {
-                    "success": False,
-                    "error": "No valid audio files processed",
-                    "transcript_text": "",
-                    "segments": [],
-                }
-            ),
-            400,
+        return JSONResponse(
+            status_code=400,
+            content={
+                "success": False,
+                "error": "No valid audio files processed",
+                "transcript_text": "",
+                "segments": [],
+            },
         )
 
     transcript_saved = False
@@ -138,20 +144,18 @@ def process_meeting():
     schedule_file_cleanup(created_files, CLEANUP_DELAY_SEC)
 
     if not transcript_saved:
-        return (
-            jsonify(
-                {
-                    "success": False,
-                    "error": node_error or "Node API call failed",
-                    "transcript_text": transcript_text,
-                    "segments": merged,
-                }
-            ),
-            502,
+        return JSONResponse(
+            status_code=502,
+            content={
+                "success": False,
+                "error": node_error or "Node API call failed",
+                "transcript_text": transcript_text,
+                "segments": merged,
+            },
         )
 
-    return jsonify(
-        {
+    return JSONResponse(
+        content={
             "success": True,
             "transcript_text": transcript_text,
             "segments": merged,
@@ -160,4 +164,6 @@ def process_meeting():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5001, debug=True, use_reloader=False)
+    import uvicorn
+
+    uvicorn.run("main:app", host="0.0.0.0", port=5001, reload=False)
