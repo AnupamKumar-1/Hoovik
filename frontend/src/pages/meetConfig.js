@@ -1,4 +1,4 @@
-import { TRANSCRIPTS_ENABLED, IS_PROD } from "../environment";
+import { TRANSCRIPTS_ENABLED, EMOTIONS_ENABLED } from "../environment";
 
 export const SOCKET_SERVER_URL =
   process.env.REACT_APP_SIGNALING_URL || "http://localhost:8000";
@@ -18,13 +18,9 @@ export const TRANSCRIPT_ENDPOINT = (() => {
     : `${trimmed}/process_meeting`;
 })();
 
-export const EMOTIONS_ENABLED =
-  typeof IS_PROD !== "undefined" ? !IS_PROD : true;
-
 export const API_BASE =
   process.env.REACT_APP_API_URL ||
   "http://localhost:8000/api/v1";
-
 
 export const ICE_CONFIG = {
   iceServers: [
@@ -40,3 +36,5 @@ export const ICE_CONFIG = {
 export const EMO_CONFIG = {
   captureIntervalMs: 3000,
 };
+
+export { EMOTIONS_ENABLED };
