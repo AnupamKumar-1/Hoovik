@@ -1,9 +1,10 @@
 fastapi
 uvicorn[standard]
+gunicorn
 python-multipart
 werkzeug
 pydub
-openai-whisper @ git+https://github.com/openai/whisper.git
+openai-whisper
 transformers
-torch
+torch==2.2.2
 requests
