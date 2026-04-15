@@ -13,7 +13,7 @@ import torch
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from fastapi import FastAPI, UploadFile, File, Form
-from fastapi.middleware.cors import CORSMiddleware
+# from fastapi.middleware.cors import CORSMiddleware
 
 import embeddings.extract_embeddings_data as _emo_mod
 from embeddings.extract_embeddings_data import load_models
@@ -517,13 +517,7 @@ async def on_emotion_frame(sid, data):
 
 
 app = FastAPI()
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["https://skymeetai.onrender.com"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+
 app.mount("/socket.io", socketio.ASGIApp(sio))
 
 

@@ -81,7 +81,17 @@ const emotionProxy = createProxyMiddleware({
   },
 
   onProxyRes(proxyRes) {
-    delete proxyRes.headers["access-control-allow-origin"];
+    const corsHeaders = [
+      "access-control-allow-origin",
+      "access-control-allow-credentials",
+      "access-control-allow-methods",
+      "access-control-allow-headers",
+      "access-control-expose-headers",
+      "access-control-max-age",
+    ];
+    corsHeaders.forEach((h) => {
+      delete proxyRes.headers[h];
+    });
   },
 });
 
