@@ -9,7 +9,8 @@ export default function useEmotionSocket({
     useEffect(() => {
         const socket = io("/", {
             path: "/emotion-socket/socket.io",
-            transports: ["websocket"],
+            transports: ["websocket", "polling"],
+            upgrade: true,
             withCredentials: true,
             reconnection: true,
             reconnectionAttempts: 5,
