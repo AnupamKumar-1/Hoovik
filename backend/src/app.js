@@ -46,33 +46,23 @@ const emotionProxy = createProxyMiddleware({
   onProxyReqWs(proxyReq) {
     proxyReq.setHeader("Origin", "https://skymeetai.onrender.com");
   },
-  onProxyRes(proxyRes, req, res) {
+  onProxyRes(proxyRes) {
     delete proxyRes.headers["access-control-allow-origin"];
     delete proxyRes.headers["access-control-allow-credentials"];
     delete proxyRes.headers["access-control-allow-methods"];
     delete proxyRes.headers["access-control-allow-headers"];
-
-    const origin = req.headers.origin;
-    if (allowedOrigins.includes(origin)) {
-      res.setHeader("Access-Control-Allow-Origin", origin);
-      res.setHeader("Access-Control-Allow-Credentials", "true");
-      res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-    }
   },
 });
 
 app.use("/emotion-socket", (req, res, next) => {
-  if (req.method === "OPTIONS") {
-    const origin = req.headers.origin;
-    if (allowedOrigins.includes(origin)) {
-      res.setHeader("Access-Control-Allow-Origin", origin);
-      res.setHeader("Access-Control-Allow-Credentials", "true");
-      res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-    }
-    return res.sendStatus(204);
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
   }
+  if (req.method === "OPTIONS") return res.sendStatus(204);
   next();
 });
 
@@ -85,7 +75,7 @@ server.on("upgrade", (req, socket, head) => {
 });
 
 app.use((req, res, next) => {
-  if (req.path.startsWith("/emotion-socket")) return next();
+  if (req.originalUrl.startsWith("/emotion-socket")) return next();
   cors({
     origin: function (origin, callback) {
       if (!origin || allowedOrigins.includes(origin)) {
