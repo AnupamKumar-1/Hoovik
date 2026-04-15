@@ -3,7 +3,6 @@ dotenv.config();
 
 import express from "express";
 import { createServer } from "node:http";
-import fs from "fs";
 import mongoose from "mongoose";
 import cors from "cors";
 import passport from "passport";
@@ -24,12 +23,39 @@ import { createProxyMiddleware } from "http-proxy-middleware";
 const app = express();
 const server = createServer(app);
 
-const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || "http://localhost:3000";
-
 const allowedOrigins = [
   "https://skymeetai.onrender.com",
   "http://localhost:3000",
 ];
+
+const EMOTION_SERVICE_URL = process.env.EMOTION_SERVICE_URL;
+
+if (!EMOTION_SERVICE_URL) {
+  console.error("EMOTION_SERVICE_URL not set");
+  process.exit(1);
+}
+
+const emotionProxy = createProxyMiddleware({
+  target: EMOTION_SERVICE_URL,
+  changeOrigin: true,
+  ws: true,
+  pathRewrite: {
+    "^/emotion-socket": "",
+  },
+  onProxyRes(proxyRes) {
+    const corsHeaders = [
+      "access-control-allow-origin",
+      "access-control-allow-credentials",
+      "access-control-allow-methods",
+      "access-control-allow-headers",
+      "access-control-expose-headers",
+      "access-control-max-age",
+    ];
+    corsHeaders.forEach((h) => delete proxyRes.headers[h]);
+  },
+});
+
+app.use("/emotion-socket", emotionProxy);
 
 app.use(
   cors({
@@ -51,11 +77,7 @@ app.use(
   })
 );
 
-//app.use(cors(corsOptions));
-// app.options("*", cors(corsOptions));
-
 app.use(passport.initialize());
-
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -63,49 +85,16 @@ app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/rooms", roomsRoutes);
 app.use("/api/v1/transcripts/proxy", transcriptProxyRoutes);
 app.use("/api/v1/transcripts", transcriptRoutes);
+app.use("/api/v1/emotion", emotionRoutes);
+app.use("/api/v1/meetings", meetingsRoutes);
 
-const EMOTION_SERVICE_URL = process.env.EMOTION_SERVICE_URL;
-
-if (!EMOTION_SERVICE_URL) {
-  console.error("EMOTION_SERVICE_URL not set");
-  process.exit(1);
-}
-
-const emotionProxy = createProxyMiddleware({
-  target: EMOTION_SERVICE_URL,
-  changeOrigin: true,
-  ws: true,
-
-  pathRewrite: {
-    "^/emotion-socket": "",
-  },
-
-  onProxyRes(proxyRes) {
-    const corsHeaders = [
-      "access-control-allow-origin",
-      "access-control-allow-credentials",
-      "access-control-allow-methods",
-      "access-control-allow-headers",
-      "access-control-expose-headers",
-      "access-control-max-age",
-    ];
-    corsHeaders.forEach((h) => {
-      delete proxyRes.headers[h];
-    });
-  },
-});
-
-app.use("/emotion-socket", emotionProxy);
+app.post("/api/v1/auth/logout", logout);
 
 server.on("upgrade", (req, socket, head) => {
   if (req.url.startsWith("/emotion-socket")) {
     emotionProxy.upgrade(req, socket, head);
   }
 });
-app.use("/api/v1/emotion", emotionRoutes);
-app.use("/api/v1/meetings", meetingsRoutes);
-
-app.post("/api/v1/auth/logout", logout);
 
 app.use("/api", (req, res) => {
   res.status(404).json({
@@ -165,7 +154,9 @@ const start = async () => {
     console.error("server: HTTP server error —", err.message);
   });
 };
+
 console.log("SERVER PORT:", process.env.PORT);
+
 process.on("unhandledRejection", (reason) => {
   console.error("server: unhandled promise rejection —", reason?.message ?? reason);
 });
