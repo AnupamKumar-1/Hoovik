@@ -43,39 +43,28 @@ const emotionProxy = createProxyMiddleware({
   pathRewrite: {
     "^/emotion-socket": "",
   },
-  onProxyReqWs(proxyReq) {
-    proxyReq.setHeader("Origin", "https://skymeetai.onrender.com");
-  },
-  onProxyRes(proxyRes, req, res) {
-    // Strip all CORS headers from the upstream response so they are never
-    // forwarded to the client.  The upstream service may return them as a
-    // plain string *or* as an array (when the value was duplicated), so we
-    // delete every possible key variant before setting our own values once.
-    const corHeaders = [
-      "access-control-allow-origin",
-      "access-control-allow-credentials",
-      "access-control-allow-methods",
-      "access-control-allow-headers",
-    ];
-    for (const header of corHeaders) {
-      delete proxyRes.headers[header];
-    }
-
-    // Write the authoritative CORS headers directly onto the outgoing
-    // response object.  Using res.setHeader() guarantees a single value
-    // regardless of what http-proxy-middleware does with proxyRes.headers.
+  onProxyReq(proxyReq, req) {
     const origin = req.headers.origin;
     if (allowedOrigins.includes(origin)) {
-      res.setHeader("Access-Control-Allow-Origin", origin);
-      res.setHeader("Access-Control-Allow-Credentials", "true");
-      res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+      proxyReq.setHeader("Origin", origin);
     }
+  },
+  onProxyReqWs(proxyReq, req) {
+    const origin = req.headers.origin;
+    if (allowedOrigins.includes(origin)) {
+      proxyReq.setHeader("Origin", origin);
+    }
+  },
+  onProxyRes(proxyRes) {
+    delete proxyRes.headers["access-control-allow-origin"];
+    delete proxyRes.headers["access-control-allow-credentials"];
+    delete proxyRes.headers["access-control-allow-methods"];
+    delete proxyRes.headers["access-control-allow-headers"];
   },
 });
 
-app.use("/emotion-socket", (req, res, next) => {
-  if (req.method === "OPTIONS") {
+app.use((req, res, next) => {
+  if (req.originalUrl.startsWith("/emotion-socket")) {
     const origin = req.headers.origin;
     if (allowedOrigins.includes(origin)) {
       res.setHeader("Access-Control-Allow-Origin", origin);
@@ -83,7 +72,9 @@ app.use("/emotion-socket", (req, res, next) => {
       res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
       res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
     }
-    return res.sendStatus(204);
+    if (req.method === "OPTIONS") {
+      return res.sendStatus(204);
+    }
   }
   next();
 });
@@ -96,26 +87,16 @@ server.on("upgrade", (req, socket, head) => {
   }
 });
 
-app.use((req, res, next) => {
-  if (req.originalUrl.startsWith("/emotion-socket")) return next();
-  cors({
-    origin: function (origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, origin);
-      } else {
-        callback(new Error("Not allowed by CORS"));
-      }
-    },
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: [
-      "Content-Type",
-      "Authorization",
-      "x-host-secret",
-      "x-user-token",
-    ],
-  })(req, res, next);
-});
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, origin);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  credentials: true,
+}));
 
 app.use(passport.initialize());
 app.use(express.json());
