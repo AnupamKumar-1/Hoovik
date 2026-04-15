@@ -230,7 +230,6 @@ export default function useSocket({
     };
     socket.on("disconnect", onDisconnect);
 
-    // ❌ REMOVED EMOTION SOCKET LISTENERS (IMPORTANT FIX)
 
     return () => {
       if (disconnectTimer) {

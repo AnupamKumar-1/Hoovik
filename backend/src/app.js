@@ -26,18 +26,33 @@ const server = createServer(app);
 
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || "http://localhost:3000";
 
-const corsOptions = {
-  origin: [
-    process.env.CLIENT_ORIGIN,
-    "http://localhost:3000",
-  ],
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  credentials: true,
-  allowedHeaders: ["Content-Type", "Authorization", "x-host-secret", "x-user-token",],
-};
+const allowedOrigins = [
+  "https://skymeetai.onrender.com",
+  "http://localhost:3000",
+];
+
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, origin);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "x-host-secret",
+      "x-user-token",
+    ],
+  })
+);
 
 app.use(cors(corsOptions));
-app.options("*", cors(corsOptions));
+// app.options("*", cors(corsOptions));
 
 app.use(passport.initialize());
 
