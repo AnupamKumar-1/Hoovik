@@ -7,10 +7,10 @@ export default function useEmotionSocket({
     const socketRef = useRef(null);
 
     useEffect(() => {
-        const socket = io("https://skymeetai-production.up.railway.app", {
+        const socket = io("https://skymeetai.onrender.com", {
             path: "/emotion-socket/socket.io",
 
-            transports: ["polling", "websocket"],
+            transports: ["websocket"],
             upgrade: true,
             rememberUpgrade: false,
 
