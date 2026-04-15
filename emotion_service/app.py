@@ -45,7 +45,7 @@ logger = logging.getLogger("emotion_socket")
 
 sio = socketio.AsyncServer(
     async_mode="asgi",
-    cors_allowed_origins=[],
+    cors_allowed_origins=None,
     ping_timeout=20,
     ping_interval=10,
 )

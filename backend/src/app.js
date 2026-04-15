@@ -43,6 +43,12 @@ const emotionProxy = createProxyMiddleware({
   pathRewrite: {
     "^/emotion-socket": "",
   },
+  onProxyRes(proxyRes) {
+    delete proxyRes.headers["access-control-allow-origin"];
+    delete proxyRes.headers["access-control-allow-credentials"];
+    proxyRes.headers["access-control-allow-origin"] = "https://skymeetai.onrender.com";
+    proxyRes.headers["access-control-allow-credentials"] = "true";
+  },
 });
 
 app.use("/emotion-socket", emotionProxy);
@@ -53,7 +59,8 @@ server.on("upgrade", (req, socket, head) => {
   }
 });
 
-app.use(
+app.use((req, res, next) => {
+  if (req.path.startsWith("/emotion-socket")) return next();
   cors({
     origin: function (origin, callback) {
       if (!origin || allowedOrigins.includes(origin)) {
@@ -70,8 +77,8 @@ app.use(
       "x-host-secret",
       "x-user-token",
     ],
-  })
-);
+  })(req, res, next);
+});
 
 app.use(passport.initialize());
 app.use(express.json());
