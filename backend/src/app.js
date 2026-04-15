@@ -39,36 +39,18 @@ const emotionProxy = createProxyMiddleware({
   target: EMOTION_SERVICE_URL,
   changeOrigin: true,
   ws: true,
-
+  secure: false,
   pathRewrite: {
     "^/emotion-socket": "",
-  },
-
-  onProxyRes(proxyRes, req, res) {
-    const corsHeaders = [
-      "access-control-allow-origin",
-      "access-control-allow-credentials",
-      "access-control-allow-methods",
-      "access-control-allow-headers",
-      "access-control-expose-headers",
-      "access-control-max-age",
-    ];
-
-    corsHeaders.forEach((h) => {
-      delete proxyRes.headers[h];
-    });
-
-    proxyRes.headers["access-control-allow-origin"] = "https://skymeetai.onrender.com";
-    proxyRes.headers["access-control-allow-credentials"] = "true";
   },
 });
 
 app.use("/emotion-socket", emotionProxy);
 
-app.use("/emotion-socket", (req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "https://skymeetai.onrender.com");
-  res.header("Access-Control-Allow-Credentials", "true");
-  next();
+server.on("upgrade", (req, socket, head) => {
+  if (req.url.startsWith("/emotion-socket")) {
+    emotionProxy.upgrade(req, socket, head);
+  }
 });
 
 app.use(
@@ -103,12 +85,6 @@ app.use("/api/v1/emotion", emotionRoutes);
 app.use("/api/v1/meetings", meetingsRoutes);
 
 app.post("/api/v1/auth/logout", logout);
-
-server.on("upgrade", (req, socket, head) => {
-  if (req.url.startsWith("/emotion-socket")) {
-    emotionProxy.upgrade(req, socket, head);
-  }
-});
 
 app.use("/api", (req, res) => {
   res.status(404).json({
