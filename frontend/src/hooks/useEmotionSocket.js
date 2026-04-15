@@ -7,14 +7,20 @@ export default function useEmotionSocket({
     const socketRef = useRef(null);
 
     useEffect(() => {
-        const socket = io("/", {
+        const socket = io("https://skymeetai-production.up.railway.app", {
             path: "/emotion-socket/socket.io",
-            transports: ["websocket", "polling"],
+
+            transports: ["polling", "websocket"],
             upgrade: true,
+            rememberUpgrade: false,
+
             withCredentials: true,
+            timeout: 20000,
+
             reconnection: true,
-            reconnectionAttempts: 5,
+            reconnectionAttempts: 10,
             reconnectionDelay: 1000,
+            reconnectionDelayMax: 5000,
         });
 
         socketRef.current = socket;
@@ -34,7 +40,9 @@ export default function useEmotionSocket({
         });
 
         socket.on("connect_error", (err) => {
-            console.error("Emotion socket error:", err.message);
+            if (err?.message !== "websocket error") {
+                console.error("Emotion socket error:", err.message);
+            }
         });
 
         socket.on("disconnect", (reason) => {
