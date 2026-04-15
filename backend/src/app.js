@@ -43,7 +43,12 @@ const emotionProxy = createProxyMiddleware({
   pathRewrite: {
     "^/emotion-socket": "",
   },
-  onProxyRes(proxyRes) {
+  onProxyReqWs(proxyReq, req) {
+    proxyReq.setHeader("Origin", "https://skymeetai.onrender.com");
+    proxyReq.setHeader("Connection", "Upgrade");
+    proxyReq.setHeader("Upgrade", "websocket");
+  },
+  onProxyRes(proxyRes, req) {
     delete proxyRes.headers["access-control-allow-origin"];
     delete proxyRes.headers["access-control-allow-credentials"];
     proxyRes.headers["access-control-allow-origin"] = "https://skymeetai.onrender.com";

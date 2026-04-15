@@ -11,10 +11,9 @@ export default function useEmotionSocket({
             path: "/emotion-socket/socket.io",
 
             transports: ["websocket"],
-            upgrade: true,
-            rememberUpgrade: false,
 
             withCredentials: true,
+
             timeout: 20000,
 
             reconnection: true,
