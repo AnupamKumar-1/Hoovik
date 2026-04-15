@@ -1,21 +1,20 @@
 import { useEffect, useRef } from "react";
 import { io } from "socket.io-client";
 
-export default function useEmotionSocket({
-    setEmotionsMap,
-}) {
+export default function useEmotionSocket({ setEmotionsMap }) {
     const socketRef = useRef(null);
+    const setEmotionsMapRef = useRef(setEmotionsMap);
+
+    useEffect(() => {
+        setEmotionsMapRef.current = setEmotionsMap;
+    }, [setEmotionsMap]);
 
     useEffect(() => {
         const socket = io("https://skymeetai-production.up.railway.app", {
             path: "/emotion-socket/socket.io",
-
             transports: ["polling", "websocket"],
-
             withCredentials: true,
-
             timeout: 20000,
-
             reconnection: true,
             reconnectionAttempts: 10,
             reconnectionDelay: 1000,
@@ -84,9 +83,8 @@ export default function useEmotionSocket({
 
                 if (score < 0.01) return;
 
-                setEmotionsMap((prev) => {
+                setEmotionsMapRef.current((prev) => {
                     const existing = prev[participantId] || [];
-
                     return {
                         ...prev,
                         [participantId]: [
@@ -114,7 +112,7 @@ export default function useEmotionSocket({
             socket.off("emotion", handleEmotion);
             socket.disconnect();
         };
-    }, [setEmotionsMap]);
+    }, []);
 
     return socketRef;
 }

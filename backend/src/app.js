@@ -46,10 +46,29 @@ const emotionProxy = createProxyMiddleware({
   onProxyReqWs(proxyReq) {
     proxyReq.setHeader("Origin", "https://skymeetai.onrender.com");
   },
-  onProxyRes(proxyRes) {
-    proxyRes.headers["access-control-allow-origin"] = "https://skymeetai.onrender.com";
-    proxyRes.headers["access-control-allow-credentials"] = "true";
+  onProxyRes(proxyRes, req) {
+    const origin = req.headers.origin;
+    delete proxyRes.headers["access-control-allow-origin"];
+    delete proxyRes.headers["access-control-allow-credentials"];
+    if (allowedOrigins.includes(origin)) {
+      proxyRes.headers["access-control-allow-origin"] = origin;
+      proxyRes.headers["access-control-allow-credentials"] = "true";
+    }
   },
+});
+
+app.use("/emotion-socket", (req, res, next) => {
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  }
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(204);
+  }
+  next();
 });
 
 app.use("/emotion-socket", emotionProxy);
