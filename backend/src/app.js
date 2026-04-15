@@ -46,14 +46,11 @@ const emotionProxy = createProxyMiddleware({
   onProxyReqWs(proxyReq) {
     proxyReq.setHeader("Origin", "https://skymeetai.onrender.com");
   },
-  onProxyRes(proxyRes, req) {
-    const origin = req.headers.origin;
+  onProxyRes(proxyRes) {
     delete proxyRes.headers["access-control-allow-origin"];
     delete proxyRes.headers["access-control-allow-credentials"];
-    if (allowedOrigins.includes(origin)) {
-      proxyRes.headers["access-control-allow-origin"] = origin;
-      proxyRes.headers["access-control-allow-credentials"] = "true";
-    }
+    delete proxyRes.headers["access-control-allow-methods"];
+    delete proxyRes.headers["access-control-allow-headers"];
   },
 });
 
