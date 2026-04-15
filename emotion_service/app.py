@@ -519,7 +519,7 @@ async def on_emotion_frame(sid, data):
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["https://skymeetai.onrender.com"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -75,18 +75,13 @@ const emotionProxy = createProxyMiddleware({
   target: EMOTION_SERVICE_URL,
   changeOrigin: true,
   ws: true,
+
   pathRewrite: {
     "^/emotion-socket": "",
   },
-  logLevel: "debug",
-  onError(err, req, res) {
-    console.error("Emotion Proxy Error:", err.message);
-  },
-  onProxyReq(proxyReq, req, res) {
-    console.log("Proxying:", req.method, req.url);
-  },
-  onProxyReqWs(proxyReq, req, socket, options, head) {
-    console.log("WS Proxying:", req.url);
+
+  onProxyRes(proxyRes) {
+    delete proxyRes.headers["access-control-allow-origin"];
   },
 });
 
@@ -141,7 +136,15 @@ const start = async () => {
     console.info(`server: listening on port ${app.get("port")}`);
 
     try {
-      connectToSocket(server, corsOptions, redisPub, redisSub);
+      connectToSocket(
+        server,
+        {
+          origin: "https://skymeetai.onrender.com",
+          credentials: true,
+        },
+        redisPub,
+        redisSub
+      );
       console.info("server: socket manager initialized");
     } catch (err) {
       console.error("server: socket manager failed to initialize —", err.message);
