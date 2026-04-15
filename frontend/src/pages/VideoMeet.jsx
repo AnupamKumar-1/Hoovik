@@ -419,6 +419,10 @@ export default function VideoMeet() {
     ICE_CONFIG,
   });
 
+  const emotionSocketRef = useEmotionSocket({
+    setEmotionsMap,
+  });
+  
   const { startPeriodicEmotionCapture, stopPeriodicEmotionCapture } =
     useEmotionCapture({
       socketRef: emotionSocketRef,
@@ -601,9 +605,7 @@ export default function VideoMeet() {
     makingOfferRef,
     socketReady,
   });
-  const emotionSocketRef = useEmotionSocket({
-    setEmotionsMap,
-  });
+
   const remoteEntries = useMemo(() => {
     return Object.entries(unwrappedRemoteStreams)
       .filter(
