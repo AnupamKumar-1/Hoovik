@@ -10,13 +10,12 @@ export default function useEmotionSocket({ setEmotionsMap }) {
     }, [setEmotionsMap]);
 
     useEffect(() => {
-        const socket = io("https://skymeetai-production.up.railway.app", {
-            path: "/emotion-socket/socket.io",
-            transports: ["polling", "websocket"],
-            withCredentials: true,
+        const socket = io(process.env.REACT_APP_EMOTION_SOCKET_URL, {
+            path: "/socket.io",
+            transports: ["websocket"],
             timeout: 20000,
             reconnection: true,
-            reconnectionAttempts: 10,
+            reconnectionAttempts: Infinity,
             reconnectionDelay: 1000,
             reconnectionDelayMax: 5000,
         });
@@ -41,6 +40,10 @@ export default function useEmotionSocket({ setEmotionsMap }) {
             console.error("Emotion socket error:", err.message);
         });
 
+        socket.io.on("reconnect_attempt", () => {
+            console.log("Reconnecting to emotion socket...");
+        });
+
         socket.on("disconnect", (reason) => {
             console.warn("Emotion socket disconnected:", reason);
         });
@@ -61,14 +64,7 @@ export default function useEmotionSocket({ setEmotionsMap }) {
                 const labelRaw =
                     result?.emotion ||
                     result?.label ||
-                    result?.top ||
-                    null;
-
-                const scoreRaw =
-                    result?.confidence ??
-                    result?.score ??
-                    result?.probability ??
-                    null;
+                    result?.top;
 
                 if (!labelRaw) return;
 
@@ -76,15 +72,21 @@ export default function useEmotionSocket({ setEmotionsMap }) {
 
                 if (!VALID_EMOTIONS.has(label)) return;
 
+                const scoreRaw =
+                    result?.confidence ??
+                    result?.score ??
+                    result?.probability;
+
                 const score =
                     typeof scoreRaw === "number"
                         ? scoreRaw
                         : Number(scoreRaw) || 0;
 
-                if (score < 0.01) return;
+                if (score < 0.05) return;
 
                 setEmotionsMapRef.current((prev) => {
                     const existing = prev[participantId] || [];
+
                     return {
                         ...prev,
                         [participantId]: [
@@ -103,13 +105,9 @@ export default function useEmotionSocket({ setEmotionsMap }) {
         };
 
         socket.on("emotion.result", handleEmotion);
-        socket.on("emotion.update", handleEmotion);
-        socket.on("emotion", handleEmotion);
 
         return () => {
             socket.off("emotion.result", handleEmotion);
-            socket.off("emotion.update", handleEmotion);
-            socket.off("emotion", handleEmotion);
             socket.disconnect();
         };
     }, []);

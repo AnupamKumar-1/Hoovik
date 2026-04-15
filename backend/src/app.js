@@ -43,24 +43,6 @@ const emotionProxy = createProxyMiddleware({
   pathRewrite: {
     "^/emotion-socket": "",
   },
-  onProxyReq(proxyReq, req) {
-    const origin = req.headers.origin;
-    if (allowedOrigins.includes(origin)) {
-      proxyReq.setHeader("Origin", origin);
-    }
-  },
-  onProxyReqWs(proxyReq, req) {
-    const origin = req.headers.origin;
-    if (allowedOrigins.includes(origin)) {
-      proxyReq.setHeader("Origin", origin);
-    }
-  },
-  onProxyRes(proxyRes) {
-    delete proxyRes.headers["access-control-allow-origin"];
-    delete proxyRes.headers["access-control-allow-credentials"];
-    delete proxyRes.headers["access-control-allow-methods"];
-    delete proxyRes.headers["access-control-allow-headers"];
-  },
 });
 
 app.use("/emotion-socket", emotionProxy);
@@ -69,40 +51,6 @@ server.on("upgrade", (req, socket, head) => {
   if (req.url.startsWith("/emotion-socket")) {
     emotionProxy.upgrade(req, socket, head);
   }
-});
-
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-
-  const originalWriteHead = res.writeHead;
-
-  res.writeHead = function (...args) {
-    res.removeHeader("Access-Control-Allow-Origin");
-    res.removeHeader("Access-Control-Allow-Credentials");
-    res.removeHeader("Access-Control-Allow-Methods");
-    res.removeHeader("Access-Control-Allow-Headers");
-
-    if (allowedOrigins.includes(origin)) {
-      res.setHeader("Access-Control-Allow-Origin", origin);
-      res.setHeader("Access-Control-Allow-Credentials", "true");
-      res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-    }
-
-    return originalWriteHead.apply(this, args);
-  };
-
-  if (req.method === "OPTIONS") {
-    if (allowedOrigins.includes(origin)) {
-      res.setHeader("Access-Control-Allow-Origin", origin);
-      res.setHeader("Access-Control-Allow-Credentials", "true");
-      res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-    }
-    return res.sendStatus(204);
-  }
-
-  next();
 });
 
 app.use(cors({
