@@ -421,7 +421,7 @@ export default function VideoMeet() {
 
   const { startPeriodicEmotionCapture, stopPeriodicEmotionCapture } =
     useEmotionCapture({
-      socketRef,
+      socketRef: emotionSocketRef,
       remoteStreamsRef,
       participantsMetaRef,
       myId,
@@ -601,7 +601,7 @@ export default function VideoMeet() {
     makingOfferRef,
     socketReady,
   });
-  useEmotionSocket({
+  const emotionSocketRef = useEmotionSocket({
     setEmotionsMap,
   });
   const remoteEntries = useMemo(() => {
