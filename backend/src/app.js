@@ -47,17 +47,29 @@ const emotionProxy = createProxyMiddleware({
     proxyReq.setHeader("Origin", "https://skymeetai.onrender.com");
   },
   onProxyRes(proxyRes, req, res) {
-    delete proxyRes.headers["access-control-allow-origin"];
-    delete proxyRes.headers["access-control-allow-credentials"];
-    delete proxyRes.headers["access-control-allow-methods"];
-    delete proxyRes.headers["access-control-allow-headers"];
+    // Strip all CORS headers from the upstream response so they are never
+    // forwarded to the client.  The upstream service may return them as a
+    // plain string *or* as an array (when the value was duplicated), so we
+    // delete every possible key variant before setting our own values once.
+    const corHeaders = [
+      "access-control-allow-origin",
+      "access-control-allow-credentials",
+      "access-control-allow-methods",
+      "access-control-allow-headers",
+    ];
+    for (const header of corHeaders) {
+      delete proxyRes.headers[header];
+    }
 
+    // Write the authoritative CORS headers directly onto the outgoing
+    // response object.  Using res.setHeader() guarantees a single value
+    // regardless of what http-proxy-middleware does with proxyRes.headers.
     const origin = req.headers.origin;
     if (allowedOrigins.includes(origin)) {
-      proxyRes.headers["access-control-allow-origin"] = origin;
-      proxyRes.headers["access-control-allow-credentials"] = "true";
-      proxyRes.headers["access-control-allow-methods"] = "GET, POST, OPTIONS";
-      proxyRes.headers["access-control-allow-headers"] = "Content-Type, Authorization";
+      res.setHeader("Access-Control-Allow-Origin", origin);
+      res.setHeader("Access-Control-Allow-Credentials", "true");
+      res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
     }
   },
 });
