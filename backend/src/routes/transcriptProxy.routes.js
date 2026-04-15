@@ -5,11 +5,11 @@ import FormData from "form-data";
 const router = express.Router();
 const upload = multer();
 
-router.post("/proxy", upload.any(), async (req, res) => {
+router.post(["/", "/process_meeting"], upload.any(), async (req, res) => {
     try {
         const form = new FormData();
 
-        Object.entries(req.body).forEach(([key, value]) => {
+        Object.entries(req.body || {}).forEach(([key, value]) => {
             form.append(key, value);
         });
 
@@ -27,8 +27,14 @@ router.post("/proxy", upload.any(), async (req, res) => {
             body: form,
         });
 
-        const data = await response.json();
-        res.status(response.status).json(data);
+        const text = await response.text();
+
+        try {
+            const data = JSON.parse(text);
+            res.status(response.status).json(data);
+        } catch {
+            res.status(response.status).send(text);
+        }
     } catch (err) {
         console.error("Proxy error:", err);
         res.status(500).json({ success: false, error: "Proxy failed" });

@@ -45,7 +45,7 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/rooms", roomsRoutes);
-app.use("/api/v1/transcripts", transcriptProxyRoutes);
+app.use("/api/v1/transcripts/proxy", transcriptProxyRoutes);
 app.use("/api/v1/transcripts", transcriptRoutes);
 app.use("/api/v1/emotion", emotionRoutes);
 app.use("/api/v1/meetings", meetingsRoutes);
