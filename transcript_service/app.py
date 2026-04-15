@@ -48,6 +48,9 @@ async def process_meeting(
     host_secret: str = Header(default="", alias="x-host-secret"),
     user_token: str = Header(default="", alias="x-user-token"),
 ):
+    form = await request.form()
+    print("FORM KEYS:", list(form.keys()))
+    print("FILES:", request.headers.get("content-type"))
     meeting_code = meeting_code.upper()
 
     try:
