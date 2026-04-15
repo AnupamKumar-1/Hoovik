@@ -516,9 +516,42 @@ async def on_emotion_frame(sid, data):
         await _process_frame(sid, frame_bytes, participant_id)
 
 
-app = FastAPI()
+@app.middleware("http")
+async def strip_cors_headers(request, call_next):
+    response = await call_next(request)
 
-app.mount("/socket.io", socketio.ASGIApp(sio))
+    response.headers.pop("access-control-allow-origin", None)
+    response.headers.pop("access-control-allow-credentials", None)
+    response.headers.pop("access-control-allow-methods", None)
+    response.headers.pop("access-control-allow-headers", None)
+
+    return response
+
+
+class StripSocketIOCors:
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        async def send_wrapper(message):
+            if message["type"] == "http.response.start":
+                headers = []
+                for k, v in message.get("headers", []):
+                    key = k.decode().lower()
+                    if key not in [
+                        "access-control-allow-origin",
+                        "access-control-allow-credentials",
+                        "access-control-allow-methods",
+                        "access-control-allow-headers",
+                    ]:
+                        headers.append((k, v))
+                message["headers"] = headers
+            await send(message)
+
+        await self.app(scope, receive, send_wrapper)
+
+
+app.mount("/socket.io", StripSocketIOCors(socketio.ASGIApp(sio)))
 
 
 @app.post("/analyze")
