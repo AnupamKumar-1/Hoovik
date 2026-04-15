@@ -13,7 +13,7 @@ import torch
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from fastapi import FastAPI, UploadFile, File, Form
-# from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.cors import CORSMiddleware
 
 import embeddings.extract_embeddings_data as _emo_mod
 from embeddings.extract_embeddings_data import load_models
@@ -28,7 +28,6 @@ EMOTION_HISTORY_TTL = 1.0
 BUFFER_TTL = 60
 MAX_FRAME_SIZE = 2 * 1024 * 1024
 FACE_DIM = 27
-
 
 MIN_INFERENCE_INTERVAL = 0.35
 
@@ -45,7 +44,7 @@ logger = logging.getLogger("emotion_socket")
 
 sio = socketio.AsyncServer(
     async_mode="asgi",
-    cors_allowed_origins=None,
+    cors_allowed_origins=[],
     ping_timeout=20,
     ping_interval=10,
 )
@@ -59,7 +58,6 @@ predictor = EmotionPredictor()
 logger.info("Models ready")
 
 _lock = threading.Lock()
-
 
 EMBEDDING_BUFFER: dict[str, deque] = defaultdict(lambda: deque(maxlen=SEQ_LEN))
 HTTP_EMBEDDING_BUFFER: dict[str, deque] = defaultdict(lambda: deque(maxlen=SEQ_LEN))
@@ -97,13 +95,11 @@ def decode_frame(data) -> np.ndarray | None:
 def smooth(key: str, probs: dict) -> dict:
     now = time.time()
 
-
     last_reset = EMOTION_HISTORY_LAST_RESET.get(key, 0)
     if now - last_reset > EMOTION_HISTORY_TTL:
         EMOTION_HISTORY.pop(key, None)
         EMOTION_HISTORY_LAST_RESET[key] = now
         logger.info("emotion history reset key=%s", key)
-
 
     raw_top = max(probs, key=probs.get)
     logger.info(
@@ -126,11 +122,6 @@ def smooth(key: str, probs: dict) -> dict:
 
 
 def extract_embedding(frame_bgr: np.ndarray) -> np.ndarray | None:
-    """
-    Extract AU/emotion/pose embedding from a BGR frame.
-    py-feat's detect_image only accepts file paths — write to a tempfile,
-    detect, then delete immediately. BytesIO is not supported by the library.
-    """
     import os
     import tempfile
 
@@ -188,11 +179,10 @@ def run_inference(embedding_deque: deque) -> dict:
     frames = list(embedding_deque)
     n_real = len(frames)
 
-
     while len(frames) < SEQ_LEN:
         frames.insert(0, frames[0])
 
-    xf = np.stack(frames, axis=0)  # (SEQ_LEN, FACE_DIM)
+    xf = np.stack(frames, axis=0)
     xa = np.zeros((SEQ_LEN, AUDIO_DIM), dtype=np.float32)
 
     fm = np.zeros(SEQ_LEN, dtype=np.float32)
@@ -227,36 +217,22 @@ _scheduler_lock = None
 
 
 async def _pump(sid: str, participant_id: str):
-    """
-    Background task per connected user.
-
-    Design:
-    - Pops the latest frame slot each iteration (never queues).
-    - FRAME_SKIP applied here (after rate-limit sleep) so we always skip
-      toward the *freshest* available frame, not the one that arrived first.
-    - Reconnect guard: exits immediately if sid leaves CONNECTED.
-    - Small yield sleep when loop is busy to avoid starving the event loop.
-    """
     loop = asyncio.get_running_loop()
     skip_counter = 0
 
     try:
         while True:
-
             if sid not in CONNECTED:
                 logger.info("pump exit: sid=%s no longer connected", sid)
                 return
 
-
             frame_bytes = LATEST_FRAME.pop(sid, None)
             if frame_bytes is None:
-
                 return
 
             now = time.time()
             LAST_SEEN[sid] = now
             frame_received_at = time.perf_counter()
-
 
             elapsed = now - LAST_INFERENCE_TIME.get(sid, 0)
             if elapsed < MIN_INFERENCE_INTERVAL:
@@ -266,9 +242,7 @@ async def _pump(sid: str, participant_id: str):
                 if sid not in CONNECTED:
                     logger.info("pump exit after sleep: sid=%s disconnected", sid)
                     return
-                # Grab the freshest frame that arrived during the sleep
                 frame_bytes = LATEST_FRAME.pop(sid, frame_bytes)
-
 
             skip_counter += 1
             if skip_counter % FRAME_SKIP != 1:
@@ -276,7 +250,6 @@ async def _pump(sid: str, participant_id: str):
                 continue
 
             LAST_INFERENCE_TIME[sid] = time.time()
-
 
             t0 = time.perf_counter()
             frame = await loop.run_in_executor(face_executor, decode_frame, frame_bytes)
@@ -287,11 +260,9 @@ async def _pump(sid: str, participant_id: str):
                 await asyncio.sleep(0.005)
                 continue
 
-
             if sid not in CONNECTED:
                 logger.info("pump exit post-decode: sid=%s disconnected", sid)
                 return
-
 
             t0 = time.perf_counter()
             try:
@@ -309,17 +280,14 @@ async def _pump(sid: str, participant_id: str):
                 await asyncio.sleep(0.005)
                 continue
 
-
             buf = EMBEDDING_BUFFER[sid]
             buf.append(embedding)
 
             buf_snapshot = deque(buf, maxlen=SEQ_LEN)
 
-
             if sid not in CONNECTED:
                 logger.info("pump exit post-extract: sid=%s disconnected", sid)
                 return
-
 
             t0 = time.perf_counter()
             try:
@@ -338,7 +306,6 @@ async def _pump(sid: str, participant_id: str):
                 logger.warning("empty pred returned sid=%s", sid)
                 await asyncio.sleep(0.005)
                 continue
-
 
             try:
                 if pred.get("probs"):
@@ -377,7 +344,6 @@ async def _pump(sid: str, participant_id: str):
                 total_latency,
             )
 
-
             if sid not in CONNECTED:
                 logger.info("pump exit pre-emit: sid=%s disconnected", sid)
                 return
@@ -392,7 +358,6 @@ async def _pump(sid: str, participant_id: str):
                 to=sid,
             )
 
-
             await asyncio.sleep(0.005)
 
     finally:
@@ -400,9 +365,6 @@ async def _pump(sid: str, participant_id: str):
 
 
 def _store_frame(sid: str, frame_bytes: bytes) -> None:
-
-    """Overwrite the latest frame slot. No skip logic here — pump handles it."""
-
     LATEST_FRAME[sid] = frame_bytes
 
 
@@ -415,9 +377,7 @@ async def _process_frame(sid: str, frame_bytes: bytes, participant_id: str):
         )
         return
 
-
     _store_frame(sid, frame_bytes)
-
 
     if sid in PUMP_RUNNING:
         return
@@ -517,6 +477,14 @@ async def on_emotion_frame(sid, data):
 
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://skymeetai.onrender.com", "http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.mount("/socket.io", socketio.ASGIApp(sio))
 
