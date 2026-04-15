@@ -20,7 +20,6 @@ router.post(["/", "/process_meeting"], upload.any(), async (req, res) => {
         const response = await fetch(process.env.Ts_SERVICE_URL, {
             method: "POST",
             headers: {
-                ...form.getHeaders(),
                 "x-host-secret": req.headers["x-host-secret"] || "",
                 "x-user-token": req.headers["x-user-token"] || "",
             },
