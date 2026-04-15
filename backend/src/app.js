@@ -18,6 +18,7 @@ import emotionRoutes from "./routes/emotion.routes.js";
 import { connectToSocket } from "./controllers/socket.controller.js";
 import { logout } from "./controllers/user.controller.js";
 import { connectRedis, redisPub, redisSub } from "./infra/redis.js";
+import transcriptProxyRoutes from "./routes/transcriptProxy.routes.js";
 
 const app = express();
 const server = createServer(app);
@@ -44,6 +45,7 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/rooms", roomsRoutes);
+app.use("/api/v1/transcripts", transcriptProxyRoutes);
 app.use("/api/v1/transcripts", transcriptRoutes);
 app.use("/api/v1/emotion", emotionRoutes);
 app.use("/api/v1/meetings", meetingsRoutes);
