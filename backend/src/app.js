@@ -78,8 +78,9 @@ const emotionProxy = createProxyMiddleware({
 app.use("/emotion-socket", emotionProxy);
 
 server.on("upgrade", (req, socket, head) => {
-  console.log("WS Upgrade:", req.url);
-  emotionProxy.upgrade(req, socket, head);
+  if (req.url.startsWith("/emotion-socket")) {
+    emotionProxy.upgrade(req, socket, head);
+  }
 });
 app.use("/api/v1/emotion", emotionRoutes);
 app.use("/api/v1/meetings", meetingsRoutes);
