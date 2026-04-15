@@ -19,6 +19,7 @@ import { connectToSocket } from "./controllers/socket.controller.js";
 import { logout } from "./controllers/user.controller.js";
 import { connectRedis, redisPub, redisSub } from "./infra/redis.js";
 import transcriptProxyRoutes from "./routes/transcriptProxy.routes.js";
+import { createProxyMiddleware } from "http-proxy-middleware";
 
 const app = express();
 const server = createServer(app);
@@ -47,6 +48,39 @@ app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/rooms", roomsRoutes);
 app.use("/api/v1/transcripts/proxy", transcriptProxyRoutes);
 app.use("/api/v1/transcripts", transcriptRoutes);
+
+const EMOTION_SERVICE_URL = process.env.EMOTION_SERVICE_URL;
+
+if (!EMOTION_SERVICE_URL) {
+  console.error("EMOTION_SERVICE_URL not set");
+  process.exit(1);
+}
+
+const emotionProxy = createProxyMiddleware({
+  target: EMOTION_SERVICE_URL,
+  changeOrigin: true,
+  ws: true,
+  pathRewrite: {
+    "^/emotion-socket": "",
+  },
+  logLevel: "debug",
+  onError(err, req, res) {
+    console.error("Emotion Proxy Error:", err.message);
+  },
+  onProxyReq(proxyReq, req, res) {
+    console.log("Proxying:", req.method, req.url);
+  },
+  onProxyReqWs(proxyReq, req, socket, options, head) {
+    console.log("WS Proxying:", req.url);
+  },
+});
+
+app.use("/emotion-socket", emotionProxy);
+
+server.on("upgrade", (req, socket, head) => {
+  console.log("WS Upgrade:", req.url);
+  emotionProxy.upgrade(req, socket, head);
+});
 app.use("/api/v1/emotion", emotionRoutes);
 app.use("/api/v1/meetings", meetingsRoutes);
 
