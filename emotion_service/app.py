@@ -45,7 +45,7 @@ logger = logging.getLogger("emotion_socket")
 
 sio = socketio.AsyncServer(
     async_mode="asgi",
-    cors_allowed_origins=["https://skymeetai.onrender.com"],
+    cors_allowed_origins="*",
     ping_timeout=20,
     ping_interval=10,
 )
