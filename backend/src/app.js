@@ -39,10 +39,12 @@ const emotionProxy = createProxyMiddleware({
   target: EMOTION_SERVICE_URL,
   changeOrigin: true,
   ws: true,
+
   pathRewrite: {
     "^/emotion-socket": "",
   },
-  onProxyRes(proxyRes) {
+
+  onProxyRes(proxyRes, req, res) {
     const corsHeaders = [
       "access-control-allow-origin",
       "access-control-allow-credentials",
@@ -51,7 +53,13 @@ const emotionProxy = createProxyMiddleware({
       "access-control-expose-headers",
       "access-control-max-age",
     ];
-    corsHeaders.forEach((h) => delete proxyRes.headers[h]);
+
+    corsHeaders.forEach((h) => {
+      delete proxyRes.headers[h];
+    });
+
+    proxyRes.headers["access-control-allow-origin"] = "https://skymeetai.onrender.com";
+    proxyRes.headers["access-control-allow-credentials"] = "true";
   },
 });
 
