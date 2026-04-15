@@ -10,7 +10,11 @@ router.post(["/", "/process_meeting"], upload.any(), async (req, res) => {
         const form = new FormData();
 
         Object.entries(req.body || {}).forEach(([key, value]) => {
-            form.append(key, value);
+            if (typeof value === "string") {
+                form.append(key, value);
+            } else {
+                form.append(key, JSON.stringify(value));
+            }
         });
 
         (req.files || []).forEach((file) => {
