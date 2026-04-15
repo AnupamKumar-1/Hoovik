@@ -175,6 +175,8 @@ export default function useSocket({
       h.current.closePeer(peerId);
       h.current.removeAnalyzer(peerId);
       delete h.current.recordersRef.current[peerId];
+
+      // keep cleanup of emotions map (valid)
       h.current.setEmotionsMap((prev) => {
         const copy = { ...prev };
         delete copy[peerId];
@@ -228,72 +230,7 @@ export default function useSocket({
     };
     socket.on("disconnect", onDisconnect);
 
-    const VALID_EMOTIONS = new Set([
-      "angry",
-      "fearful",
-      "disgust",
-      "happy",
-      "sad",
-      "neutral/calm",
-      "neutral",
-    ]);
-
-    const emotionHandler = (payload) => {
-      const participantId =
-        payload.participant_id ||
-        payload.participantId ||
-        payload.from ||
-        payload.userId;
-
-      if (!participantId) return;
-
-      const emotion =
-        payload?.result?.result || payload?.result || payload?.emotion;
-
-      if (!emotion) return;
-
-      const tryPushEntry = (label, score) => {
-        if (!label || typeof label !== "string") return false;
-        const normalized = label.trim().toLowerCase();
-        if (!VALID_EMOTIONS.has(normalized)) return false;
-        if (typeof score === "number" && score < 0.01) return false;
-        h.current.setEmotionsMap((prev) => {
-          const existing = prev[participantId] || [];
-          return {
-            ...prev,
-            [participantId]: [
-              ...existing,
-              { label: normalized, score: score ?? 1, ts: Date.now() },
-            ].slice(-20),
-          };
-        });
-        return true;
-      };
-
-      if (emotion.label) {
-        tryPushEntry(emotion.label, emotion.score);
-        return;
-      }
-
-      if (emotion.emotion) {
-        tryPushEntry(emotion.emotion, emotion.confidence);
-        return;
-      }
-
-      if (emotion.probs) {
-        const entries = Object.entries(emotion.probs);
-        if (!entries.length) return;
-        const [topLabel, topScore] = entries.reduce(
-          (max, curr) => (curr[1] > max[1] ? curr : max),
-          ["", 0]
-        );
-        tryPushEntry(topLabel, topScore);
-      }
-    };
-
-    socket.on("emotion.result", emotionHandler);
-    socket.on("emotion.update", emotionHandler);
-    socket.on("emotion", emotionHandler);
+    // ❌ REMOVED EMOTION SOCKET LISTENERS (IMPORTANT FIX)
 
     return () => {
       if (disconnectTimer) {
@@ -312,9 +249,6 @@ export default function useSocket({
       socket.off("chat-ack", onChatAck);
       socket.off("end-meeting", onEndMeeting);
       socket.off("disconnect", onDisconnect);
-      socket.off("emotion.result", emotionHandler);
-      socket.off("emotion.update", emotionHandler);
-      socket.off("emotion", emotionHandler);
       socket.off("update-participant-state", onParticipantStateUpdate);
     };
   }, [socketReady]);

@@ -15,6 +15,7 @@ import { TRANSCRIPTS_ENABLED } from "../environment";
 import ParticipantCard from "./ParticipantCard";
 import SpotlightCard from "./SpotlightCard";
 import useChat from "../hooks/useChat";
+import useEmotionSocket from "../hooks/useEmotionSocket";
 import {
   SOCKET_SERVER_URL,
   TRANSCRIPT_ENDPOINT,
@@ -57,6 +58,16 @@ function useIsScrolledToBottom(ref, threshold = 60) {
     if (!el) return true;
     return el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
   }, [ref, threshold]);
+}
+
+function useIsMobile(breakpoint = 600) {
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth <= breakpoint);
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth <= breakpoint);
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
+  }, [breakpoint]);
+  return isMobile;
 }
 
 function ChatPanel({
@@ -289,6 +300,8 @@ export default function VideoMeet() {
   const [participantsMeta, setParticipantsMeta] = useState([]);
   const [socketReady, setSocketReady] = useState(0);
   const [spotlightPeerId, setSpotlightPeerId] = useState(null);
+
+  const isMobile = useIsMobile(600);
 
   const participantsMetaRef = useRef([]);
   useEffect(() => {
@@ -588,7 +601,9 @@ export default function VideoMeet() {
     makingOfferRef,
     socketReady,
   });
-
+  useEmotionSocket({
+    setEmotionsMap,
+  });
   const remoteEntries = useMemo(() => {
     return Object.entries(unwrappedRemoteStreams)
       .filter(
@@ -642,6 +657,8 @@ export default function VideoMeet() {
     return map;
   }, [participantsMeta, emotionsMap, isHost]);
 
+  const multiPartyLayout = remoteEntries.length > 0 && activeEntry;
+
   return (
     <div className={styles.meetVideoContainer}>
       <div className={styles.bgSparkles} aria-hidden="true" />
@@ -675,16 +692,19 @@ export default function VideoMeet() {
             </div>
           )}
 
-          {remoteEntries.length > 0 && (
+          {multiPartyLayout && (
             <div
               style={{
                 display: "flex",
+                flexDirection: isMobile ? "column" : "row",
                 width: "100%",
                 height: "100%",
                 gap: 10,
+                minWidth: 0,
+                minHeight: 0,
               }}
             >
-              <div style={{ flex: 1 }}>
+              <div style={{ flex: 1, minWidth: 0, minHeight: 0 }}>
                 {activeEntry && (
                   <SpotlightCard
                     key={activeEntry[0]}
@@ -702,28 +722,40 @@ export default function VideoMeet() {
                 )}
               </div>
 
-              <div className={styles.rightColumn}>
-                {otherEntries.map(([peerId, stream]) => (
-                  <ParticipantCard
-                    key={peerId}
-                    peerId={peerId}
-                    stream={stream}
-                    meta={participantMap[peerId]}
-                    emotion={
-                      isHost
-                        ? socketEmotionMap[peerId]?.at(-1)
-                        : undefined
-                    }
-                    isActive={stableSpeakerId === peerId}
-                    isHost={isHost}
-                    compact
-                    onClick={() => {
-                      spotlightPeerRef.current = peerId;
-                      setSpotlightPeerId(peerId);
-                    }}
-                  />
-                ))}
-              </div>
+              {otherEntries.length > 0 && (
+                <div
+                  className={styles.rightColumn}
+                  style={isMobile ? {
+                    width: "100%",
+                    flexDirection: "row",
+                    height: 90,
+                    overflowX: "auto",
+                    overflowY: "hidden",
+                    flexShrink: 0,
+                  } : undefined}
+                >
+                  {otherEntries.map(([peerId, stream]) => (
+                    <ParticipantCard
+                      key={peerId}
+                      peerId={peerId}
+                      stream={stream}
+                      meta={participantMap[peerId]}
+                      emotion={
+                        isHost
+                          ? socketEmotionMap[peerId]?.at(-1)
+                          : undefined
+                      }
+                      isActive={stableSpeakerId === peerId}
+                      isHost={isHost}
+                      compact
+                      onClick={() => {
+                        spotlightPeerRef.current = peerId;
+                        setSpotlightPeerId(peerId);
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
