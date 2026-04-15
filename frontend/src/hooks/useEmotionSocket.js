@@ -7,9 +7,10 @@ export default function useEmotionSocket({
     const socketRef = useRef(null);
 
     useEffect(() => {
-        const socket = io("https://skymeetai-production.up.railway.app", {
+        const socket = io("/", {
             path: "/emotion-socket/socket.io",
             transports: ["websocket"],
+            withCredentials: true,
             reconnection: true,
             reconnectionAttempts: 5,
             reconnectionDelay: 1000,
@@ -38,7 +39,6 @@ export default function useEmotionSocket({
         socket.on("disconnect", (reason) => {
             console.warn("Emotion socket disconnected:", reason);
         });
-
 
         const handleEmotion = (payload) => {
             try {
