@@ -65,6 +65,12 @@ const emotionProxy = createProxyMiddleware({
 
 app.use("/emotion-socket", emotionProxy);
 
+app.use("/emotion-socket", (req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "https://skymeetai.onrender.com");
+  res.header("Access-Control-Allow-Credentials", "true");
+  next();
+});
+
 app.use(
   cors({
     origin: function (origin, callback) {
