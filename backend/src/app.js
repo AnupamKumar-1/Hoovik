@@ -46,23 +46,31 @@ const emotionProxy = createProxyMiddleware({
   onProxyReqWs(proxyReq) {
     proxyReq.setHeader("Origin", "https://skymeetai.onrender.com");
   },
-  onProxyRes(proxyRes) {
+  onProxyRes(proxyRes, req) {
     delete proxyRes.headers["access-control-allow-origin"];
     delete proxyRes.headers["access-control-allow-credentials"];
     delete proxyRes.headers["access-control-allow-methods"];
     delete proxyRes.headers["access-control-allow-headers"];
+
+    const origin = req.headers.origin;
+    if (allowedOrigins.includes(origin)) {
+      proxyRes.headers["access-control-allow-origin"] = origin;
+      proxyRes.headers["access-control-allow-credentials"] = "true";
+      proxyRes.headers["access-control-allow-methods"] = "GET, POST, OPTIONS";
+      proxyRes.headers["access-control-allow-headers"] = "Content-Type, Authorization";
+    }
   },
 });
 
 app.use("/emotion-socket", (req, res, next) => {
-  const origin = req.headers.origin;
-  if (allowedOrigins.includes(origin)) {
-    res.setHeader("Access-Control-Allow-Origin", origin);
-    res.setHeader("Access-Control-Allow-Credentials", "true");
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  }
   if (req.method === "OPTIONS") {
+    const origin = req.headers.origin;
+    if (allowedOrigins.includes(origin)) {
+      res.setHeader("Access-Control-Allow-Origin", origin);
+      res.setHeader("Access-Control-Allow-Credentials", "true");
+      res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    }
     return res.sendStatus(204);
   }
   next();
