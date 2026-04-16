@@ -144,13 +144,6 @@ export default function useMeetingLifecycle({
       stopPeriodicEmotionCapture();
     } catch { }
 
-    try {
-      const tmp = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-        video: true,
-      });
-      tmp.getTracks().forEach((t) => t.stop());
-    } catch { }
     startedRef.current = false;
   }, [
     socketRef,
@@ -167,6 +160,7 @@ export default function useMeetingLifecycle({
     try {
       setConnecting(true);
       pcsRef.current = {};
+
       const resetRef = (ref) => {
         if (!ref) return;
         if (typeof ref !== "object") return;
@@ -174,7 +168,6 @@ export default function useMeetingLifecycle({
         ref.current = {};
       };
 
-      pcsRef.current = {};
       resetRef(makingOfferRef);
       resetRef(politeRef);
       resetRef(pendingCandidatesRef);
@@ -206,6 +199,7 @@ export default function useMeetingLifecycle({
           socketRef.current.disconnect();
         } catch { }
       }
+
       const socket = io(SOCKET_SERVER_URL, { autoConnect: false });
       socketRef.current = socket;
 
@@ -301,53 +295,43 @@ export default function useMeetingLifecycle({
       }
     } catch { }
     await cleanupAll();
-
-    setTimeout(() => {
-      navigate("/home");
-    }, 50);
+    navigate("/home");
   }
 
   async function endMeeting() {
     try {
       if (isHostRef.current) {
-        if (TRANSCRIPTS_ENABLED) {
-          const code = (roomId || "").toUpperCase();
-          const hostDataRaw = localStorage.getItem(`host:${code}`);
-          const hostData = hostDataRaw ? JSON.parse(hostDataRaw) : null;
+        const code = (roomId || "").toUpperCase();
+        const hostDataRaw = localStorage.getItem(`host:${code}`);
+        const hostData = hostDataRaw ? JSON.parse(hostDataRaw) : null;
 
-          if (hostData?.hostSecret) {
-            try {
-              await uploadRecordingsAndStoreTranscript({
-                hostSecret: hostData.hostSecret,
-                meetingCode: code,
-              });
-            } catch { }
-          }
+        if (TRANSCRIPTS_ENABLED && hostData?.hostSecret) {
+          try {
+            uploadRecordingsAndStoreTranscript({
+              hostSecret: hostData.hostSecret,
+              meetingCode: code,
+            }).catch(() => { });
+          } catch { }
         } else {
           try {
             stopAllRecorders();
           } catch { }
-          try {
-            recordersRef.current = {};
-          } catch { }
+          recordersRef.current = {};
         }
 
-        await persistHistorySnapshot();
+        persistHistorySnapshot().catch(() => { });
 
         if (socketRef.current?.connected) {
           socketRef.current.emit("end-meeting", roomId);
-          await new Promise((r) => setTimeout(r, 80));
         }
       } else {
         await leaveCall();
         return;
       }
     } catch { }
-    await cleanupAll();
 
-    setTimeout(() => {
-      navigate("/home");
-    }, 50);
+    await cleanupAll();
+    navigate("/home");
   }
 
   useEffect(() => {
@@ -378,5 +362,11 @@ export default function useMeetingLifecycle({
     };
   }, [roomId]);
 
-  return { start, leaveCall, endMeeting, cleanupAll, persistHistorySnapshot };
+  return {
+    start,
+    leaveCall,
+    endMeeting,
+    cleanupAll,
+    persistHistorySnapshot
+  };
 }

@@ -422,7 +422,7 @@ export default function VideoMeet() {
   const emotionSocketRef = useEmotionSocket({
     setEmotionsMap,
   });
-  
+
   const { startPeriodicEmotionCapture, stopPeriodicEmotionCapture } =
     useEmotionCapture({
       socketRef: emotionSocketRef,
