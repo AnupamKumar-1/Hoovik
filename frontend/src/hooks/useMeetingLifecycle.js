@@ -307,6 +307,10 @@ export default function useMeetingLifecycle({
 
         if (TRANSCRIPTS_ENABLED && hostData?.hostSecret) {
           try {
+            stopAllRecorders();
+
+            await new Promise((r) => setTimeout(r, 500));
+
             await uploadRecordingsAndStoreTranscript({
               hostSecret: hostData.hostSecret,
               meetingCode: code,
