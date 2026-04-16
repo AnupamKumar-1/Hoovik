@@ -307,19 +307,21 @@ export default function useMeetingLifecycle({
 
         if (TRANSCRIPTS_ENABLED && hostData?.hostSecret) {
           try {
-            uploadRecordingsAndStoreTranscript({
+            await uploadRecordingsAndStoreTranscript({
               hostSecret: hostData.hostSecret,
               meetingCode: code,
-            }).catch(() => { });
+            });
           } catch { }
         } else {
           try {
             stopAllRecorders();
           } catch { }
-          recordersRef.current = {};
+          try {
+            recordersRef.current = {};
+          } catch { }
         }
 
-        persistHistorySnapshot().catch(() => { });
+        await persistHistorySnapshot();
 
         if (socketRef.current?.connected) {
           socketRef.current.emit("end-meeting", roomId);
@@ -331,6 +333,7 @@ export default function useMeetingLifecycle({
     } catch { }
 
     await cleanupAll();
+
     navigate("/home");
   }
 
