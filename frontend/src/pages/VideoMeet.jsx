@@ -291,7 +291,7 @@ export default function VideoMeet() {
   const spotlightPeerRef = useRef(null);
   const ignoreOfferRef = useRef({});
   const isSettingRemoteAnswerPending = useRef({});
-
+  const [endingMeeting, setEndingMeeting] = useState(false);
   const [remoteStreams, setRemoteStreams] = useState({});
   const [connecting, setConnecting] = useState(true);
   const [muted, setMuted] = useState(false);
@@ -927,7 +927,20 @@ export default function VideoMeet() {
 
         <button
           className={`${styles.iconButton} ${styles.leaveButton}`}
-          onClick={isHost ? endMeeting : leaveCall}
+          onClick={async () => {
+            if (endingMeeting) return;
+            setEndingMeeting(true);
+
+            try {
+              if (isHost) {
+                await endMeeting();
+              } else {
+                await leaveCall();
+              }
+            } finally {
+              setEndingMeeting(false);
+            }
+          }}
           aria-label={isHost ? "End meeting for everyone" : "Leave call"}
           title={isHost ? "End meeting" : "Leave call"}
         >
