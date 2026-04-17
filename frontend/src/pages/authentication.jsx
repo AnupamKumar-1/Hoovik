@@ -118,7 +118,7 @@ export default function Authentication() {
         </div>
       </aside>
 
-      {/* ── RIGHT PANEL ── */}
+      {/* RIGHT PANEL */}
       <main className="au-panel">
         <div className="au-form-card">
 
@@ -213,7 +213,7 @@ export default function Authentication() {
               />
             </div>
 
-            {/* Error */}
+
             {error && (
               <div className="au-error" role="alert">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">

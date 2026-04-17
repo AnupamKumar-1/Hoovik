@@ -302,6 +302,7 @@ function SpotlightCard({
 
       {debouncedIsActive && (
         <div className={styles.activeSpeakerBar}>
+          <span className={styles.activeSpeakerLiveDot} />
           <span>Active Speaker</span>
           <SpotlightWaveBars />
         </div>

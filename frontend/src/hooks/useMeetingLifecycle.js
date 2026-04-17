@@ -298,47 +298,99 @@ export default function useMeetingLifecycle({
     navigate("/home");
   }
 
-  async function endMeeting() {
-    try {
-      if (isHostRef.current) {
-        const code = (roomId || "").toUpperCase();
-        const hostDataRaw = localStorage.getItem(`host:${code}`);
-        const hostData = hostDataRaw ? JSON.parse(hostDataRaw) : null;
+  function runBackgroundTranscript(code, hostSecret, recordersSnapshot) {
+    const speakerMap = {};
+    const currentMeta = participantsMetaRef?.current || [];
+    currentMeta.forEach((p) => {
+      const name =
+        p?.meta?.name ||
+        p?.meta?.displayName ||
+        p?.name ||
+        `Guest-${(p.id || "").slice(0, 6)}`;
+      if (p.id) speakerMap[p.id] = name;
+    });
+    speakerMap["local"] = localStorage.getItem("displayName") || "Host";
 
-        if (TRANSCRIPTS_ENABLED && hostData?.hostSecret) {
-          try {
-            stopAllRecorders();
+    const fd = new FormData();
+    fd.append("meeting_code", code);
+    fd.append("speaker_map", JSON.stringify(speakerMap));
 
-            await new Promise((r) => setTimeout(r, 500));
+    let fileCount = 0;
+    for (const [id, rec] of Object.entries(recordersSnapshot)) {
+      const chunks = rec?.chunks;
+      if (!chunks?.length) continue;
+      const blob = new Blob(chunks, { type: "audio/webm" });
+      fd.append("audio_files", blob, `${id}.webm`);
+      fileCount++;
+    }
 
-            await uploadRecordingsAndStoreTranscript({
-              hostSecret: hostData.hostSecret,
+    if (fileCount === 0) return;
+
+    const token = localStorage.getItem("token");
+
+    fetch(TRANSCRIPT_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "x-host-secret": hostSecret,
+        ...(token ? { "x-user-token": token } : {}),
+      },
+      body: fd,
+    })
+      .then((resp) => {
+        if (!resp?.ok) return;
+        return resp.json();
+      })
+      .then((data) => {
+        if (!data?.success) return;
+        try {
+          const existingRaw = localStorage.getItem(`host:${code}`);
+          const existing = existingRaw ? JSON.parse(existingRaw) : {};
+          localStorage.setItem(
+            `host:${code}`,
+            JSON.stringify({
+              ...existing,
               meetingCode: code,
-            });
-          } catch { }
-        } else {
-          try {
-            stopAllRecorders();
-          } catch { }
-          try {
-            recordersRef.current = {};
-          } catch { }
-        }
+              lastTranscriptAt: new Date().toISOString(),
+            })
+          );
+        } catch { }
+      })
+      .catch(() => { });
+  }
 
-        await persistHistorySnapshot();
+  async function endMeeting() {
+    if (!isHostRef.current) {
+      await leaveCall();
+      return;
+    }
 
-        if (socketRef.current?.connected) {
-          socketRef.current.emit("end-meeting", roomId);
-        }
-      } else {
-        await leaveCall();
-        return;
+    const code = (roomId || "").toUpperCase();
+    const hostDataRaw = localStorage.getItem(`host:${code}`);
+    const hostData = hostDataRaw ? JSON.parse(hostDataRaw) : null;
+
+    try {
+      stopAllRecorders();
+    } catch { }
+
+    const recordersSnapshot = { ...(recordersRef.current || {}) };
+
+    try {
+      if (socketRef.current?.connected) {
+        socketRef.current.emit("end-meeting", roomId);
       }
     } catch { }
+
+    persistHistorySnapshot().catch(() => { });
 
     await cleanupAll();
 
     navigate("/home");
+
+    if (TRANSCRIPTS_ENABLED && hostData?.hostSecret && TRANSCRIPT_ENDPOINT) {
+      setTimeout(() => {
+        runBackgroundTranscript(code, hostData.hostSecret, recordersSnapshot);
+      }, 0);
+    }
   }
 
   useEffect(() => {

@@ -10,7 +10,6 @@ import { useParams, useNavigate } from "react-router-dom";
 import { AuthContext } from "../contexts/AuthContext";
 import useMediaBridge from "../hooks/useMediaBridge";
 import useMeetingLifecycle from "../hooks/useMeetingLifecycle";
-import styles from "../styles/videoComponent.module.css";
 import { TRANSCRIPTS_ENABLED } from "../environment";
 import ParticipantCard from "./ParticipantCard";
 import SpotlightCard from "./SpotlightCard";
@@ -22,18 +21,7 @@ import {
   API_BASE,
   ICE_CONFIG,
 } from "./meetConfig";
-import {
-  FaMicrophone,
-  FaMicrophoneSlash,
-  FaVideo,
-  FaVideoSlash,
-  FaDesktop,
-  FaPhoneSlash,
-  FaComments,
-  FaRegComments,
-} from "react-icons/fa";
 import { motion, AnimatePresence } from "framer-motion";
-import ChatInput from "./ChatInput";
 import useWebRTC from "../hooks/useWebRTC";
 import useSocket from "../hooks/useSocket";
 import useRecording from "../hooks/useRecording";
@@ -41,234 +29,54 @@ import useMediaControls from "../hooks/useMediaControls";
 import EmotionServicePanel from "./EmotionServicePanel";
 import useAudioAnalyzer from "../hooks/useAudioAnalyzer";
 import useEmotionCapture from "../hooks/useEmotionCapture";
+import MeetTopBar from "./MeetTopBar";
+import MeetControlBar from "./MeetControlBar";
+import MeetChatPanel from "./MeetChatPanel";
+import MeetLocalPreview from "./MeetLocalPreview";
+import MobilePanelSheet from "./MobilePanelSheet";
+import s from "../styles/videoComponent.module.css";
 
 const HOST_ONLY_EMOTION = true;
 
-function isValidStream(s) {
+function isValidStream(stream) {
   return (
-    s &&
-    typeof s.getTracks === "function" &&
-    s.getTracks().some((t) => t.readyState === "live")
+    stream &&
+    typeof stream.getTracks === "function" &&
+    stream.getTracks().some((t) => t.readyState === "live")
   );
 }
 
-function useIsScrolledToBottom(ref, threshold = 60) {
-  return useCallback(() => {
-    const el = ref.current;
-    if (!el) return true;
-    return el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
-  }, [ref, threshold]);
+function useIsMobile(bp = 900) {
+  const [val, setVal] = useState(() => window.innerWidth <= bp);
+  useEffect(() => {
+    const h = () => setVal(window.innerWidth <= bp);
+    window.addEventListener("resize", h);
+    return () => window.removeEventListener("resize", h);
+  }, [bp]);
+  return val;
 }
 
-function useIsMobile(breakpoint = 600) {
-  const [isMobile, setIsMobile] = useState(() => window.innerWidth <= breakpoint);
-  useEffect(() => {
-    const handler = () => setIsMobile(window.innerWidth <= breakpoint);
-    window.addEventListener("resize", handler);
-    return () => window.removeEventListener("resize", handler);
-  }, [breakpoint]);
-  return isMobile;
-}
-
-function ChatPanel({
-  chatMessages,
-  participantsMeta,
-  myUserId,
-  retryMessage,
-  sendChatMessage,
-  chatContainerRef,
-  chatEndRef,
-  onClose,
-}) {
-  const isAtBottom = useIsScrolledToBottom(chatContainerRef);
-
-  useEffect(() => {
-    if (isAtBottom()) {
-      chatEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-    }
-  }, [chatMessages, isAtBottom, chatEndRef]);
-
+function EmptyState() {
   return (
-    <motion.aside
-      className={styles.chatRoom}
-      initial={{ opacity: 0, x: 60 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 60 }}
-      transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-      aria-label="Chat panel"
-    >
-      <div className={styles.chatHeader}>
-        <FaRegComments size={13} className={styles.chatHeaderIcon} />
-        <strong>Chat</strong>
-        <div className={styles.chatHeaderCount}>
-          <span className={styles.chatHeaderCountDot} />
-          {participantsMeta.length + 1} in call
-        </div>
-        <button
-          onClick={onClose}
-          aria-label="Close chat"
-          title="Close chat"
-          style={{
-            marginLeft: "8px",
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: "26px",
-            height: "26px",
-            borderRadius: "50%",
-            border: "1px solid rgba(255,255,255,0.08)",
-            background: "transparent",
-            color: "var(--vm-muted-bright)",
-            cursor: "pointer",
-            flexShrink: 0,
-            transition: "background 130ms ease, color 130ms ease",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = "rgba(255,255,255,0.07)";
-            e.currentTarget.style.color = "var(--vm-text)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = "transparent";
-            e.currentTarget.style.color = "var(--vm-muted-bright)";
-          }}
+    <div className={s.emptyState}>
+      <div className={s.emptyOrb} />
+      <div className={s.emptyIcon}>
+        <svg
+          width="26"
+          height="26"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
         >
-          <svg
-            width="10"
-            height="10"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            aria-hidden
-          >
-            <path d="M18 6L6 18M6 6l12 12" />
-          </svg>
-        </button>
+          <path d="M23 7l-7 5 7 5V7z" />
+          <rect x="1" y="5" width="15" height="14" rx="2" />
+        </svg>
       </div>
-
-      <div
-        ref={chatContainerRef}
-        className={styles.chatMessages}
-        role="log"
-        aria-live="polite"
-        aria-label="Chat messages"
-      >
-        {chatMessages.length === 0 && (
-          <div className={styles.chatEmptyState}>
-            <FaRegComments
-              size={20}
-              style={{ opacity: 0.3, color: "var(--vm-muted-bright)" }}
-            />
-            <p className={styles.chatEmptyStateText}>
-              No messages yet.
-              <br />
-              Say hello! 👋
-            </p>
-          </div>
-        )}
-
-        {chatMessages.map((m) => {
-          const isOwn = m.from === myUserId || m.userId === myUserId;
-          return (
-            <motion.div
-              key={m.id}
-              className={`${styles.msgWrapper} ${isOwn ? styles.own : styles.other}`}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.14 }}
-            >
-              {!isOwn && (
-                <div className={styles.msgMeta}>
-                  <span className={styles.msgMetaName}>
-                    {m.meta?.name || "User"}
-                  </span>
-                </div>
-              )}
-              <div
-                className={`${styles.msgBubble} ${isOwn ? styles.msgBubbleOwn : styles.msgBubbleOther
-                  }`}
-              >
-                {m.text}
-              </div>
-              <div className={styles.msgMeta}>
-                {isOwn && (
-                  <span
-                    className={`${styles.msgMetaName} ${styles.msgMetaNameOwn}`}
-                  >
-                    You
-                  </span>
-                )}
-                <span>
-                  {new Date(m.ts).toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </span>
-                {isOwn && (
-                  <>
-                    {m.status === "pending" && (
-                      <span
-                        className={`${styles.msgStatusIcon} ${styles.msgStatusPending}`}
-                        aria-label="Sending"
-                      >
-                        ●
-                      </span>
-                    )}
-                    {m.status === "sent" && (
-                      <span
-                        className={`${styles.msgStatusIcon} ${styles.msgStatusSent}`}
-                        aria-label="Sent"
-                      >
-                        ✓
-                      </span>
-                    )}
-                    {m.status === "failed" && (
-                      <span
-                        className={`${styles.msgStatusIcon} ${styles.msgStatusFailed}`}
-                        onClick={() => retryMessage(m)}
-                        role="button"
-                        tabIndex={0}
-                        title="Retry sending"
-                        aria-label="Send failed — click to retry"
-                        onKeyDown={(e) => e.key === "Enter" && retryMessage(m)}
-                      >
-                        !
-                      </span>
-                    )}
-                  </>
-                )}
-              </div>
-            </motion.div>
-          );
-        })}
-        <div ref={chatEndRef} />
-      </div>
-
-      <div className={styles.chattingArea}>
-        <ChatInput onSend={sendChatMessage} />
-      </div>
-    </motion.aside>
-  );
-}
-
-function EmptyStateIcon() {
-  return (
-    <div className={styles.emptyStateIcon}>
-      <svg
-        width="26"
-        height="26"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        aria-hidden="true"
-      >
-        <path d="M23 7l-7 5 7 5V7z" />
-        <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
-      </svg>
+      <p className={s.emptyTitle}>Waiting for others to join</p>
+      <p className={s.emptySub}>Share your meeting link to get started</p>
     </div>
   );
 }
@@ -291,6 +99,7 @@ export default function VideoMeet() {
   const spotlightPeerRef = useRef(null);
   const ignoreOfferRef = useRef({});
   const isSettingRemoteAnswerPending = useRef({});
+
   const [endingMeeting, setEndingMeeting] = useState(false);
   const [remoteStreams, setRemoteStreams] = useState({});
   const [connecting, setConnecting] = useState(true);
@@ -300,18 +109,21 @@ export default function VideoMeet() {
   const [participantsMeta, setParticipantsMeta] = useState([]);
   const [socketReady, setSocketReady] = useState(0);
   const [spotlightPeerId, setSpotlightPeerId] = useState(null);
-
-  const isMobile = useIsMobile(600);
-
-  const participantsMetaRef = useRef([]);
-  useEffect(() => {
-    participantsMetaRef.current = participantsMeta;
-  }, [participantsMeta]);
-
   const [myId, setMyId] = useState(null);
   const [shareEmotion, setShareEmotion] = useState(false);
   const [emotionsMap, setEmotionsMap] = useState({});
   const [stableSpeakerId, setStableSpeakerId] = useState(null);
+  const [meetDuration, setMeetDuration] = useState(0);
+
+  // Mobile sheet state — "chat" | "emotion" | null
+  const [mobileSheet, setMobileSheet] = useState(null);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const isMobile = useIsMobile(900);
+  const participantsMetaRef = useRef([]);
+  useEffect(() => {
+    participantsMetaRef.current = participantsMeta;
+  }, [participantsMeta]);
 
   const { addToUserHistory } = useContext(AuthContext);
 
@@ -319,7 +131,6 @@ export default function VideoMeet() {
     () => !!localStorage.getItem(`host:${(roomId || "").toUpperCase()}`),
     [roomId]
   );
-
   const myUserId = useMemo(
     () => localStorage.getItem("userId") || myId || "",
     [myId]
@@ -333,16 +144,19 @@ export default function VideoMeet() {
   useEffect(() => {
     videoOffRef.current = videoOff;
   }, [videoOff]);
-
   useEffect(() => {
     activeSpeakerIdRef.current = stableSpeakerId;
   }, [stableSpeakerId]);
 
+  useEffect(() => {
+    const id = setInterval(() => setMeetDuration((d) => d + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
+
   const unwrappedRemoteStreams = useMemo(() => {
     const out = {};
-    for (const [id, entry] of Object.entries(remoteStreams)) {
+    for (const [id, entry] of Object.entries(remoteStreams))
       out[id] = entry?.stream ?? entry;
-    }
     return out;
   }, [remoteStreams]);
 
@@ -365,12 +179,33 @@ export default function VideoMeet() {
     displayName: localStorage.getItem("displayName") ?? undefined,
   });
 
+  // Track unread messages when chat sheet is closed
+  const prevMsgCountRef = useRef(0);
+
+  useEffect(() => {
+    const isChatVisible = isMobile
+      ? mobileSheet === "chat"
+      : chatOpen;
+
+    if (isChatVisible) {
+      setUnreadCount(0);
+      prevMsgCountRef.current = chatMessages.length;
+      return;
+    }
+
+    const newCount = chatMessages.length - prevMsgCountRef.current;
+
+    if (newCount > 0) {
+      setUnreadCount((n) => n + newCount);
+    }
+
+    prevMsgCountRef.current = chatMessages.length;
+  }, [chatMessages.length, isMobile, mobileSheet, chatOpen]);
+
   const participantsMetaMap = useMemo(() => {
     const map = {};
     (participantsMeta || []).forEach((p) => {
-      map[p.id] = {
-        muted: p?.meta?.muted === true,
-      };
+      map[p.id] = { muted: p?.meta?.muted === true };
     });
     return map;
   }, [participantsMeta]);
@@ -419,9 +254,7 @@ export default function VideoMeet() {
     ICE_CONFIG,
   });
 
-  const emotionSocketRef = useEmotionSocket({
-    setEmotionsMap,
-  });
+  const emotionSocketRef = useEmotionSocket({ setEmotionsMap });
 
   const { startPeriodicEmotionCapture, stopPeriodicEmotionCapture } =
     useEmotionCapture({
@@ -448,39 +281,43 @@ export default function VideoMeet() {
     startPeriodicEmotionCapture,
   });
 
-  const { leaveCall, endMeeting, cleanupAll, persistHistorySnapshot } =
-    useMeetingLifecycle({
-      roomId,
-      navigate,
-      socketRef,
-      localStreamRef,
-      localVideoRef,
-      prevLocalStreamRef,
-      pcsRef,
-      participantsMeta,
-      isHost,
-      addToUserHistory,
-      TRANSCRIPTS_ENABLED,
-      TRANSCRIPT_ENDPOINT,
-      API_BASE,
-      createAnalyzerForStream,
-      removeAnalyzer,
-      startRecordingForStream,
-      stopAllRecorders,
-      uploadRecordingsAndStoreTranscript,
-      stopPeriodicEmotionCapture,
-      setConnecting,
-      setParticipantsMeta,
-      setRemoteStreams,
-      recordersRef,
-      makingOfferRef,
-      politeRef,
-      pendingCandidatesRef,
-      ignoreOfferRef,
-      isSettingRemoteAnswerPending,
-      SOCKET_SERVER_URL,
-      onSocketReady: () => setSocketReady((n) => n + 1),
-    });
+  const {
+    leaveCall,
+    endMeeting,
+    cleanupAll,
+    persistHistorySnapshot,
+  } = useMeetingLifecycle({
+    roomId,
+    navigate,
+    socketRef,
+    localStreamRef,
+    localVideoRef,
+    prevLocalStreamRef,
+    pcsRef,
+    participantsMeta,
+    isHost,
+    addToUserHistory,
+    TRANSCRIPTS_ENABLED,
+    TRANSCRIPT_ENDPOINT,
+    API_BASE,
+    createAnalyzerForStream,
+    removeAnalyzer,
+    startRecordingForStream,
+    stopAllRecorders,
+    uploadRecordingsAndStoreTranscript,
+    stopPeriodicEmotionCapture,
+    setConnecting,
+    setParticipantsMeta,
+    setRemoteStreams,
+    recordersRef,
+    makingOfferRef,
+    politeRef,
+    pendingCandidatesRef,
+    ignoreOfferRef,
+    isSettingRemoteAnswerPending,
+    SOCKET_SERVER_URL,
+    onSocketReady: () => setSocketReady((n) => n + 1),
+  });
 
   useEffect(() => {
     cleanupRef.current = cleanupAll;
@@ -501,9 +338,7 @@ export default function VideoMeet() {
     (peerId) => {
       const pc = pcsRef.current[peerId];
       if (pc) {
-        try {
-          pc.close();
-        } catch { }
+        try { pc.close(); } catch { }
         delete pcsRef.current[peerId];
       }
       try {
@@ -511,18 +346,14 @@ export default function VideoMeet() {
         if (rec?.state === "recording") rec.stop();
         delete recordersRef.current[peerId];
       } catch { }
-
       removeAnalyzer(peerId);
       notifyPcsChanged();
-
       setRemoteStreams((prev) => {
         const next = { ...prev };
         delete next[peerId];
         return next;
       });
-
       setStableSpeakerId((prev) => (prev === peerId ? null : prev));
-
       setSpotlightPeerId((prev) => {
         if (prev !== peerId) return prev;
         spotlightPeerRef.current = null;
@@ -534,51 +365,40 @@ export default function VideoMeet() {
 
   useEffect(() => {
     if (speakerTimerRef.current) clearTimeout(speakerTimerRef.current);
-    if (!activeSpeakerId) {
-      setStableSpeakerId(null);
-      return;
-    }
+    if (!activeSpeakerId) { setStableSpeakerId(null); return; }
     setStableSpeakerId(activeSpeakerId);
   }, [activeSpeakerId]);
 
-  useEffect(() => {
-    return () => {
-      if (speakerTimerRef.current) clearTimeout(speakerTimerRef.current);
-    };
-  }, []);
+  useEffect(
+    () => () => { if (speakerTimerRef.current) clearTimeout(speakerTimerRef.current); },
+    []
+  );
 
   useEffect(() => {
     if (!isHost) return;
-    if (shareEmotion) {
-      startPeriodicEmotionCapture({});
-    } else {
-      stopPeriodicEmotionCapture();
-    }
+    if (shareEmotion) startPeriodicEmotionCapture({});
+    else stopPeriodicEmotionCapture();
   }, [shareEmotion, isHost, startPeriodicEmotionCapture, stopPeriodicEmotionCapture]);
 
   useEffect(() => {
     const onKeyDown = (e) => {
       const tag = (e.target?.tagName || "").toUpperCase();
-      const isEditable =
-        tag === "INPUT" || tag === "TEXTAREA" || e.target?.isContentEditable;
-      if (isEditable) return;
-      if (e.key === "m" || e.key === "M") {
+      if (tag === "INPUT" || tag === "TEXTAREA" || e.target?.isContentEditable)
+        return;
+      if (e.key === "m" || e.key === "M")
         toggleMute(muted, setMuted, mutedRef, TRANSCRIPTS_ENABLED, recordersRef);
-      } else if (e.key === "v" || e.key === "V") {
+      else if (e.key === "v" || e.key === "V")
         toggleVideo(videoOffRef.current, setVideoOff);
-      } else if (e.key === "c" || e.key === "C") {
-        setChatOpen((v) => !v);
+      else if (e.key === "c" || e.key === "C") {
+        if (isMobile) setMobileSheet((v) => (v === "chat" ? null : "chat"));
+        else setChatOpen((v) => !v);
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [toggleMute, toggleVideo]);
+  }, [toggleMute, toggleVideo, isMobile]);
 
-  useEffect(() => {
-    return () => {
-      Object.keys(pcsRef.current).forEach((peerId) => closePeer(peerId));
-    };
-  }, []);
+  useEffect(() => () => { Object.keys(pcsRef.current).forEach((pid) => closePeer(pid)); }, []);
 
   useSocket({
     socketRef,
@@ -606,44 +426,44 @@ export default function VideoMeet() {
     socketReady,
   });
 
-  const remoteEntries = useMemo(() => {
-    return Object.entries(unwrappedRemoteStreams)
-      .filter(
-        ([peerId, stream]) =>
-          peerId && peerId !== myId && isValidStream(stream)
-      )
-      .sort(([a], [b]) => a.localeCompare(b));
-  }, [unwrappedRemoteStreams, myId]);
+  const remoteEntries = useMemo(
+    () =>
+      Object.entries(unwrappedRemoteStreams)
+        .filter(
+          ([peerId, stream]) =>
+            peerId && peerId !== myId && isValidStream(stream)
+        )
+        .sort(([a], [b]) => a.localeCompare(b)),
+    [unwrappedRemoteStreams, myId]
+  );
 
   const effectiveSpotlightId = useMemo(() => {
-    if (remoteEntries.length === 0) return null;
-
-    if (spotlightPeerId && remoteEntries.some(([id]) => id === spotlightPeerId)) {
+    if (!remoteEntries.length) return null;
+    if (spotlightPeerId && remoteEntries.some(([id]) => id === spotlightPeerId))
       return spotlightPeerId;
-    }
-
-    if (stableSpeakerId && remoteEntries.some(([id]) => id === stableSpeakerId)) {
+    if (stableSpeakerId && remoteEntries.some(([id]) => id === stableSpeakerId))
       return stableSpeakerId;
-    }
-
     return remoteEntries[0][0];
   }, [remoteEntries, spotlightPeerId, stableSpeakerId]);
 
-  const activeEntry = useMemo(() => {
-    if (!effectiveSpotlightId) return null;
-    return remoteEntries.find(([id]) => id === effectiveSpotlightId) || null;
-  }, [remoteEntries, effectiveSpotlightId]);
-
-  const otherEntries = useMemo(() => {
-    if (!activeEntry) return remoteEntries;
-    return remoteEntries.filter(([id]) => id !== activeEntry[0]);
-  }, [remoteEntries, activeEntry]);
+  const activeEntry = useMemo(
+    () =>
+      !effectiveSpotlightId
+        ? null
+        : remoteEntries.find(([id]) => id === effectiveSpotlightId) || null,
+    [remoteEntries, effectiveSpotlightId]
+  );
+  const otherEntries = useMemo(
+    () =>
+      !activeEntry
+        ? remoteEntries
+        : remoteEntries.filter(([id]) => id !== activeEntry[0]),
+    [remoteEntries, activeEntry]
+  );
 
   const participantMap = useMemo(() => {
     const map = {};
-    participantsMeta.forEach((p) => {
-      map[p.id] = p.meta;
-    });
+    participantsMeta.forEach((p) => { map[p.id] = p.meta; });
     return map;
   }, [participantsMeta]);
 
@@ -659,54 +479,61 @@ export default function VideoMeet() {
     return map;
   }, [participantsMeta, emotionsMap, isHost]);
 
+  const handleLeaveEnd = useCallback(async () => {
+    if (endingMeeting) return;
+    setEndingMeeting(true);
+    try {
+      if (isHost) await endMeeting();
+      else await leaveCall();
+    } finally {
+      setEndingMeeting(false);
+    }
+  }, [endingMeeting, isHost, endMeeting, leaveCall]);
+
+  // Unified chat toggle: desktop uses chatOpen, mobile opens sheet
+  const handleToggleChat = useCallback(() => {
+    if (isMobile) {
+      setMobileSheet((v) => (v === "chat" ? null : "chat"));
+      setUnreadCount(0);
+    } else {
+      setChatOpen((v) => !v);
+    }
+  }, [isMobile]);
+
+  const handleToggleEmotion = useCallback(() => {
+    if (isMobile && isHost) {
+      setShareEmotion((v) => !v);
+      setMobileSheet((v) => (v === "emotion" ? null : "emotion"));
+    } else {
+      setShareEmotion((v) => !v);
+    }
+  }, [isMobile, isHost]);
+
   const multiPartyLayout = remoteEntries.length > 0 && activeEntry;
+  const showEmotionPanel = isHost && shareEmotion && !isMobile;
 
   return (
-    <div className={styles.meetVideoContainer}>
-      <div className={styles.bgSparkles} aria-hidden="true" />
+    <div className={s.shell}>
+      <div className={s.bgMesh} aria-hidden="true" />
 
-      <AnimatePresence>
-        {connecting && (
-          <motion.div
-            className={styles.connecting}
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.2 }}
-            role="status"
-            aria-live="polite"
-          >
-            Connecting…
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <MeetTopBar
+        roomId={roomId}
+        isHost={isHost}
+        duration={meetDuration}
+        participantCount={participantsMeta.length + 1}
+        connecting={connecting}
+      />
 
-      <div className={styles.conferenceWrap}>
-        <div
-          className={styles.conferenceView}
-          aria-live="polite"
-          aria-label="Participants"
-        >
-          {remoteEntries.length === 0 && !connecting && (
-            <div className={styles.emptyState} role="status">
-              <EmptyStateIcon />
-              <span>You're the only one here</span>
-            </div>
-          )}
+      <div className={s.body}>
+        <div className={s.videoArea}>
+          {remoteEntries.length === 0 && !connecting && <EmptyState />}
 
           {multiPartyLayout && (
             <div
-              style={{
-                display: "flex",
-                flexDirection: isMobile ? "column" : "row",
-                width: "100%",
-                height: "100%",
-                gap: 10,
-                minWidth: 0,
-                minHeight: 0,
-              }}
+              className={`${s.stageLayout} ${isMobile ? s.stageLayoutMobile : ""
+                }`}
             >
-              <div style={{ flex: 1, minWidth: 0, minHeight: 0 }}>
+              <div className={s.spotlightWrap}>
                 {activeEntry && (
                   <SpotlightCard
                     key={activeEntry[0]}
@@ -726,15 +553,8 @@ export default function VideoMeet() {
 
               {otherEntries.length > 0 && (
                 <div
-                  className={styles.rightColumn}
-                  style={isMobile ? {
-                    width: "100%",
-                    flexDirection: "row",
-                    height: 90,
-                    overflowX: "auto",
-                    overflowY: "hidden",
-                    flexShrink: 0,
-                  } : undefined}
+                  className={`${s.filmstrip} ${isMobile ? s.filmstripHoriz : ""
+                    }`}
                 >
                   {otherEntries.map(([peerId, stream]) => (
                     <ParticipantCard
@@ -761,199 +581,97 @@ export default function VideoMeet() {
             </div>
           )}
         </div>
+
+        {/* Desktop chat panel */}
+        <AnimatePresence>
+          {chatOpen && !isMobile && (
+            <MeetChatPanel
+              chatMessages={chatMessages}
+              participantsMeta={participantsMeta}
+              myUserId={myUserId}
+              retryMessage={retryMessage}
+              sendChatMessage={sendChatMessage}
+              chatContainerRef={chatContainerRef}
+              chatEndRef={chatEndRef}
+              onClose={() => setChatOpen(false)}
+            />
+          )}
+        </AnimatePresence>
+
+        {/* Desktop emotion panel */}
+        <AnimatePresence>
+          {showEmotionPanel && (
+            <motion.div
+              key="emotion-panel"
+              initial={{ opacity: 0, x: -40 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -40 }}
+              transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+              style={{ position: "absolute", inset: 0, pointerEvents: "none" }}
+            >
+              <div style={{ pointerEvents: "all" }}>
+                <EmotionServicePanel
+                  emotionsMap={socketEmotionMap}
+                  participantsMeta={participantsMeta}
+                  isHost={isHost}
+                  DEBUG_SHOW_EMOTION_FOR_EVERYONE={false}
+                />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
-      <motion.div
-        className={styles.localPreview}
-        initial={{ opacity: 0, scale: 0.92, y: 10 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
-        drag
-        dragMomentum={false}
-        dragElastic={0.06}
-        whileHover={{ scale: 1.03 }}
-        whileDrag={{ scale: 1.04, cursor: "grabbing" }}
-        aria-label="Your local video preview — drag to reposition"
-        title="Your camera preview (drag to move)"
-      >
-        <video
-          ref={localVideoRef}
-          autoPlay
-          muted
-          playsInline
-          aria-label="Your local video"
-          style={{
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-            display: "block",
+      <MeetLocalPreview
+        localVideoRef={localVideoRef}
+        displayName={localStorage.getItem("displayName") || "You"}
+        isHost={isHost}
+        isSpeaking={stableSpeakerId === "local"}
+        muted={muted}
+        videoOff={videoOff}
+        shareEmotion={shareEmotion}
+        onToggleMute={() =>
+          toggleMute(muted, setMuted, mutedRef, TRANSCRIPTS_ENABLED, recordersRef)
+        }
+        onToggleVideo={() => toggleVideo(videoOff, setVideoOff)}
+        onToggleEmotion={handleToggleEmotion}
+      />
+
+      <MeetControlBar
+        muted={muted}
+        videoOff={videoOff}
+        chatOpen={isMobile ? mobileSheet === "chat" : chatOpen}
+        shareEmotion={shareEmotion}
+        isHost={isHost}
+        endingMeeting={endingMeeting}
+        unreadCount={unreadCount}
+        onToggleMute={() =>
+          toggleMute(muted, setMuted, mutedRef, TRANSCRIPTS_ENABLED, recordersRef)
+        }
+        onToggleVideo={() => toggleVideo(videoOff, setVideoOff)}
+        onScreenShare={() => startScreenShare(prevLocalStreamRef)}
+        onToggleChat={handleToggleChat}
+        onToggleEmotion={handleToggleEmotion}
+        onLeaveEnd={handleLeaveEnd}
+      />
+
+      {/* Mobile bottom sheet */}
+      {isMobile && (
+        <MobilePanelSheet
+          activeSheet={mobileSheet}
+          onClose={() => setMobileSheet(null)}
+          onTabChange={(tab) => {
+            setMobileSheet(tab);
+            if (tab === "chat") setUnreadCount(0);
           }}
-        />
-        <div
-          className={styles.youBadge}
-          style={
-            stableSpeakerId === "local"
-              ? { boxShadow: "0 0 12px rgba(14,165,233,0.7)" }
-              : undefined
-          }
-        >
-          {localStorage.getItem("displayName") || "You"}
-          {isHost && (
-            <span
-              style={{
-                marginLeft: 4,
-                fontSize: "0.7em",
-                opacity: 0.75,
-                fontWeight: 600,
-              }}
-            >
-              (Host)
-            </span>
-          )}
-        </div>
-        <div className={styles.previewControls}>
-          <button
-            className={`${styles.iconButton} ${muted ? styles.active : ""}`}
-            onClick={() =>
-              toggleMute(muted, setMuted, mutedRef, TRANSCRIPTS_ENABLED, recordersRef)
-            }
-            aria-label={muted ? "Unmute" : "Mute"}
-            title={muted ? "Unmute" : "Mute"}
-            style={{ minWidth: 30, minHeight: 30, fontSize: "0.82rem", padding: 6 }}
-          >
-            {muted ? <FaMicrophoneSlash /> : <FaMicrophone />}
-          </button>
-          <button
-            className={`${styles.iconButton} ${videoOff ? styles.active : ""}`}
-            onClick={() => toggleVideo(videoOff, setVideoOff)}
-            aria-label={videoOff ? "Turn camera on" : "Turn camera off"}
-            title={videoOff ? "Turn camera on" : "Turn camera off"}
-            style={{ minWidth: 30, minHeight: 30, fontSize: "0.82rem", padding: 6 }}
-          >
-            {videoOff ? <FaVideoSlash /> : <FaVideo />}
-          </button>
-          {isHost && (
-            <button
-              className={`${styles.iconButton} ${shareEmotion ? styles.active : ""}`}
-              onClick={() => setShareEmotion((v) => !v)}
-              aria-pressed={shareEmotion}
-              aria-label={shareEmotion ? "Stop emotion detection" : "Start emotion detection"}
-              title={shareEmotion ? "Stop emotion detection" : "Start emotion detection (host only)"}
-              style={{ minWidth: 30, minHeight: 30, fontSize: 13, padding: 6 }}
-            >
-              😊
-            </button>
-          )}
-        </div>
-      </motion.div>
-
-      <AnimatePresence>
-        {chatOpen && (
-          <ChatPanel
-            chatMessages={chatMessages}
-            participantsMeta={participantsMeta}
-            myUserId={myUserId}
-            retryMessage={retryMessage}
-            sendChatMessage={sendChatMessage}
-            chatContainerRef={chatContainerRef}
-            chatEndRef={chatEndRef}
-            onClose={() => setChatOpen(false)}
-          />
-        )}
-      </AnimatePresence>
-
-      <div
-        className={styles.buttonContainers}
-        role="toolbar"
-        aria-label="Meeting controls"
-      >
-        <button
-          className={`${styles.iconButton} ${muted ? styles.active : ""}`}
-          onClick={() =>
-            toggleMute(muted, setMuted, mutedRef, TRANSCRIPTS_ENABLED, recordersRef)
-          }
-          aria-label={muted ? "Unmute microphone" : "Mute microphone"}
-          title={muted ? "Unmute (M)" : "Mute (M)"}
-          aria-pressed={muted}
-        >
-          {muted ? <FaMicrophoneSlash /> : <FaMicrophone />}
-        </button>
-
-        <button
-          className={`${styles.iconButton} ${videoOff ? styles.active : ""}`}
-          onClick={() => toggleVideo(videoOff, setVideoOff)}
-          aria-label={videoOff ? "Turn camera on" : "Turn camera off"}
-          title={videoOff ? "Camera on (V)" : "Camera off (V)"}
-          aria-pressed={videoOff}
-        >
-          {videoOff ? <FaVideoSlash /> : <FaVideo />}
-        </button>
-
-        <button
-          className={styles.iconButton}
-          onClick={() => startScreenShare(prevLocalStreamRef)}
-          aria-label="Share your screen"
-          title="Share screen"
-        >
-          <FaDesktop />
-        </button>
-
-        <div className={styles.controlDivider} aria-hidden="true" />
-
-        <button
-          className={`${styles.iconButton} ${chatOpen ? styles.iconButtonChatActive : ""}`}
-          onClick={() => setChatOpen((v) => !v)}
-          aria-label={chatOpen ? "Close chat" : "Open chat"}
-          title="Toggle chat (C)"
-          aria-pressed={chatOpen}
-          aria-expanded={chatOpen}
-        >
-          <FaComments />
-        </button>
-
-        {isHost && (
-          <button
-            className={`${styles.iconButton} ${shareEmotion ? styles.active : ""}`}
-            onClick={() => setShareEmotion((v) => !v)}
-            aria-pressed={shareEmotion}
-            aria-label={shareEmotion ? "Stop emotion detection" : "Start emotion detection"}
-            title={shareEmotion ? "Stop emotion detection" : "Start emotion detection (host only)"}
-          >
-            😊
-          </button>
-        )}
-
-        <div className={styles.controlDivider} aria-hidden="true" />
-
-        <button
-          className={`${styles.iconButton} ${styles.leaveButton}`}
-          onClick={async () => {
-            if (endingMeeting) return;
-            setEndingMeeting(true);
-
-            try {
-              if (isHost) {
-                await endMeeting();
-              } else {
-                await leaveCall();
-              }
-            } finally {
-              setEndingMeeting(false);
-            }
-          }}
-          aria-label={isHost ? "End meeting for everyone" : "Leave call"}
-          title={isHost ? "End meeting" : "Leave call"}
-        >
-          <FaPhoneSlash />
-        </button>
-      </div>
-
-      {isHost && (
-        <EmotionServicePanel
-          emotionsMap={socketEmotionMap}
+          showEmotionTab={isHost && shareEmotion}
+          chatMessages={chatMessages}
           participantsMeta={participantsMeta}
+          myUserId={myUserId}
+          retryMessage={retryMessage}
+          sendChatMessage={sendChatMessage}
+          emotionsMap={socketEmotionMap}
           isHost={isHost}
-          DEBUG_SHOW_EMOTION_FOR_EVERYONE={false}
         />
       )}
     </div>

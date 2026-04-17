@@ -25,9 +25,28 @@
   --font-body:      'DM Sans', sans-serif;
 }
 
-@keyframes vmSpin   { to { transform: rotate(360deg); } }
-@keyframes vmFadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes vmBlink  { 0%, 100% { opacity: 1; } 50% { opacity: 0.28; } }
+@keyframes vmSpin   {
+   to {
+     transform: rotate(360deg);
+     }
+    }
+@keyframes vmFadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  } to {
+     opacity: 1;
+     transform: translateY(0);
+    }
+  }
+@keyframes vmBlink  {
+  0%, 100%
+  {
+     opacity: 1;
+    } 50% {
+      opacity: 0.28;
+    }
+  }
 
 .hist-root {
   min-height: 100vh;

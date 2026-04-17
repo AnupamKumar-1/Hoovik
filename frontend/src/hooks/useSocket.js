@@ -176,7 +176,6 @@ export default function useSocket({
       h.current.removeAnalyzer(peerId);
       delete h.current.recordersRef.current[peerId];
 
-      // keep cleanup of emotions map (valid)
       h.current.setEmotionsMap((prev) => {
         const copy = { ...prev };
         delete copy[peerId];

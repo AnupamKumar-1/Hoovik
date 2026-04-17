@@ -9,6 +9,7 @@ const API_BASE = process.env.REACT_APP_API_URL || `${SERVER_BASE}/api/v1`;
 
 const TRANSCRIPT_CACHE_KEY = "tx_cache";
 const TRANSCRIPT_CACHE_TTL = 2 * 60 * 1000;
+const TRANSCRIPTS_PER_PAGE = 5;
 
 async function copyToClipboard(text) {
   try {
@@ -157,6 +158,85 @@ function Snack({ msg, severity, open }) {
   );
 }
 
+function TranscriptItem({ t, isExpanded, onToggle }) {
+  const segments = t.metadata?.segments;
+
+  return (
+    <div className={`hm-tx-item ${isExpanded ? "hm-tx-item-expanded" : ""}`}>
+      <div
+        className="hm-tx-head"
+        onClick={onToggle}
+        role="button"
+        aria-expanded={isExpanded}
+        tabIndex={0}
+        onKeyDown={(e) => e.key === "Enter" && onToggle()}
+      >
+        <div className="hm-tx-head-left">
+          <div className="hm-tx-code-wrap">
+            <span className="hm-tx-dot" />
+            <span className="hm-tx-code">{t.meetingCode}</span>
+          </div>
+          <div className="hm-tx-date">
+            {t.createdAt ? new Date(t.createdAt).toLocaleString(undefined, {
+              month: "short", day: "numeric", hour: "2-digit", minute: "2-digit"
+            }) : "Unknown date"}
+          </div>
+        </div>
+        <div className="hm-tx-head-right">
+          {segments?.length > 0 && (
+            <span className="hm-tx-seg-count">{segments.length} turns</span>
+          )}
+          <svg
+            className={`hm-tx-chevron ${isExpanded ? "hm-tx-chevron-open" : ""}`}
+            width="15" height="15" viewBox="0 0 24 24"
+            fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"
+          >
+            <path d="M6 9l6 6 6-6" />
+          </svg>
+        </div>
+      </div>
+
+      {isExpanded && (
+        <div className="hm-tx-body">
+          <div className="hm-tx-preview">
+            {Array.isArray(segments) && segments.length > 0 ? (
+              segments.map((s, idx) => (
+                <div key={idx} className="hm-tx-segment">
+                  <span className="hm-tx-speaker">{s.speaker}</span>
+                  {s.emoji && <span className="hm-tx-emoji">{s.emoji}</span>}
+                  {s.emotion && <span className="hm-tx-emotion">{s.emotion}</span>}
+                  <span className="hm-tx-seg-text">: {s.text}</span>
+                </div>
+              ))
+            ) : (
+              <span className="hm-tx-raw">{t.transcriptText?.trim() || "(empty transcript)"}</span>
+            )}
+          </div>
+          <div className="hm-tx-actions">
+            <button
+              className="hm-tx-btn hm-tx-btn-dl"
+              onClick={() => {
+                const blob = new Blob([t.transcriptText || ""], { type: "text/plain" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `${t.meetingCode.replace(/[^a-z0-9_-]/gi, "_")}.txt`;
+                a.click();
+                URL.revokeObjectURL(url);
+              }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
+              </svg>
+              Download .txt
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Home() {
   const navigate = useNavigate();
   const { logout } = useContext(AuthContext);
@@ -164,11 +244,14 @@ export default function Home() {
   const [name, setName] = useState(localStorage.getItem("displayName") || "");
   const [room, setRoom] = useState("");
   const [transcripts, setTranscripts] = useState([]);
+  const [txLoading, setTxLoading] = useState(false);
   const [expandedTranscripts, setExpandedTranscripts] = useState({});
+  const [visibleCount, setVisibleCount] = useState(TRANSCRIPTS_PER_PAGE);
   const [snackOpen, setSnackOpen] = useState(false);
   const [snackMsg, setSnackMsg] = useState("");
   const [snackSeverity, setSnackSeverity] = useState("success");
   const isFetchingRef = useRef(false);
+  const prevCountRef = useRef(0);
 
   const loadTranscripts = useCallback(async (bustCache = false) => {
     if (!TRANSCRIPTS_ENABLED) return;
@@ -178,6 +261,7 @@ export default function Home() {
       const cached = getCachedTranscripts();
       if (cached) {
         setTranscripts(cached);
+        prevCountRef.current = cached.length;
         return;
       }
     } else {
@@ -185,48 +269,42 @@ export default function Home() {
     }
 
     isFetchingRef.current = true;
+    if (bustCache) setTxLoading(true);
 
     try {
       const token = localStorage.getItem("token");
-
       const res = await fetch(`${API_BASE}/transcripts?limit=200`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
 
-      if (!res.ok) {
-        console.error("Transcript fetch failed:", res.status);
-        throw new Error(`HTTP ${res.status}`);
-      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
       const data = await res.json();
 
       if (data?.success) {
-        const normalized = (data.transcripts || [])
-          .map(normalizeTranscript)
-          .filter(Boolean);
-
+        const normalized = (data.transcripts || []).map(normalizeTranscript).filter(Boolean);
         const deduped = dedupeByCode(normalized);
 
-        if (deduped.length > 0) {
-          setCachedTranscripts(deduped);
-        }
+        if (deduped.length > 0) setCachedTranscripts(deduped);
 
+        const isNew = deduped.length > prevCountRef.current;
+        if (bustCache && isNew && deduped.length > prevCountRef.current) {
+          showSnack(`${deduped.length - prevCountRef.current} new transcript${deduped.length - prevCountRef.current > 1 ? "s" : ""} available`, "success");
+          setVisibleCount(TRANSCRIPTS_PER_PAGE);
+        }
+        prevCountRef.current = deduped.length;
         setTranscripts(deduped);
       }
     } catch (err) {
       console.error("loadTranscripts error:", err);
     } finally {
       isFetchingRef.current = false;
+      setTxLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    cleanInvalidHosts();
-  }, []);
-
-  useEffect(() => {
-    loadTranscripts();
-  }, [loadTranscripts]);
+  useEffect(() => { cleanInvalidHosts(); }, []);
+  useEffect(() => { loadTranscripts(); }, [loadTranscripts]);
 
   useEffect(() => {
     const handleFocus = () => loadTranscripts(true);
@@ -252,10 +330,7 @@ export default function Home() {
   }
 
   async function createRoom() {
-    if (!name.trim()) {
-      showSnack("Please enter your name first.", "error");
-      return;
-    }
+    if (!name.trim()) { showSnack("Please enter your name first.", "error"); return; }
     try {
       const { code, link } = await createRoomAndGetLink(name);
       await copyToClipboard(link);
@@ -268,28 +343,19 @@ export default function Home() {
   }
 
   async function copyLink() {
-    if (!name.trim()) {
-      showSnack("Enter your name before creating a link", "error");
-      return;
-    }
+    if (!name.trim()) { showSnack("Enter your name before creating a link", "error"); return; }
     try {
       const { link } = await createRoomAndGetLink(name);
       const copied = await copyToClipboard(link);
       setRoom(link);
-      showSnack(
-        copied ? "Link copied to clipboard" : `Copy failed — link: ${link}`,
-        copied ? "success" : "error"
-      );
+      showSnack(copied ? "Link copied to clipboard" : `Copy failed — link: ${link}`, copied ? "success" : "error");
     } catch {
       showSnack("Unable to create room link.", "error");
     }
   }
 
   async function joinRoom() {
-    if (!room.trim()) {
-      showSnack("Enter room code or link", "error");
-      return;
-    }
+    if (!room.trim()) { showSnack("Enter room code or link", "error"); return; }
     const roomId = extractRoomCode(room);
     try {
       const res = await fetch(`${API_BASE}/rooms/${roomId}`);
@@ -303,19 +369,20 @@ export default function Home() {
 
   async function handleLogout() {
     try {
-      if (logout) {
-        await logout(true);
-      } else {
-        localStorage.removeItem("token");
-        navigate("/login");
-      }
+      if (logout) await logout(true);
+      else { localStorage.removeItem("token"); navigate("/login"); }
     } catch { }
-    try {
-      localStorage.removeItem("displayName");
-    } catch { }
+    try { localStorage.removeItem("displayName"); } catch { }
   }
 
+  const toggleExpand = useCallback((key) => {
+    setExpandedTranscripts((prev) => ({ ...prev, [key]: !prev[key] }));
+  }, []);
+
   const displayInitial = (name || "?")[0].toUpperCase();
+  const visibleTranscripts = transcripts.slice(0, visibleCount);
+  const hasMore = visibleCount < transcripts.length;
+  const hiddenCount = transcripts.length - visibleCount;
 
   return (
     <div className="hm-root">
@@ -327,31 +394,19 @@ export default function Home() {
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
               <path
                 d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.89L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"
-                stroke="#38bdf8"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+                stroke="#38bdf8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
               />
             </svg>
           </div>
           <span className="hm-brand-name">SkyMeetAI</span>
         </div>
         <div className="hm-topbar-right">
-          <button
-            className="hm-icon-btn"
-            onClick={() => navigate("/history")}
-            title="History"
-            aria-label="Open history"
-          >
+          <button className="hm-icon-btn" onClick={() => navigate("/history")} title="History" aria-label="Open history">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="M3 3v5h5" />
-              <path d="M21 12a9 9 0 1 1-9-9" />
-              <path d="M12 7v6l4 2" />
+              <path d="M3 3v5h5" /><path d="M21 12a9 9 0 1 1-9-9" /><path d="M12 7v6l4 2" />
             </svg>
           </button>
-          <button className="hm-logout-btn" onClick={handleLogout} aria-label="Sign out">
-            Sign out
-          </button>
+          <button className="hm-logout-btn" onClick={handleLogout} aria-label="Sign out">Sign out</button>
         </div>
       </header>
 
@@ -393,8 +448,7 @@ export default function Home() {
               </div>
               <div className="hm-tip-row">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" strokeWidth="2" strokeLinecap="round" aria-hidden>
-                  <circle cx="12" cy="12" r="10" />
-                  <path d="M12 16v-4M12 8h.01" />
+                  <circle cx="12" cy="12" r="10" /><path d="M12 16v-4M12 8h.01" />
                 </svg>
                 <span>Allow camera &amp; microphone when prompted. Share your link to invite others.</span>
               </div>
@@ -411,7 +465,12 @@ export default function Home() {
             <div className="hm-card-body">
               <div className="hm-field">
                 <label htmlFor="hm-room">Room code or link</label>
-                <input id="hm-room" type="text" value={room} onChange={(e) => setRoom(e.target.value)} placeholder="e.g. XKCD42 or https://…" onKeyDown={(e) => e.key === "Enter" && joinRoom()} />
+                <input
+                  id="hm-room" type="text" value={room}
+                  onChange={(e) => setRoom(e.target.value)}
+                  placeholder="e.g. XKCD42 or https://…"
+                  onKeyDown={(e) => e.key === "Enter" && joinRoom()}
+                />
               </div>
               <button className="hm-btn-full" onClick={joinRoom}>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
@@ -429,9 +488,23 @@ export default function Home() {
               <div className="hm-card-title">Recent transcripts</div>
               <div className="hm-card-sub">From your hosted meetings</div>
             </div>
-            {transcripts.length > 0 && (
-              <span className="hm-tx-badge">{transcripts.length} meetings analyzed</span>
-            )}
+            <div className="hm-tx-header-actions">
+              {transcripts.length > 0 && (
+                <span className="hm-tx-badge">{transcripts.length} meeting{transcripts.length !== 1 ? "s" : ""}</span>
+              )}
+              <button
+                className={`hm-tx-refresh-btn ${txLoading ? "hm-tx-refresh-spinning" : ""}`}
+                onClick={() => loadTranscripts(true)}
+                title="Refresh transcripts"
+                aria-label="Refresh transcripts"
+                disabled={txLoading}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                  <path d="M1 4v6h6" /><path d="M23 20v-6h-6" />
+                  <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15" />
+                </svg>
+              </button>
+            </div>
           </div>
 
           <div className="hm-divider" />
@@ -440,8 +513,7 @@ export default function Home() {
             <div className="hm-tx-notice hm-tx-notice-warn">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
                 <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-                <line x1="12" y1="9" x2="12" y2="13" />
-                <line x1="12" y1="17" x2="12.01" y2="17" />
+                <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
               </svg>
               <div>
                 <p>Transcript service unavailable on this build.</p>
@@ -450,7 +522,7 @@ export default function Home() {
             </div>
           )}
 
-          {transcripts.length === 0 && TRANSCRIPTS_ENABLED && (
+          {transcripts.length === 0 && TRANSCRIPTS_ENABLED && !txLoading && (
             <div className="hm-tx-empty">
               <div className="hm-tx-empty-icon" aria-hidden>
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="1.5" strokeLinecap="round">
@@ -462,70 +534,55 @@ export default function Home() {
             </div>
           )}
 
-          {transcripts.map((t, i) => {
-            const key = getTranscriptKey(t, i);
-            const isExpanded = !!expandedTranscripts[key];
-            const segments = t.metadata?.segments;
+          {txLoading && transcripts.length === 0 && (
+            <div className="hm-tx-loading">
+              <div className="hm-tx-loading-dots">
+                <span /><span /><span />
+              </div>
+            </div>
+          )}
 
-            return (
-              <div key={key} className="hm-tx-item">
-                <div
-                  className="hm-tx-head"
-                  onClick={() => setExpandedTranscripts((prev) => ({ ...prev, [key]: !prev[key] }))}
-                  role="button"
-                  aria-expanded={isExpanded}
-                  tabIndex={0}
-                  onKeyDown={(e) => e.key === "Enter" && setExpandedTranscripts((prev) => ({ ...prev, [key]: !prev[key] }))}
+          <div className="hm-tx-list">
+            {visibleTranscripts.map((t, i) => {
+              const key = getTranscriptKey(t, i);
+              return (
+                <TranscriptItem
+                  key={key}
+                  t={t}
+                  isExpanded={!!expandedTranscripts[key]}
+                  onToggle={() => toggleExpand(key)}
+                />
+              );
+            })}
+          </div>
+
+          {(hasMore || visibleCount > TRANSCRIPTS_PER_PAGE) && (
+            <div className="hm-tx-pagination">
+              {hasMore && (
+                <button
+                  className="hm-tx-load-more"
+                  onClick={() => setVisibleCount((v) => v + TRANSCRIPTS_PER_PAGE)}
                 >
-                  <div>
-                    <div className="hm-tx-code">{t.meetingCode}</div>
-                    <div className="hm-tx-date">{t.createdAt ? new Date(t.createdAt).toLocaleString() : "Unknown date"}</div>
-                  </div>
-                  <svg className={`hm-tx-chevron ${isExpanded ? "hm-tx-chevron-open" : ""}`} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
                     <path d="M6 9l6 6 6-6" />
                   </svg>
-                </div>
-
-                {isExpanded && (
-                  <div className="hm-tx-body">
-                    <div className="hm-tx-preview">
-                      {Array.isArray(segments) && segments.length > 0 ? (
-                        segments.map((s, idx) => (
-                          <div key={idx} className="hm-tx-segment">
-                            <span className="hm-tx-speaker">{s.speaker}</span>
-                            {s.emoji && <span>{s.emoji}</span>}
-                            {s.emotion && <span className="hm-tx-emotion">({s.emotion})</span>}
-                            <span>: {s.text}</span>
-                          </div>
-                        ))
-                      ) : (
-                        t.transcriptText?.trim() || "(empty transcript)"
-                      )}
-                    </div>
-                    <div className="hm-tx-actions">
-                      <button
-                        className="hm-tx-btn hm-tx-btn-dl"
-                        onClick={() => {
-                          const blob = new Blob([t.transcriptText || ""], { type: "text/plain" });
-                          const url = URL.createObjectURL(blob);
-                          const a = document.createElement("a");
-                          a.href = url;
-                          a.download = `${t.meetingCode.replace(/[^a-z0-9_-]/gi, "_")}.txt`;
-                          a.click();
-                          URL.revokeObjectURL(url);
-                        }}
-                      >
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
-                          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
-                        </svg>
-                        Download .txt
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
+                  Show {Math.min(hiddenCount, TRANSCRIPTS_PER_PAGE)} more
+                  <span className="hm-tx-remaining">({hiddenCount} remaining)</span>
+                </button>
+              )}
+              {visibleCount > TRANSCRIPTS_PER_PAGE && (
+                <button
+                  className="hm-tx-collapse"
+                  onClick={() => { setVisibleCount(TRANSCRIPTS_PER_PAGE); setExpandedTranscripts({}); }}
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                    <path d="M18 15l-6-6-6 6" />
+                  </svg>
+                  Collapse
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

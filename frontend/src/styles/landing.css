@@ -419,17 +419,24 @@
 
 .lp-vid-bar {
   position: absolute;
-  bottom: 8px;
-  left: 8px;
-  right: 8px;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+
   display: flex;
   align-items: center;
-  gap: 6px;
-  background: rgba(4, 8, 15, 0.7);
+  gap: 7px;
+
+  padding: 5px 12px;
+
+  background: rgba(14,165,233,0.12);
+  border: 1px solid rgba(14,165,233,0.30);
+  border-radius: 100px;
+
   backdrop-filter: blur(8px);
-  border-radius: 8px;
-  padding: 5px 8px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+
+  z-index: 5;
+  white-space: nowrap;
 }
 
 .lp-live-dot {
