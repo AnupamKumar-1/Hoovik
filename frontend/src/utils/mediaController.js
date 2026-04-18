@@ -9,25 +9,24 @@ import {
   replaceTrackInPeers,
   stopOutgoingVideoToPeers,
   restoreOutgoingVideoToPeers,
-  replaceLocalTrack,
   stopAndRemoveTracks,
   clearPreviewIfNoTracks,
   refreshSafariPreview,
   runExternalCleaners,
 } from "./mediaControllerUtils";
 
-const TOGGLE_TIMEOUT_MS = 15_000;
+const TOGGLE_TIMEOUT_MS = 12_000;
 
 let localStream = null;
 let socketRef = null;
 let pcsRef = {};
 let localVideoEl = null;
 let localMirrorEnabled = false;
-let preferPeerPlaceholder = false;
 let togglingAudio = false;
 let togglingVideo = false;
 let _placeholderTrack = null;
 let _placeholderStream = null;
+let _onLocalStreamChange = null;
 
 const remoteVideoEls = new Map();
 
@@ -54,6 +53,32 @@ function _ctx() {
   };
 }
 
+function _notifyStreamChange(stream) {
+  try {
+    if (_onLocalStreamChange) _onLocalStreamChange(stream);
+  } catch { }
+}
+
+function _applyStreamToPreview() {
+  if (!localVideoEl) return;
+  try {
+    syncPreview({
+      localVideoEl,
+      localStream,
+      placeholderStream: _placeholderStream,
+      localMirrorEnabled,
+    });
+  } catch { }
+  if (isSafari()) {
+    refreshSafariPreview({
+      localVideoEl,
+      localStream,
+      placeholderStream: _placeholderStream,
+      localMirrorEnabled,
+    });
+  }
+}
+
 function _safeEmit(event, payload) {
   try {
     if (!socketRef) return;
@@ -62,16 +87,47 @@ function _safeEmit(event, payload) {
 }
 
 async function _getUserMediaWithTimeout(constraints) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), TOGGLE_TIMEOUT_MS);
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia(constraints);
-    return stream;
-  } finally {
-    clearTimeout(timeout);
-  }
+  const timeout = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error("getUserMedia timeout")), TOGGLE_TIMEOUT_MS)
+  );
+  return Promise.race([navigator.mediaDevices.getUserMedia(constraints), timeout]);
 }
 
+function _getTrack(kind) {
+  if (!localStream) return null;
+  const tracks = kind === "audio"
+    ? localStream.getAudioTracks()
+    : localStream.getVideoTracks();
+  return tracks[0] ?? null;
+}
+
+function _setTransceiversSendrecv() {
+  Object.values(pcsRef ?? {})
+    .filter((pc) => pc && pc.connectionState !== "closed")
+    .forEach((pc) => {
+      try {
+        pc.getTransceivers?.().forEach((tx) => {
+          try {
+            if (tx.kind === "video" || tx.sender?.track?.kind === "video") {
+              try { tx.direction = "sendrecv"; } catch { }
+            }
+          } catch { }
+        });
+      } catch { }
+    });
+}
+
+function _cleanupPlaceholder() {
+  if (_placeholderTrack) {
+    stopAndCleanupPlaceholder(_placeholderTrack);
+    _placeholderTrack = null;
+  }
+  _placeholderStream = null;
+}
+
+export function setOnLocalStreamChange(cb) {
+  _onLocalStreamChange = typeof cb === "function" ? cb : null;
+}
 
 export function setExternalCleaners(refs = {}) {
   externalCleaners.recordersRef = refs.recordersRef ?? null;
@@ -80,20 +136,12 @@ export function setExternalCleaners(refs = {}) {
   externalCleaners.prevLocalStreamRef = refs.prevLocalStreamRef ?? null;
 }
 
-export function setPreferPeerPlaceholder(enabled = false) {
-  preferPeerPlaceholder = !!enabled;
-}
-
 export function setSocketRef(socket) {
   socketRef = socket ?? null;
 }
 
 export function setPeerConnections(peerConnections) {
-  if (!peerConnections || typeof peerConnections !== "object") {
-    pcsRef = {};
-    return;
-  }
-  pcsRef = peerConnections;
+  pcsRef = peerConnections && typeof peerConnections === "object" ? peerConnections : {};
 }
 
 export function setLocalMirrorEnabled(enabled) {
@@ -103,28 +151,8 @@ export function setLocalMirrorEnabled(enabled) {
 
 export function setLocalStream(stream) {
   localStream = stream ?? null;
-  if (!localVideoEl) return;
-  try {
-    syncPreview({
-      localVideoEl,
-      localStream,
-      placeholderStream: _placeholderStream,
-      localMirrorEnabled,
-    });
-  } catch (err) {
-    console.warn(
-      "[mediaController] setLocalStream: failed to update preview:",
-      err
-    );
-  }
-  if (isSafari()) {
-    refreshSafariPreview({
-      localVideoEl,
-      localStream,
-      placeholderStream: _placeholderStream,
-      localMirrorEnabled,
-    });
-  }
+  _notifyStreamChange(localStream);
+  _applyStreamToPreview();
 }
 
 export function setVideoElement(videoEl) {
@@ -142,9 +170,7 @@ export function setVideoElement(videoEl) {
       localMirrorEnabled,
     });
     safePlay(localVideoEl);
-  } catch (err) {
-    console.warn("[mediaController] setVideoElement: attach failed:", err);
-  }
+  } catch { }
   if (isSafari()) {
     refreshSafariPreview({
       localVideoEl,
@@ -155,20 +181,10 @@ export function setVideoElement(videoEl) {
   }
 }
 
-export function initMediaController(
-  stream,
-  socket,
-  peerConnections = {},
-  videoElement = null
-) {
-  localStream = stream ?? localStream;
-  socketRef = socket ?? socketRef;
-  pcsRef = peerConnections ?? pcsRef;
-
+export function initMediaController(stream, socket, peerConnections = {}, videoElement = null) {
   localStream = stream ?? null;
   socketRef = socket ?? null;
   pcsRef = peerConnections ?? {};
-
   if (process.env.NODE_ENV !== "production") {
     window.__MEDIA_CTRL = {
       getLocalStream: _getLocalStream,
@@ -176,26 +192,19 @@ export function initMediaController(
       forceRelease: forceReleaseEverything,
     };
   }
-
-  if (videoElement) {
-    setVideoElement(videoElement);
-  }
+  if (videoElement) setVideoElement(videoElement);
 }
 
 export function resetMediaController() {
-  if (_placeholderTrack) {
-    stopAndCleanupPlaceholder(_placeholderTrack);
-    _placeholderTrack = null;
-  }
-  _placeholderStream = null;
+  _cleanupPlaceholder();
   localStream = null;
   socketRef = null;
   pcsRef = {};
   localVideoEl = null;
   localMirrorEnabled = false;
-  preferPeerPlaceholder = false;
   togglingAudio = false;
   togglingVideo = false;
+  _onLocalStreamChange = null;
   remoteVideoEls.clear();
   externalCleaners = {
     recordersRef: null,
@@ -212,9 +221,7 @@ export function registerRemoteVideoElement(peerId, videoEl) {
     videoEl.autoplay = true;
     videoEl.playsInline = true;
     enforceVideoMirrorBehavior(videoEl, { mirror: false });
-  } catch (err) {
-    console.warn("[mediaController] registerRemoteVideoElement failed:", err);
-  }
+  } catch { }
 }
 
 export function unregisterRemoteVideoElement(peerId) {
@@ -243,111 +250,119 @@ export function attachRemoteStream(peerId, stream) {
       if (ph) ph.style.display = "flex";
     }
     enforceVideoMirrorBehavior(el, { mirror: false });
-  } catch (err) {
-    console.warn("[mediaController] attachRemoteStream failed:", err);
-  }
+  } catch { }
 }
-
 
 export async function toggleAudio(currentMuted) {
   if (togglingAudio) return currentMuted;
   togglingAudio = true;
   try {
-    const newMuted = !currentMuted;
-    if (newMuted) {
-      stopAndRemoveTracks("audio", _ctx());
-      runExternalCleaners("audio", { externalCleaners, localStream });
-      // _safeEmit("update-participant-state", { muted: true });
-      if (isSafari()) {
-        refreshSafariPreview({
-          localVideoEl,
-          localStream,
-          placeholderStream: _placeholderStream,
-          localMirrorEnabled,
-        });
-      }
-      return true;
-    }
+    const wantMuted = !currentMuted;
 
-    let acquired;
-    try {
-      acquired = await _getUserMediaWithTimeout({ audio: true });
-    } catch (err) {
-      console.warn(
-        "[mediaController] toggleAudio: getUserMedia(audio) failed:",
-        err
-      );
-      return currentMuted;
-    }
-
-    const newTrack = acquired.getAudioTracks()[0];
-    if (!newTrack) {
-      acquired.getTracks().forEach((t) => { try { t.stop(); } catch { } });
-      return currentMuted;
-    }
-
-    try {
-      await replaceTrackInPeers(newTrack, "audio", { pcsRef, localStream });
-      replaceLocalTrack(newTrack, "audio", _ctx());
-      //_safeEmit("update-participant-state", { muted: false });
-      if (isSafari()) {
-        refreshSafariPreview({
-          localVideoEl,
-          localStream,
-          placeholderStream: _placeholderStream,
-          localMirrorEnabled,
-        });
-      }
-      return false;
-    } catch (err) {
-      console.warn("[mediaController] toggleAudio: attach failed:", err);
-      try { newTrack.stop(); } catch { }
-      return currentMuted;
-    } finally {
-      acquired.getTracks().forEach((t) => {
-        const present = localStream?.getTracks().some((lt) => lt.id === t.id);
-        if (!present) try { t.stop(); } catch { }
-      });
+    if (wantMuted) {
+      return await _turnAudioOff();
+    } else {
+      return await _turnAudioOn(currentMuted);
     }
   } finally {
     togglingAudio = false;
   }
 }
 
+async function _turnAudioOff() {
+  const track = _getTrack("audio");
+  if (track) {
+    try { track.stop(); } catch { }
+    try { localStream?.removeTrack(track); } catch { }
+  }
+
+  await replaceTrackInPeers(null, "audio", { pcsRef, localStream });
+
+  runExternalCleaners("audio", { externalCleaners, localStream });
+
+  if (isSafari()) _applyStreamToPreview();
+
+  _safeEmit("update-participant-state", { muted: true });
+  return true;
+}
+
+async function _turnAudioOn(currentMuted) {
+  let acquired;
+  try {
+    acquired = await _getUserMediaWithTimeout({ audio: true });
+  } catch {
+    return currentMuted;
+  }
+
+  const newTrack = acquired.getAudioTracks()[0];
+  if (!newTrack) {
+    acquired.getTracks().forEach((t) => { try { t.stop(); } catch { } });
+    return currentMuted;
+  }
+
+  try {
+    const stale = _getTrack("audio");
+    if (stale) {
+      try { stale.stop(); } catch { }
+      try { localStream?.removeTrack(stale); } catch { }
+    }
+
+    if (!localStream) {
+      localStream = new MediaStream([newTrack]);
+      _notifyStreamChange(localStream);
+    } else {
+      try {
+        localStream.addTrack(newTrack);
+      } catch {
+        localStream = new MediaStream([...localStream.getVideoTracks(), newTrack]);
+        _notifyStreamChange(localStream);
+      }
+    }
+
+    newTrack.enabled = true;
+    attachTrackEndHandler(newTrack, "audio", _ctx());
+    await replaceTrackInPeers(newTrack, "audio", { pcsRef, localStream });
+
+    if (isSafari()) _applyStreamToPreview();
+
+    _safeEmit("update-participant-state", { muted: false });
+    return false;
+  } catch {
+    try { newTrack.stop(); } catch { }
+    return currentMuted;
+  } finally {
+    acquired.getTracks().forEach((t) => {
+      const present = localStream?.getTracks().some((lt) => lt.id === t.id);
+      if (!present) try { t.stop(); } catch { }
+    });
+  }
+}
 
 export async function toggleVideo(currentVideoOff, { usePlaceholder = false } = {}) {
   if (togglingVideo) return currentVideoOff;
   togglingVideo = true;
   try {
-    const newVideoOff = !currentVideoOff;
-
-    if (!navigator?.mediaDevices || !localStream) {
-      _safeEmit("update-participant-state", { video: !newVideoOff });
-      return newVideoOff;
+    const wantVideoOff = !currentVideoOff;
+    if (!navigator?.mediaDevices) {
+      _safeEmit("update-participant-state", { video: !wantVideoOff });
+      return wantVideoOff;
     }
-
-    if (newVideoOff) {
-      return await _turnVideoOff({ usePlaceholder });
-    }
-
-    return await _turnVideoOn(currentVideoOff);
+    return wantVideoOff
+      ? await _turnVideoOff()
+      : await _turnVideoOn(currentVideoOff);
   } finally {
     togglingVideo = false;
   }
 }
 
-async function _turnVideoOff({ usePlaceholder }) {
-
-  if (!localStream) {
-    _safeEmit("update-participant-state", { video: false });
-    return true;
+async function _turnVideoOff() {
+  const track = _getTrack("video");
+  if (track && !track.__isPlaceholder) {
+    try { track.stop(); } catch { }
+    try { localStream?.removeTrack(track); } catch { }
   }
 
-  if (_placeholderTrack) {
-    stopAndCleanupPlaceholder(_placeholderTrack);
-    _placeholderTrack = null;
-    _placeholderStream = null;
-  }
+  _cleanupPlaceholder();
 
   _placeholderTrack = createPlaceholderVideoTrack();
   _placeholderStream = _placeholderTrack?.__placeholderStream ?? null;
@@ -361,32 +376,14 @@ async function _turnVideoOff({ usePlaceholder }) {
     });
   }
 
-  const shouldUsePlaceholder = usePlaceholder || preferPeerPlaceholder;
-
-  if (shouldUsePlaceholder && _placeholderTrack) {
-    try {
-      await replaceTrackInPeers(_placeholderTrack, "video", { pcsRef, localStream });
-    } catch {
-      await stopOutgoingVideoToPeers({ pcsRef });
-    }
-  } else {
+  try {
+    await replaceTrackInPeers(_placeholderTrack, "video", { pcsRef, localStream });
+  } catch {
     await stopOutgoingVideoToPeers({ pcsRef });
   }
 
   if (isSafari()) {
     await _safariMicSwap();
-  }
-
-  try {
-    localStream.getVideoTracks?.().forEach((t) => {
-      try { t.stop(); } catch { }
-      try { localStream.removeTrack(t); } catch { }
-    });
-  } catch { }
-
-  runExternalCleaners("video", { externalCleaners, localStream });
-
-  if (isSafari()) {
     clearPreviewIfNoTracks({ localStream, localVideoEl });
     refreshSafariPreview({
       localVideoEl,
@@ -396,6 +393,7 @@ async function _turnVideoOff({ usePlaceholder }) {
     });
   }
 
+  runExternalCleaners("video", { externalCleaners, localStream });
   _safeEmit("update-participant-state", { video: false });
   return true;
 }
@@ -404,8 +402,7 @@ async function _turnVideoOn(currentVideoOff) {
   let acquired = null;
   try {
     acquired = await _getUserMediaWithTimeout({ video: true });
-  } catch (err) {
-    console.warn("[mediaController] toggleVideo ON: getUserMedia failed:", err);
+  } catch {
     return currentVideoOff;
   }
 
@@ -416,64 +413,42 @@ async function _turnVideoOn(currentVideoOff) {
   }
 
   try {
-    if (_placeholderTrack) {
-      stopAndCleanupPlaceholder(_placeholderTrack);
-      _placeholderTrack = null;
-    }
-    if (_placeholderStream && localVideoEl) {
+    _cleanupPlaceholder();
+
+    if (localVideoEl) {
       try { localVideoEl.srcObject = null; } catch { }
     }
-    _placeholderStream = null;
 
-
-    let mergedStream;
-    try {
-      if (localStream?.getAudioTracks?.().length > 0) {
-        try {
-          localStream.addTrack(newTrack);
-          mergedStream = localStream;
-        } catch {
-          mergedStream = new MediaStream([
-            ...localStream.getAudioTracks(),
-            newTrack,
-          ]);
-        }
-      } else {
-        mergedStream = new MediaStream([newTrack]);
-      }
-    } catch (err) {
-      console.warn(
-        "[mediaController] toggleVideo ON: building merged stream failed:",
-        err
-      );
-      try { newTrack.stop(); } catch { }
-      return currentVideoOff;
+    const existingVideo = _getTrack("video");
+    if (existingVideo) {
+      try { existingVideo.stop(); } catch { }
+      try { localStream?.removeTrack(existingVideo); } catch { }
     }
 
-    localStream = mergedStream;
+    if (!localStream) {
+      localStream = new MediaStream([newTrack]);
+      _notifyStreamChange(localStream);
+    } else {
+      try {
+        localStream.addTrack(newTrack);
+      } catch {
+        localStream = new MediaStream([...localStream.getAudioTracks(), newTrack]);
+        _notifyStreamChange(localStream);
+      }
+    }
+
+    newTrack.enabled = true;
     attachTrackEndHandler(newTrack, "video", _ctx());
 
     await replaceTrackInPeers(newTrack, "video", { pcsRef, localStream });
+    _setTransceiversSendrecv();
 
-    Object.values(pcsRef ?? {})
-      .filter((pc) => pc && pc.connectionState !== "closed")
-      .forEach((pc) => {
-        try {
-          pc.getTransceivers?.().forEach((tx) => {
-            try {
-              if (
-                tx.kind === "video" ||
-                tx.sender?.track?.kind === "video"
-              ) {
-                try { tx.direction = "sendrecv"; } catch { }
-              }
-            } catch { }
-          });
-        } catch { }
-      });
-
-
-    setLocalStream(localStream);
+    syncPreview({
+      localVideoEl,
+      localStream,
+      placeholderStream: null,
+      localMirrorEnabled,
+    });
 
     if (isSafari()) {
       refreshSafariPreview({
@@ -486,8 +461,7 @@ async function _turnVideoOn(currentVideoOff) {
 
     _safeEmit("update-participant-state", { video: true });
     return false;
-  } catch (err) {
-    console.warn("[mediaController] toggleVideo ON: failed:", err);
+  } catch {
     try { newTrack.stop(); } catch { }
     return currentVideoOff;
   } finally {
@@ -505,12 +479,18 @@ async function _safariMicSwap() {
     acquired = await _getUserMediaWithTimeout({ audio: true });
     const micTrack = acquired.getAudioTracks()[0];
     if (micTrack) {
+      const old = _getTrack("audio");
+      if (old) {
+        try { old.stop(); } catch { }
+        try { localStream.removeTrack(old); } catch { }
+      }
+      try { localStream.addTrack(micTrack); } catch { }
+      micTrack.enabled = true;
       await replaceTrackInPeers(micTrack, "audio", { pcsRef, localStream });
-      replaceLocalTrack(micTrack, "audio", _ctx());
+      attachTrackEndHandler(micTrack, "audio", _ctx());
     }
-  } catch (err) {
-    console.warn("[mediaController] Safari mic swap failed (non-fatal):", err);
-  } finally {
+  } catch { }
+  finally {
     acquired?.getTracks().forEach((t) => {
       const present = localStream?.getTracks().some((lt) => lt.id === t.id);
       if (!present) try { t.stop(); } catch { }
@@ -518,17 +498,13 @@ async function _safariMicSwap() {
   }
 }
 
-function _stopAllVideoTracks() {
+export function stopAllVideoAndCleanup() {
   try {
     localStream?.getVideoTracks?.().forEach((t) => {
       if (!t.__isPlaceholder) try { t.stop(); } catch { }
     });
   } catch { }
-
-  if (localVideoEl) {
-    try { localVideoEl.srcObject = null; } catch { }
-  }
-
+  if (localVideoEl) try { localVideoEl.srcObject = null; } catch { }
   try {
     Object.values(pcsRef ?? {})
       .filter((pc) => pc && pc.connectionState !== "closed")
@@ -543,12 +519,7 @@ function _stopAllVideoTracks() {
         });
       });
   } catch { }
-
   try { externalCleaners.removeAnalyzerFn?.("video"); } catch { }
-}
-
-export function stopAllVideoAndCleanup() {
-  _stopAllVideoTracks();
 }
 
 export function forceReleaseEverything() {
@@ -568,9 +539,7 @@ export function forceReleaseEverything() {
       delete pcsRef[peerId];
     });
   } catch { }
-
   runExternalCleaners("video", { externalCleaners, localStream });
-
   if (localVideoEl) {
     try {
       localStream?.getTracks?.().forEach((t) => {

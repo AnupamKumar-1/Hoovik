@@ -3,8 +3,11 @@ import io from "socket.io-client";
 import {
   initMediaController,
   setExternalCleaners,
+  resetMediaController,
 } from "../utils/mediaController";
 import { notifyLocalStreamReady } from "./useWebRTC";
+
+const _activeRooms = new Set();
 
 export default function useMeetingLifecycle({
   roomId,
@@ -40,7 +43,7 @@ export default function useMeetingLifecycle({
 }) {
   const participantsMetaRef = useRef(participantsMeta);
   const isHostRef = useRef(isHost);
-  const startedRef = useRef(false);
+  const instanceKey = useRef(`${roomId}:${Date.now()}:${Math.random()}`);
 
   useEffect(() => {
     participantsMetaRef.current = participantsMeta;
@@ -72,31 +75,21 @@ export default function useMeetingLifecycle({
   }, [roomId, addToUserHistory]);
 
   const cleanupAll = useCallback(async () => {
+    _activeRooms.delete(instanceKey.current);
+
     try {
       socketRef.current?.removeAllListeners?.();
       socketRef.current?.disconnect();
     } catch { }
-    if (socketRef && "current" in socketRef) {
-      socketRef.current = null;
-    }
+    if (socketRef && "current" in socketRef) socketRef.current = null;
 
-    try {
-      window.myId = null;
-    } catch { }
+    try { window.myId = null; } catch { }
 
-    try {
-      localStreamRef.current?.getTracks?.().forEach((t) => t.stop());
-    } catch { }
-
-    try {
-      prevLocalStreamRef.current?.getTracks?.().forEach((t) => t.stop());
-    } catch { }
-
+    try { localStreamRef.current?.getTracks?.().forEach((t) => t.stop()); } catch { }
+    try { prevLocalStreamRef.current?.getTracks?.().forEach((t) => t.stop()); } catch { }
     try {
       const prev = window.__previousLocalStreamForToggle;
-      if (prev?.getTracks) {
-        prev.getTracks().forEach((t) => t.stop());
-      }
+      if (prev?.getTracks) prev.getTracks().forEach((t) => t.stop());
       window.__previousLocalStreamForToggle = null;
     } catch { }
 
@@ -124,9 +117,7 @@ export default function useMeetingLifecycle({
     pcsRef.current = {};
 
     const resetRef = (ref) => {
-      if (!ref) return;
-      if (typeof ref !== "object") return;
-      if (!("current" in ref)) return;
+      if (!ref || typeof ref !== "object" || !("current" in ref)) return;
       ref.current = {};
     };
 
@@ -140,11 +131,9 @@ export default function useMeetingLifecycle({
     setRemoteStreams({});
     setParticipantsMeta([]);
 
-    try {
-      stopPeriodicEmotionCapture();
-    } catch { }
+    try { stopPeriodicEmotionCapture(); } catch { }
 
-    startedRef.current = false;
+    resetMediaController();
   }, [
     socketRef,
     localStreamRef,
@@ -156,15 +145,16 @@ export default function useMeetingLifecycle({
     stopPeriodicEmotionCapture,
   ]);
 
-  async function start() {
+  async function start(key) {
+    if (_activeRooms.has(key)) return;
+    _activeRooms.add(key);
+
     try {
       setConnecting(true);
       pcsRef.current = {};
 
       const resetRef = (ref) => {
-        if (!ref) return;
-        if (typeof ref !== "object") return;
-        if (!("current" in ref)) return;
+        if (!ref || typeof ref !== "object" || !("current" in ref)) return;
         ref.current = {};
       };
 
@@ -174,81 +164,78 @@ export default function useMeetingLifecycle({
       resetRef(ignoreOfferRef);
       resetRef(isSettingRemoteAnswerPending);
 
+      if (!_activeRooms.has(key)) return;
+
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: true,
         video: { width: { ideal: 1280 }, height: { ideal: 720 } },
       });
 
+      if (!_activeRooms.has(key)) {
+        stream.getTracks().forEach((t) => t.stop());
+        return;
+      }
+
       localStreamRef.current = stream;
 
       if (localVideoRef.current) {
+        localVideoRef.current.autoplay = true;
+        localVideoRef.current.playsInline = true;
+        localVideoRef.current.muted = true;
         localVideoRef.current.srcObject = stream;
-        try {
-          await localVideoRef.current.play();
-        } catch { }
+        try { await localVideoRef.current.play(); } catch { }
       }
-
-      createAnalyzerForStream("local", stream);
-      startRecordingForStream("local", stream);
-
-      notifyLocalStreamReady(stream);
 
       if (socketRef.current) {
         try {
           socketRef.current.removeAllListeners();
           socketRef.current.disconnect();
         } catch { }
+        socketRef.current = null;
       }
 
       const socket = io(SOCKET_SERVER_URL, { autoConnect: false });
       socketRef.current = socket;
 
       await new Promise((resolve, reject) => {
-        const TO = setTimeout(() => reject(new Error()), 8000);
-
+        const TO = setTimeout(() => reject(new Error("socket timeout")), 8000);
         const cleanup = () => {
           clearTimeout(TO);
           socket.off("connect", onConnect);
           socket.off("connect_error", onError);
         };
-
-        const onConnect = () => {
-          cleanup();
-          resolve();
-        };
-
-        const onError = () => {
-          cleanup();
-          reject();
-        };
-
+        const onConnect = () => { cleanup(); resolve(); };
+        const onError = () => { cleanup(); reject(new Error("socket connect_error")); };
         socket.on("connect", onConnect);
         socket.on("connect_error", onError);
         socket.connect();
       });
 
+      if (!_activeRooms.has(key)) {
+        socket.disconnect();
+        stream.getTracks().forEach((t) => t.stop());
+        return;
+      }
+
+      initMediaController(stream, socketRef.current, pcsRef.current, localVideoRef.current);
+
+      setExternalCleaners({
+        recordersRef,
+        removeAnalyzerFn: removeAnalyzer,
+        prevLocalStreamRef,
+      });
+
+      createAnalyzerForStream("local", stream);
+      startRecordingForStream("local", stream);
+
+      notifyLocalStreamReady(stream);
+
       onSocketReady?.();
-
-      initMediaController(
-        localStreamRef.current,
-        socketRef.current,
-        pcsRef.current,
-        localVideoRef.current
-      );
-
-      try {
-        setExternalCleaners({
-          recordersRef,
-          removeAnalyzerFn: removeAnalyzer,
-          prevLocalStreamRef,
-        });
-      } catch { }
 
       const token =
         localStorage.getItem("token") || localStorage.getItem("accessToken");
 
       let uid = null;
-
       if (token) {
         try {
           const payload = JSON.parse(atob(token.split(".")[1]));
@@ -267,10 +254,7 @@ export default function useMeetingLifecycle({
       const displayName = localStorage.getItem("displayName") || "Guest";
       const code = (roomId || "").toUpperCase();
 
-      socketRef.current.emit("join-call", roomId, {
-        name: displayName,
-        userId: uid,
-      });
+      socketRef.current.emit("join-call", roomId, { name: displayName, userId: uid });
 
       if (isHostRef.current) {
         setTimeout(() => {
@@ -281,6 +265,7 @@ export default function useMeetingLifecycle({
       }
     } catch (err) {
       console.error(err);
+      _activeRooms.delete(key);
       alert("Unable to access camera/mic or connect.");
     } finally {
       setConnecting(false);
@@ -336,10 +321,7 @@ export default function useMeetingLifecycle({
       },
       body: fd,
     })
-      .then((resp) => {
-        if (!resp?.ok) return;
-        return resp.json();
-      })
+      .then((resp) => { if (!resp?.ok) return; return resp.json(); })
       .then((data) => {
         if (!data?.success) return;
         try {
@@ -368,22 +350,17 @@ export default function useMeetingLifecycle({
     const hostDataRaw = localStorage.getItem(`host:${code}`);
     const hostData = hostDataRaw ? JSON.parse(hostDataRaw) : null;
 
-    try {
-      stopAllRecorders();
-    } catch { }
+    try { stopAllRecorders(); } catch { }
 
     const recordersSnapshot = { ...(recordersRef.current || {}) };
 
     try {
-      if (socketRef.current?.connected) {
-        socketRef.current.emit("end-meeting", roomId);
-      }
+      if (socketRef.current?.connected) socketRef.current.emit("end-meeting", roomId);
     } catch { }
 
     persistHistorySnapshot().catch(() => { });
 
     await cleanupAll();
-
     navigate("/home");
 
     if (TRANSCRIPTS_ENABLED && hostData?.hostSecret && TRANSCRIPT_ENDPOINT) {
@@ -394,17 +371,14 @@ export default function useMeetingLifecycle({
   }
 
   useEffect(() => {
-    if (startedRef.current) return;
-    startedRef.current = true;
-
     const name =
       localStorage.getItem("displayName") ||
       prompt("Enter your display name", "Guest") ||
       "Guest";
-
     localStorage.setItem("displayName", name);
 
-    start();
+    const key = instanceKey.current;
+    start(key);
 
     const onBeforeUnload = () => {
       try {
@@ -426,6 +400,6 @@ export default function useMeetingLifecycle({
     leaveCall,
     endMeeting,
     cleanupAll,
-    persistHistorySnapshot
+    persistHistorySnapshot,
   };
 }

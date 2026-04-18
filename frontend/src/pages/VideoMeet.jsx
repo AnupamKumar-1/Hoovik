@@ -114,8 +114,8 @@ export default function VideoMeet() {
   const [emotionsMap, setEmotionsMap] = useState({});
   const [stableSpeakerId, setStableSpeakerId] = useState(null);
   const [meetDuration, setMeetDuration] = useState(0);
+  const [streamVersion, setStreamVersion] = useState(0);
 
-  // Mobile sheet state — "chat" | "emotion" | null
   const [mobileSheet, setMobileSheet] = useState(null);
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -138,15 +138,9 @@ export default function VideoMeet() {
 
   const mutedRef = useRef(muted);
   const videoOffRef = useRef(videoOff);
-  useEffect(() => {
-    mutedRef.current = muted;
-  }, [muted]);
-  useEffect(() => {
-    videoOffRef.current = videoOff;
-  }, [videoOff]);
-  useEffect(() => {
-    activeSpeakerIdRef.current = stableSpeakerId;
-  }, [stableSpeakerId]);
+  useEffect(() => { mutedRef.current = muted; }, [muted]);
+  useEffect(() => { videoOffRef.current = videoOff; }, [videoOff]);
+  useEffect(() => { activeSpeakerIdRef.current = stableSpeakerId; }, [stableSpeakerId]);
 
   useEffect(() => {
     const id = setInterval(() => setMeetDuration((d) => d + 1), 1000);
@@ -158,7 +152,7 @@ export default function VideoMeet() {
     for (const [id, entry] of Object.entries(remoteStreams))
       out[id] = entry?.stream ?? entry;
     return out;
-  }, [remoteStreams]);
+  }, [remoteStreams, streamVersion]);
 
   useEffect(() => {
     remoteStreamsRef.current = unwrappedRemoteStreams;
@@ -179,26 +173,17 @@ export default function VideoMeet() {
     displayName: localStorage.getItem("displayName") ?? undefined,
   });
 
-  // Track unread messages when chat sheet is closed
   const prevMsgCountRef = useRef(0);
 
   useEffect(() => {
-    const isChatVisible = isMobile
-      ? mobileSheet === "chat"
-      : chatOpen;
-
+    const isChatVisible = isMobile ? mobileSheet === "chat" : chatOpen;
     if (isChatVisible) {
       setUnreadCount(0);
       prevMsgCountRef.current = chatMessages.length;
       return;
     }
-
     const newCount = chatMessages.length - prevMsgCountRef.current;
-
-    if (newCount > 0) {
-      setUnreadCount((n) => n + newCount);
-    }
-
+    if (newCount > 0) setUnreadCount((n) => n + newCount);
     prevMsgCountRef.current = chatMessages.length;
   }, [chatMessages.length, isMobile, mobileSheet, chatOpen]);
 
@@ -247,7 +232,10 @@ export default function VideoMeet() {
     socketRef,
     localStreamRef,
     pcsRef,
-    setRemoteStreams,
+    setRemoteStreams: (updater) => {
+      setRemoteStreams(updater);
+      setStreamVersion((v) => v + 1);
+    },
     createAnalyzerForStream,
     removeAnalyzer,
     recordersRef,
@@ -319,9 +307,7 @@ export default function VideoMeet() {
     onSocketReady: () => setSocketReady((n) => n + 1),
   });
 
-  useEffect(() => {
-    cleanupRef.current = cleanupAll;
-  }, [cleanupAll]);
+  useEffect(() => { cleanupRef.current = cleanupAll; }, [cleanupAll]);
 
   useMediaBridge({
     localStreamRef,
@@ -353,6 +339,7 @@ export default function VideoMeet() {
         delete next[peerId];
         return next;
       });
+      setStreamVersion((v) => v + 1);
       setStableSpeakerId((prev) => (prev === peerId ? null : prev));
       setSpotlightPeerId((prev) => {
         if (prev !== peerId) return prev;
@@ -383,8 +370,7 @@ export default function VideoMeet() {
   useEffect(() => {
     const onKeyDown = (e) => {
       const tag = (e.target?.tagName || "").toUpperCase();
-      if (tag === "INPUT" || tag === "TEXTAREA" || e.target?.isContentEditable)
-        return;
+      if (tag === "INPUT" || tag === "TEXTAREA" || e.target?.isContentEditable) return;
       if (e.key === "m" || e.key === "M")
         toggleMute(muted, setMuted, mutedRef, TRANSCRIPTS_ENABLED, recordersRef);
       else if (e.key === "v" || e.key === "V")
@@ -429,12 +415,9 @@ export default function VideoMeet() {
   const remoteEntries = useMemo(
     () =>
       Object.entries(unwrappedRemoteStreams)
-        .filter(
-          ([peerId, stream]) =>
-            peerId && peerId !== myId && isValidStream(stream)
-        )
+        .filter(([peerId, stream]) => peerId && peerId !== myId && isValidStream(stream))
         .sort(([a], [b]) => a.localeCompare(b)),
-    [unwrappedRemoteStreams, myId]
+    [unwrappedRemoteStreams, myId, streamVersion]
   );
 
   const effectiveSpotlightId = useMemo(() => {
@@ -447,17 +430,12 @@ export default function VideoMeet() {
   }, [remoteEntries, spotlightPeerId, stableSpeakerId]);
 
   const activeEntry = useMemo(
-    () =>
-      !effectiveSpotlightId
-        ? null
-        : remoteEntries.find(([id]) => id === effectiveSpotlightId) || null,
+    () => !effectiveSpotlightId ? null : remoteEntries.find(([id]) => id === effectiveSpotlightId) || null,
     [remoteEntries, effectiveSpotlightId]
   );
+
   const otherEntries = useMemo(
-    () =>
-      !activeEntry
-        ? remoteEntries
-        : remoteEntries.filter(([id]) => id !== activeEntry[0]),
+    () => !activeEntry ? remoteEntries : remoteEntries.filter(([id]) => id !== activeEntry[0]),
     [remoteEntries, activeEntry]
   );
 
@@ -472,8 +450,7 @@ export default function VideoMeet() {
     const map = {};
     participantsMeta.forEach((p) => {
       const userId = p.meta?.userId;
-      const history =
-        (userId && emotionsMap[userId]) || emotionsMap[p.id] || [];
+      const history = (userId && emotionsMap[userId]) || emotionsMap[p.id] || [];
       if (Array.isArray(history) && history.length) map[p.id] = history;
     });
     return map;
@@ -490,7 +467,6 @@ export default function VideoMeet() {
     }
   }, [endingMeeting, isHost, endMeeting, leaveCall]);
 
-  // Unified chat toggle: desktop uses chatOpen, mobile opens sheet
   const handleToggleChat = useCallback(() => {
     if (isMobile) {
       setMobileSheet((v) => (v === "chat" ? null : "chat"));
@@ -512,6 +488,8 @@ export default function VideoMeet() {
   const multiPartyLayout = remoteEntries.length > 0 && activeEntry;
   const showEmotionPanel = isHost && shareEmotion && !isMobile;
 
+  const mobileParticipantCount = remoteEntries.length;
+
   return (
     <div className={s.shell}>
       <div className={s.bgMesh} aria-hidden="true" />
@@ -530,21 +508,20 @@ export default function VideoMeet() {
 
           {multiPartyLayout && (
             <div
-              className={`${s.stageLayout} ${isMobile ? s.stageLayoutMobile : ""
-                }`}
+              className={`${s.stageLayout} ${isMobile ? s.stageLayoutMobile : ""}`}
+              style={isMobile ? getMobileStageStyle(mobileParticipantCount) : undefined}
             >
-              <div className={s.spotlightWrap}>
+              <div
+                className={s.spotlightWrap}
+                style={isMobile ? getMobileSpotlightStyle(mobileParticipantCount) : undefined}
+              >
                 {activeEntry && (
                   <SpotlightCard
                     key={activeEntry[0]}
                     id={activeEntry[0]}
                     stream={activeEntry[1]}
                     meta={participantMap[activeEntry[0]]}
-                    emotion={
-                      isHost
-                        ? socketEmotionMap[activeEntry[0]]?.at(-1)
-                        : undefined
-                    }
+                    emotion={isHost ? socketEmotionMap[activeEntry[0]]?.at(-1) : undefined}
                     isActive={stableSpeakerId === activeEntry[0]}
                     isHost={isHost}
                   />
@@ -553,8 +530,8 @@ export default function VideoMeet() {
 
               {otherEntries.length > 0 && (
                 <div
-                  className={`${s.filmstrip} ${isMobile ? s.filmstripHoriz : ""
-                    }`}
+                  className={`${s.filmstrip} ${isMobile ? s.filmstripHoriz : ""}`}
+                  style={isMobile ? getMobileFilmstripStyle(mobileParticipantCount) : undefined}
                 >
                   {otherEntries.map(([peerId, stream]) => (
                     <ParticipantCard
@@ -562,14 +539,11 @@ export default function VideoMeet() {
                       peerId={peerId}
                       stream={stream}
                       meta={participantMap[peerId]}
-                      emotion={
-                        isHost
-                          ? socketEmotionMap[peerId]?.at(-1)
-                          : undefined
-                      }
+                      emotion={isHost ? socketEmotionMap[peerId]?.at(-1) : undefined}
                       isActive={stableSpeakerId === peerId}
                       isHost={isHost}
                       compact
+                      style={isMobile ? getMobileCardStyle(mobileParticipantCount) : undefined}
                       onClick={() => {
                         spotlightPeerRef.current = peerId;
                         setSpotlightPeerId(peerId);
@@ -582,7 +556,6 @@ export default function VideoMeet() {
           )}
         </div>
 
-        {/* Desktop chat panel */}
         <AnimatePresence>
           {chatOpen && !isMobile && (
             <MeetChatPanel
@@ -598,7 +571,6 @@ export default function VideoMeet() {
           )}
         </AnimatePresence>
 
-        {/* Desktop emotion panel */}
         <AnimatePresence>
           {showEmotionPanel && (
             <motion.div
@@ -630,9 +602,7 @@ export default function VideoMeet() {
         muted={muted}
         videoOff={videoOff}
         shareEmotion={shareEmotion}
-        onToggleMute={() =>
-          toggleMute(muted, setMuted, mutedRef, TRANSCRIPTS_ENABLED, recordersRef)
-        }
+        onToggleMute={() => toggleMute(muted, setMuted, mutedRef, TRANSCRIPTS_ENABLED, recordersRef)}
         onToggleVideo={() => toggleVideo(videoOff, setVideoOff)}
         onToggleEmotion={handleToggleEmotion}
       />
@@ -645,9 +615,7 @@ export default function VideoMeet() {
         isHost={isHost}
         endingMeeting={endingMeeting}
         unreadCount={unreadCount}
-        onToggleMute={() =>
-          toggleMute(muted, setMuted, mutedRef, TRANSCRIPTS_ENABLED, recordersRef)
-        }
+        onToggleMute={() => toggleMute(muted, setMuted, mutedRef, TRANSCRIPTS_ENABLED, recordersRef)}
         onToggleVideo={() => toggleVideo(videoOff, setVideoOff)}
         onScreenShare={() => startScreenShare(prevLocalStreamRef)}
         onToggleChat={handleToggleChat}
@@ -655,7 +623,6 @@ export default function VideoMeet() {
         onLeaveEnd={handleLeaveEnd}
       />
 
-      {/* Mobile bottom sheet */}
       {isMobile && (
         <MobilePanelSheet
           activeSheet={mobileSheet}
@@ -676,4 +643,49 @@ export default function VideoMeet() {
       )}
     </div>
   );
+}
+
+function getMobileStageStyle(count) {
+  if (count === 1) {
+    return {
+      flexDirection: "column",
+      height: "100%",
+    };
+  }
+  return {
+    flexDirection: "column",
+    height: "100%",
+  };
+}
+
+function getMobileSpotlightStyle(count) {
+  if (count === 1) {
+    return { flex: "1 1 0", minHeight: 0 };
+  }
+  return { flex: "1 1 0", minHeight: 0 };
+}
+
+function getMobileFilmstripStyle(count) {
+  return {
+    flexDirection: "row",
+    height: "120px",
+    minHeight: "120px",
+    flexShrink: 0,
+    width: "100%",
+    overflowX: "auto",
+    overflowY: "hidden",
+    display: "flex",
+    gap: "6px",
+    padding: "4px",
+  };
+}
+
+function getMobileCardStyle(count) {
+  return {
+    width: "160px",
+    height: "112px",
+    minWidth: "160px",
+    flexShrink: 0,
+    borderRadius: "10px",
+  };
 }

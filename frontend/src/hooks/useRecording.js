@@ -10,15 +10,40 @@ export default function useRecording({
 }) {
   const recordersRef = useRef({});
 
-  function startRecordingForStream(id, stream) {
+  function _stopRecorderForId(id) {
+    const existing = recordersRef.current[id];
+    if (!existing) return;
+    try {
+      if (existing.recorder?.state !== "inactive") {
+        existing.recorder.stop();
+      }
+    } catch { }
+    delete recordersRef.current[id];
+  }
+
+  function startRecordingForStream(id, stream, { force = false } = {}) {
     if (!isHost || !stream) return;
-    if (recordersRef.current[id]) return;
+
+    const audioTracks = stream.getAudioTracks();
+    if (!audioTracks?.length) return;
+
+    const existing = recordersRef.current[id];
+
+    if (existing && !force) {
+      const recorderTrack = existing.audioStream?.getAudioTracks?.()?.[0];
+      const newTrack = audioTracks[0];
+      if (recorderTrack && recorderTrack.id === newTrack.id) {
+        if (existing.recorder?.state === "recording") return;
+      }
+    }
+
+    if (existing) {
+      _stopRecorderForId(id);
+    }
 
     try {
-      const audioTracks = stream.getAudioTracks();
-      if (!audioTracks?.length) return;
-
-      const audioStream = new MediaStream([audioTracks[0]]);
+      const track = audioTracks[0];
+      const audioStream = new MediaStream([track]);
 
       let mimeType = "audio/webm;codecs=opus";
       if (!MediaRecorder.isTypeSupported(mimeType)) {
@@ -30,13 +55,14 @@ export default function useRecording({
         mimeType ? { mimeType } : undefined
       );
 
-      const chunks = [];
+      const chunks = existing?.chunks ?? [];
+
       recorder.ondataavailable = (ev) => {
         if (ev.data?.size > 0) chunks.push(ev.data);
       };
 
       recorder.start(1000);
-      recordersRef.current[id] = { recorder, chunks };
+      recordersRef.current[id] = { recorder, chunks, audioStream };
     } catch { }
   }
 

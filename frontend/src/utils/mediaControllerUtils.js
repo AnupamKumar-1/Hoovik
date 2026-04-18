@@ -24,9 +24,7 @@ export function enforceVideoMirrorBehavior(el, { mirror = false } = {}) {
         const val = mirror ? "scaleX(-1)" : "none";
         el.style.transform = val;
         el.style.webkitTransform = val;
-    } catch (err) {
-        console.warn("[mediaControllerUtils] enforceVideoMirrorBehavior failed:", err);
-    }
+    } catch { }
 }
 
 export function syncPreview({
@@ -41,9 +39,7 @@ export function syncPreview({
         if (localVideoEl.srcObject !== src) localVideoEl.srcObject = src;
         enforceVideoMirrorBehavior(localVideoEl, { mirror: !!localMirrorEnabled });
         safePlay(localVideoEl);
-    } catch (err) {
-        console.warn("[mediaControllerUtils] syncPreview failed:", err);
-    }
+    } catch { }
 }
 
 export function createPlaceholderVideoTrack() {
@@ -62,11 +58,7 @@ export function createPlaceholderVideoTrack() {
         track.__placeholderCanvas = canvas;
         track.__placeholderStream = stream;
         return track;
-    } catch (err) {
-        console.warn(
-            "[mediaControllerUtils] createPlaceholderVideoTrack failed:",
-            err
-        );
+    } catch {
         return null;
     }
 }
@@ -117,8 +109,7 @@ export function attachTrackEndHandler(
 }
 
 async function _replaceViaSender(pc, track, kind) {
-    const sender =
-        pc.getSenders?.().find((s) => s.track?.kind === kind) ?? null;
+    const sender = pc.getSenders?.().find((s) => s.track?.kind === kind) ?? null;
     if (!sender) return false;
     await sender.replaceTrack(track);
     return true;
@@ -163,9 +154,7 @@ async function _replaceViaAddTrack(pc, track, localStream) {
             if (!s || s === newSender) return;
             if (s.track?.kind === track.kind) {
                 try { s.replaceTrack(null); } catch { }
-                try {
-                    if (!s.track.__isPlaceholder) s.track.stop();
-                } catch { }
+                try { if (!s.track.__isPlaceholder) s.track.stop(); } catch { }
             }
         } catch { }
     });
@@ -178,14 +167,14 @@ async function _nullifyTrackInPeer(pc, kind) {
         for (const s of senders) {
             try {
                 if (s?.track?.kind === kind) {
+                    const track = s.track;
                     try { await s.replaceTrack(null); } catch { }
-                    try {
-                        if (!s.track.__isPlaceholder) s.track.stop();
-                    } catch { }
+                    try { if (track && !track.__isPlaceholder) track.stop(); } catch { }
                 }
             } catch { }
         }
     } catch { }
+
     try {
         const txs = pc.getTransceivers?.() ?? [];
         for (const tx of txs) {
@@ -212,12 +201,7 @@ export async function replaceTrackInPeers(track, kind, { pcsRef, localStream }) 
             if (await _replaceViaTransceiver(pc, track, kind)) continue;
             if (await _replaceViaNewTransceiver(pc, track, kind)) continue;
             await _replaceViaAddTrack(pc, track, localStream);
-        } catch (err) {
-            console.warn(
-                "[mediaControllerUtils] replaceTrackInPeers error for pc:",
-                err
-            );
-        }
+        } catch { }
     }
 }
 
@@ -236,10 +220,7 @@ export async function restoreOutgoingVideoToPeers(realTrack, { pcsRef }) {
             const txs = pc.getTransceivers?.() ?? [];
             for (const tx of txs) {
                 try {
-                    if (
-                        tx.kind === "video" ||
-                        tx.sender?.track?.kind === "video"
-                    ) {
+                    if (tx.kind === "video" || tx.sender?.track?.kind === "video") {
                         try { tx.direction = "sendrecv"; } catch { }
                     }
                 } catch { }
@@ -255,7 +236,6 @@ export function replaceLocalTrack(
 ) {
     const localStream = typeof getLocalStream === "function" ? getLocalStream() : null;
     if (!localStream) {
-        console.warn("[mediaControllerUtils] replaceLocalTrack: no localStream");
         try { newTrack?.stop(); } catch { }
         return;
     }
@@ -267,12 +247,7 @@ export function replaceLocalTrack(
                 try { t.stop(); } catch { }
                 try { localStream.removeTrack(t); } catch { }
             });
-    } catch (err) {
-        console.warn(
-            "[mediaControllerUtils] replaceLocalTrack: removing old tracks failed:",
-            err
-        );
-    }
+    } catch { }
     try {
         localStream.addTrack(newTrack);
         attachTrackEndHandler(newTrack, kind, {
@@ -281,29 +256,15 @@ export function replaceLocalTrack(
             localVideoEl,
             localMirrorEnabled,
         });
-    } catch (err) {
-        console.warn(
-            "[mediaControllerUtils] replaceLocalTrack: addTrack failed:",
-            err
-        );
+    } catch {
         try { newTrack.stop(); } catch { }
         return;
     }
     if (kind === "video") {
-        syncPreview({
-            localVideoEl,
-            localStream,
-            placeholderStream: null,
-            localMirrorEnabled,
-        });
+        syncPreview({ localVideoEl, localStream, placeholderStream: null, localMirrorEnabled });
     }
     if (isSafari()) {
-        refreshSafariPreview({
-            localVideoEl,
-            localStream,
-            placeholderStream: null,
-            localMirrorEnabled,
-        });
+        refreshSafariPreview({ localVideoEl, localStream, placeholderStream: null, localMirrorEnabled });
     }
 }
 
@@ -320,12 +281,8 @@ export function stopAndRemoveTracks(
                 try { t.stop(); } catch { }
                 try { localStream.removeTrack(t); } catch { }
             });
-    } catch (err) {
-        console.warn(
-            "[mediaControllerUtils] stopAndRemoveTracks: local track removal failed:",
-            err
-        );
-    }
+    } catch { }
+
     const pcs = Object.values(pcsRef ?? {}).filter(
         (pc) => pc && pc.connectionState !== "closed"
     );
@@ -347,9 +304,7 @@ export function stopAndRemoveTracks(
                 matched.forEach((t) => {
                     try { t.direction = "recvonly"; } catch { }
                     try { t.sender?.replaceTrack(null); } catch { }
-                    try {
-                        if (!t.sender?.track?.__isPlaceholder) t.sender?.track?.stop();
-                    } catch { }
+                    try { if (!t.sender?.track?.__isPlaceholder) t.sender?.track?.stop(); } catch { }
                 });
                 continue;
             }
@@ -357,16 +312,9 @@ export function stopAndRemoveTracks(
                 .filter((s) => s.track?.kind === kind)
                 .forEach((s) => {
                     try { s.replaceTrack(null); } catch { }
-                    try {
-                        if (!s.track.__isPlaceholder) s.track.stop();
-                    } catch { }
+                    try { if (!s.track.__isPlaceholder) s.track.stop(); } catch { }
                 });
-        } catch (err) {
-            console.warn(
-                "[mediaControllerUtils] stopAndRemoveTracks pc loop error:",
-                err
-            );
-        }
+        } catch { }
     }
     if (isSafari()) clearPreviewIfNoTracks({ localStream, localVideoEl });
     enforceVideoMirrorBehavior(localVideoEl, { mirror: !!localMirrorEnabled });

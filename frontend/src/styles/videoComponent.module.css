@@ -228,6 +228,7 @@
   padding-bottom: calc(var(--m-bar-h) + 12px);
 }
 
+/* ─── Desktop stage ─── */
 .stageLayout {
   display: flex;
   flex-direction: row;
@@ -238,8 +239,10 @@
   min-height: 0;
 }
 
+/* ─── Mobile stage: column, fills entire videoArea ─── */
 .stageLayoutMobile {
   flex-direction: column;
+  align-items: stretch;
 }
 
 .spotlightWrap {
@@ -261,6 +264,7 @@
   height: 100%;
 }
 
+/* ─── Desktop filmstrip (vertical) ─── */
 .filmstrip {
   display: flex;
   flex-direction: column;
@@ -276,14 +280,22 @@
 .filmstrip::-webkit-scrollbar { width: 3px; }
 .filmstrip::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.07); border-radius: 2px; }
 
+/* ─── Mobile filmstrip (horizontal row, fixed height) ─── */
 .filmstripHoriz {
-  flex-direction: row;
-  width: 100%;
-  height: 90px;
-  flex-shrink: 0;
-  overflow-x: auto;
-  overflow-y: hidden;
+  flex-direction: row !important;
+  width: 100% !important;
+  height: 120px !important;
+  min-height: 120px !important;
+  max-height: 120px !important;
+  flex-shrink: 0 !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  align-items: stretch;
+  padding: 4px !important;
+  gap: 6px !important;
+  scrollbar-width: none;
 }
+.filmstripHoriz::-webkit-scrollbar { display: none; }
 
 .emptyState {
   display: flex;
@@ -814,9 +826,7 @@
   transition: border-color 200ms ease;
 }
 
-.emotionCard:hover {
-  border-color: var(--m-border2);
-}
+.emotionCard:hover { border-color: var(--m-border2); }
 
 .emotionCardHeader {
   display: flex;
@@ -838,10 +848,7 @@
   flex-shrink: 0;
 }
 
-.emotionCardInfo {
-  flex: 1;
-  min-width: 0;
-}
+.emotionCardInfo { flex: 1; min-width: 0; }
 
 .emotionCardName {
   font-size: 12px;
@@ -867,17 +874,9 @@
   flex-shrink: 0;
 }
 
-.emotionBarsSection {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-}
+.emotionBarsSection { display: flex; flex-direction: column; gap: 7px; }
 
-.emotionBarRow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
+.emotionBarRow { display: flex; align-items: center; gap: 8px; }
 
 .emotionBarLabel {
   font-size: 10px;
@@ -986,9 +985,7 @@
   border: 1px solid var(--m-border);
 }
 
-.participantCardCompact {
-  flex-shrink: 0;
-}
+.participantCardCompact { flex-shrink: 0; }
 
 .participantCardSpeaking {
   border-color: rgba(0,229,195,0.45) !important;
@@ -1081,39 +1078,39 @@
   animation: blink 1.8s ease infinite;
 }
 
- .activeSpeakerBar {
- position: absolute;
- bottom: 10px;
- left: 50%;
- transform: translateX(-50%);
- display: flex;
- align-items: center;
- gap: 7px;
- padding: 5px 12px;
- background: rgba(14,165,233,0.12);
- border: 1px solid rgba(14,165,233,0.30);
- border-radius: 100px;
- backdrop-filter: blur(8px);
- z-index: 10;
- white-space: nowrap;
- }
+.activeSpeakerBar {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 12px;
+  background: rgba(14,165,233,0.12);
+  border: 1px solid rgba(14,165,233,0.30);
+  border-radius: 100px;
+  backdrop-filter: blur(8px);
+  z-index: 10;
+  white-space: nowrap;
+}
 
- .activeSpeakerLiveDot {
- width: 6px; height: 6px; border-radius: 50%;
- background: var(--m-green);
+.activeSpeakerLiveDot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--m-green);
   box-shadow: 0 0 7px var(--m-green);
- flex-shrink: 0;
- animation: blink 1.8s ease infinite;
- }
+  flex-shrink: 0;
+  animation: blink 1.8s ease infinite;
+}
 
- .activeSpeakerLabel {
- font-family: var(--m-font-head);
- font-size: 10px;
- font-weight: 700;
- letter-spacing: 0.08em;
- color: var(--m-blue);
- text-transform: uppercase;
- }
+.activeSpeakerLabel {
+  font-family: var(--m-font-head);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--m-blue);
+  text-transform: uppercase;
+}
 
 .waveBars {
   display: flex;
@@ -1151,9 +1148,7 @@
   font-family: var(--m-font-body);
 }
 
-.chatInputField::placeholder {
-  color: var(--m-text3);
-}
+.chatInputField::placeholder { color: var(--m-text3); }
 
 .chatSendButton {
   display: flex;
@@ -1170,14 +1165,8 @@
   transition: all 120ms ease;
 }
 
-.chatSendButton:hover {
-  background: rgba(0,229,195,0.18);
-}
-
-.chatSendButton:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
+.chatSendButton:hover { background: rgba(0,229,195,0.18); }
+.chatSendButton:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .msgWrapper {
   display: flex;
@@ -1399,13 +1388,15 @@
   to   { transform: translateY(100%); opacity: 0; }
 }
 
+/* ═══════════════════════════════════════════
+   MOBILE RESPONSIVE
+═══════════════════════════════════════════ */
+
 @media (max-width: 900px) {
   .localPreview { width: 150px; height: 84px; right: 12px; }
   .timerDisplay { display: none; }
-
   .emotionSidebar { display: none !important; }
   .chatPanel { display: none !important; }
-
   .mobilePanelFab { display: flex; }
 
   .mobileSheet.open {
@@ -1414,14 +1405,54 @@
   }
   .mobileSheetBackdrop.open { display: block; }
 
-  .filmstrip { width: 140px; }
-
+  /* video area: full height, no side padding issues */
   .videoArea {
+    padding: 8px;
+    padding-bottom: calc(var(--m-bar-h) + 8px);
     align-items: stretch;
   }
 
+  /* Mobile stage: column layout, fills container */
   .stageLayout {
+    width: 100%;
+    height: 100%;
+  }
+
+  .stageLayoutMobile {
+    flex-direction: column;
     align-items: stretch;
+    gap: 6px;
+  }
+
+  /* Spotlight takes all remaining space */
+  .stageLayoutMobile .spotlightWrap {
+    flex: 1 1 0;
+    min-height: 0;
+    width: 100%;
+  }
+
+  /* Filmstrip: fixed 120px height horizontal row */
+  .stageLayoutMobile .filmstripHoriz {
+    flex-shrink: 0;
+    height: 120px;
+    min-height: 120px;
+    max-height: 120px;
+    width: 100%;
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+    gap: 6px;
+    padding: 4px;
+    align-items: stretch;
+  }
+
+  /* Each card in the mobile filmstrip */
+  .stageLayoutMobile .filmstripHoriz .participantCard {
+    width: 160px;
+    min-width: 160px;
+    height: 112px;
+    flex-shrink: 0;
+    border-radius: 10px;
   }
 }
 
@@ -1435,8 +1466,8 @@
     bottom: calc(var(--m-bar-h) + 8px);
   }
   .videoArea {
-    padding: 8px;
-    padding-bottom: calc(var(--m-bar-h) + 8px);
+    padding: 6px;
+    padding-bottom: calc(var(--m-bar-h) + 6px);
     align-items: stretch;
   }
   .ctrlBtn { min-width: 40px; padding: 0 6px; }
@@ -1453,17 +1484,16 @@
 
   .mobileSheet { height: 78vh; max-height: 78vh; }
 
-  .stageLayoutMobile {
-    align-items: stretch;
-  }
-
-  .stageLayoutMobile .spotlightWrap {
-    flex: 1;
-    min-height: 0;
-  }
-
   .stageLayoutMobile .filmstripHoriz {
-    height: 80px;
+    height: 100px;
+    min-height: 100px;
+    max-height: 100px;
+  }
+
+  .stageLayoutMobile .filmstripHoriz .participantCard {
+    width: 136px;
+    min-width: 136px;
+    height: 92px;
   }
 }
 
@@ -1472,5 +1502,16 @@
   .hostBadge { display: none; }
   .participantCount { display: none; }
   .mobileSheet { height: 85vh; max-height: 85vh; border-radius: 16px 16px 0 0; }
-}
 
+  .stageLayoutMobile .filmstripHoriz {
+    height: 88px;
+    min-height: 88px;
+    max-height: 88px;
+  }
+
+  .stageLayoutMobile .filmstripHoriz .participantCard {
+    width: 120px;
+    min-width: 120px;
+    height: 80px;
+  }
+}
