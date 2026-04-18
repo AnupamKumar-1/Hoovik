@@ -32,8 +32,8 @@ function deriveName(meta, emotion, peerId) {
   return "Unknown";
 }
 
-function getLiveVideoTrack(stream) {
-  return stream?.getVideoTracks?.().find((t) => t.readyState === "live") ?? null;
+function hasLiveVideoTrack(stream) {
+  return !!stream?.getVideoTracks?.().find((t) => t.readyState === "live");
 }
 
 const WAVE_DELAYS = [0.55, 0.4, 0.7, 0.5, 0.62, 0.48, 0.75];
@@ -58,6 +58,19 @@ function UserIcon() {
   );
 }
 
+function safePlay(el) {
+  if (!el) return;
+  const p = el.play();
+  if (p && typeof p.catch === "function") {
+    p.catch(() => {
+      setTimeout(() => {
+        const p2 = el.play();
+        if (p2 && typeof p2.catch === "function") p2.catch(() => { });
+      }, 300);
+    });
+  }
+}
+
 const ParticipantCard = forwardRef(({
   peerId, stream, compact = false, style = {},
   meta, emotion, isActive = false, isHost = false,
@@ -67,7 +80,8 @@ const ParticipantCard = forwardRef(({
   const videoRef = useRef(null);
   const unmountedRef = useRef(false);
   const pollRef = useRef(null);
-  const cleanupRef = useRef([]);
+  const streamRef = useRef(null);
+  const cleanupFnsRef = useRef([]);
 
   const name = useMemo(() => deriveName(meta, emotion, peerId), [meta, emotion, peerId]);
   const initial = useMemo(() => (name[0] ?? "?").toUpperCase(), [name]);
@@ -84,21 +98,29 @@ const ParticipantCard = forwardRef(({
     if (!unmountedRef.current) setVideoActive(v);
   }, []);
 
-  const sync = useCallback(() => {
+  const syncVideo = useCallback(() => {
     const el = videoRef.current;
     if (!el || !stream) return;
     if (el.srcObject !== stream) {
       el.srcObject = stream;
-      el.play().catch(() => { });
+      safePlay(el);
     }
-    safeSetActive(!!getLiveVideoTrack(stream));
+    const hasVideo = hasLiveVideoTrack(stream);
+    safeSetActive(hasVideo);
+    if (!hasVideo) {
+      setTimeout(() => {
+        if (unmountedRef.current || streamRef.current !== stream) return;
+        safeSetActive(hasLiveVideoTrack(stream));
+      }, 500);
+    }
   }, [stream, safeSetActive]);
 
   useEffect(() => {
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
-    cleanupRef.current.forEach((fn) => fn());
-    cleanupRef.current = [];
+    cleanupFnsRef.current.forEach((fn) => fn());
+    cleanupFnsRef.current = [];
 
+    streamRef.current = stream;
     const el = videoRef.current;
 
     if (!stream) {
@@ -107,30 +129,41 @@ const ParticipantCard = forwardRef(({
       return;
     }
 
-    if (el && el.srcObject !== stream) {
-      el.srcObject = stream;
-      el.play().catch(() => { });
-    }
+    syncVideo();
 
-    safeSetActive(!!getLiveVideoTrack(stream));
-
-    const onTrackEvent = () => sync();
-    stream.addEventListener("addtrack", onTrackEvent);
-    stream.addEventListener("removetrack", onTrackEvent);
-    cleanupRef.current.push(() => {
-      stream.removeEventListener("addtrack", onTrackEvent);
-      stream.removeEventListener("removetrack", onTrackEvent);
+    const onAddTrack = () => {
+      if (streamRef.current !== stream) return;
+      syncVideo();
+    };
+    const onRemoveTrack = () => {
+      if (streamRef.current !== stream) return;
+      safeSetActive(hasLiveVideoTrack(stream));
+    };
+    stream.addEventListener("addtrack", onAddTrack);
+    stream.addEventListener("removetrack", onRemoveTrack);
+    cleanupFnsRef.current.push(() => {
+      stream.removeEventListener("addtrack", onAddTrack);
+      stream.removeEventListener("removetrack", onRemoveTrack);
     });
 
-    const vt = getLiveVideoTrack(stream);
+    const vt = stream.getVideoTracks().find((t) => t.readyState === "live");
     if (vt) {
-      const onMute = () => safeSetActive(!!getLiveVideoTrack(stream));
-      const onUnmute = () => { sync(); safeSetActive(true); };
-      const onEnded = () => safeSetActive(!!getLiveVideoTrack(stream));
+      const onMute = () => {
+        if (streamRef.current !== stream) return;
+        safeSetActive(hasLiveVideoTrack(stream));
+      };
+      const onUnmute = () => {
+        if (streamRef.current !== stream) return;
+        syncVideo();
+      };
+      const onEnded = () => {
+        if (streamRef.current !== stream) return;
+        safeSetActive(hasLiveVideoTrack(stream));
+      };
       vt.addEventListener("mute", onMute);
       vt.addEventListener("unmute", onUnmute);
       vt.addEventListener("ended", onEnded);
-      cleanupRef.current.push(() => {
+      cleanupFnsRef.current.push(() => {
         vt.removeEventListener("mute", onMute);
         vt.removeEventListener("unmute", onUnmute);
         vt.removeEventListener("ended", onEnded);
@@ -139,10 +172,21 @@ const ParticipantCard = forwardRef(({
 
     let attempts = 0;
     pollRef.current = setInterval(() => {
-      if (unmountedRef.current) { clearInterval(pollRef.current); return; }
+      if (unmountedRef.current || streamRef.current !== stream) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+        return;
+      }
       attempts++;
-      sync();
-      if (getLiveVideoTrack(stream) || attempts >= 160) {
+      const el2 = videoRef.current;
+      
+      if (el2 && el2.srcObject !== stream) {
+        el2.srcObject = stream;
+        safePlay(el2);
+      }
+      const hasVideo = hasLiveVideoTrack(stream);
+      safeSetActive(hasVideo);
+      if (hasVideo || attempts >= 160) {
         clearInterval(pollRef.current);
         pollRef.current = null;
       }
@@ -150,10 +194,24 @@ const ParticipantCard = forwardRef(({
 
     return () => {
       if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
-      cleanupRef.current.forEach((fn) => fn());
-      cleanupRef.current = [];
+      cleanupFnsRef.current.forEach((fn) => fn());
+      cleanupFnsRef.current = [];
     };
-  }, [stream, sync, safeSetActive]);
+  }, [stream, syncVideo, safeSetActive]);
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      const el = videoRef.current;
+      const s = streamRef.current;
+      if (!el || !s) return;
+      if (el.srcObject !== s) el.srcObject = s;
+      safePlay(el);
+      safeSetActive(hasLiveVideoTrack(s));
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [safeSetActive]);
 
   useEffect(() => {
     const el = videoRef.current;
@@ -180,9 +238,8 @@ const ParticipantCard = forwardRef(({
   }), [compact, style, onClick]);
 
   const emotionBadge = useMemo(() => {
-    if ((isHost || DEBUG_SHOW_EMOTION_FOR_EVERYONE) && renderEmotionBadgeForId) {
+    if ((isHost || DEBUG_SHOW_EMOTION_FOR_EVERYONE) && renderEmotionBadgeForId)
       return renderEmotionBadgeForId(peerId);
-    }
     return null;
   }, [peerId, isHost, DEBUG_SHOW_EMOTION_FOR_EVERYONE, renderEmotionBadgeForId]);
 
@@ -209,6 +266,7 @@ const ParticipantCard = forwardRef(({
           width: "100%", height: "100%",
           objectFit: "cover",
           display: videoActive ? "block" : "none",
+          minWidth: 0, minHeight: 0,
         }}
       />
 

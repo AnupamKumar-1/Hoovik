@@ -31,8 +31,8 @@ function deriveName(meta, emotion, id) {
   return "Unknown";
 }
 
-function getLiveVideoTrack(stream) {
-  return stream?.getVideoTracks?.().find((t) => t.readyState === "live") ?? null;
+function hasLiveVideoTrack(stream) {
+  return !!stream?.getVideoTracks?.().find((t) => t.readyState === "live");
 }
 
 const WAVE_DELAYS = [0.55, 0.4, 0.7, 0.5, 0.62, 0.48, 0.75];
@@ -47,6 +47,20 @@ function SpotlightWaveBars() {
   );
 }
 
+function safePlay(el) {
+  if (!el) return;
+  const p = el.play();
+  if (p && typeof p.catch === "function") {
+    p.catch(() => {
+
+      setTimeout(() => {
+        const p2 = el.play();
+        if (p2 && typeof p2.catch === "function") p2.catch(() => { });
+      }, 300);
+    });
+  }
+}
+
 function SpotlightCard({
   id, stream, meta, emotion,
   isActive = false, isHost = false,
@@ -56,7 +70,8 @@ function SpotlightCard({
   const videoRef = useRef(null);
   const unmountedRef = useRef(false);
   const pollRef = useRef(null);
-  const cleanupRef = useRef([]);
+  const streamRef = useRef(null);
+  const cleanupFnsRef = useRef([]);
 
   const name = useMemo(() => deriveName(meta, emotion, id), [meta, emotion, id]);
   const initial = useMemo(() => (name[0] ?? "?").toUpperCase(), [name]);
@@ -82,24 +97,34 @@ function SpotlightCard({
   }, []);
 
 
-  const sync = useCallback(() => {
+  const syncVideo = useCallback(() => {
     const el = videoRef.current;
     if (!el || !stream) return;
 
     if (el.srcObject !== stream) {
       el.srcObject = stream;
-      el.play().catch(() => { });
+      safePlay(el);
     }
-    const hasVideo = !!getLiveVideoTrack(stream);
+
+    const hasVideo = hasLiveVideoTrack(stream);
     safeSetActive(hasVideo);
+
+
+    if (!hasVideo) {
+      setTimeout(() => {
+        if (unmountedRef.current || streamRef.current !== stream) return;
+        safeSetActive(hasLiveVideoTrack(stream));
+      }, 500);
+    }
   }, [stream, safeSetActive]);
 
   useEffect(() => {
-
+    // Clear previous state
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
-    cleanupRef.current.forEach((fn) => fn());
-    cleanupRef.current = [];
+    cleanupFnsRef.current.forEach((fn) => fn());
+    cleanupFnsRef.current = [];
 
+    streamRef.current = stream;
     const el = videoRef.current;
 
     if (!stream) {
@@ -108,47 +133,69 @@ function SpotlightCard({
       return;
     }
 
+    syncVideo();
 
-    if (el && el.srcObject !== stream) {
-      el.srcObject = stream;
-      el.play().catch(() => { });
-    }
-
-    const hasVideo = !!getLiveVideoTrack(stream);
-    safeSetActive(hasVideo);
-
-    const onTrackEvent = () => sync();
-    stream.addEventListener("addtrack", onTrackEvent);
-    stream.addEventListener("removetrack", onTrackEvent);
-    cleanupRef.current.push(() => {
-      stream.removeEventListener("addtrack", onTrackEvent);
-      stream.removeEventListener("removetrack", onTrackEvent);
+    const onAddTrack = () => {
+      if (streamRef.current !== stream) return;
+      syncVideo();
+    };
+    const onRemoveTrack = () => {
+      if (streamRef.current !== stream) return;
+      safeSetActive(hasLiveVideoTrack(stream));
+    };
+    stream.addEventListener("addtrack", onAddTrack);
+    stream.addEventListener("removetrack", onRemoveTrack);
+    cleanupFnsRef.current.push(() => {
+      stream.removeEventListener("addtrack", onAddTrack);
+      stream.removeEventListener("removetrack", onRemoveTrack);
     });
 
-
-    const vt = getLiveVideoTrack(stream);
+    // Watch existing video track for mute/end events
+    const vt = stream.getVideoTracks().find((t) => t.readyState === "live");
     if (vt) {
-      const onMute = () => safeSetActive(!!getLiveVideoTrack(stream));
-      const onUnmute = () => { sync(); safeSetActive(true); };
-      const onEnded = () => safeSetActive(!!getLiveVideoTrack(stream));
+      const onMute = () => {
+        if (streamRef.current !== stream) return;
+        safeSetActive(hasLiveVideoTrack(stream));
+      };
+      const onUnmute = () => {
+        if (streamRef.current !== stream) return;
+        syncVideo();
+      };
+      const onEnded = () => {
+        if (streamRef.current !== stream) return;
+        safeSetActive(hasLiveVideoTrack(stream));
+      };
       vt.addEventListener("mute", onMute);
       vt.addEventListener("unmute", onUnmute);
       vt.addEventListener("ended", onEnded);
-      cleanupRef.current.push(() => {
+      cleanupFnsRef.current.push(() => {
         vt.removeEventListener("mute", onMute);
         vt.removeEventListener("unmute", onUnmute);
         vt.removeEventListener("ended", onEnded);
       });
     }
 
-    // Poll as fallback — covers late-arriving tracks and renegotiation
-    // 160 × 250ms = 40s
+    // Poll as fallback — critical for mobile where events are unreliable.
+    // 160 × 250ms = 40 seconds total.
     let attempts = 0;
     pollRef.current = setInterval(() => {
-      if (unmountedRef.current) { clearInterval(pollRef.current); return; }
+      if (unmountedRef.current || streamRef.current !== stream) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+        return;
+      }
       attempts++;
-      sync();
-      if (getLiveVideoTrack(stream) || attempts >= 160) {
+
+      const el2 = videoRef.current;
+      if (el2 && el2.srcObject !== stream) {
+        el2.srcObject = stream;
+        safePlay(el2);
+      }
+
+      const hasVideo = hasLiveVideoTrack(stream);
+      safeSetActive(hasVideo);
+
+      if (hasVideo || attempts >= 160) {
         clearInterval(pollRef.current);
         pollRef.current = null;
       }
@@ -156,12 +203,26 @@ function SpotlightCard({
 
     return () => {
       if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
-      cleanupRef.current.forEach((fn) => fn());
-      cleanupRef.current = [];
+      cleanupFnsRef.current.forEach((fn) => fn());
+      cleanupFnsRef.current = [];
     };
-  }, [stream, sync, safeSetActive]);
+  }, [stream, syncVideo, safeSetActive]);
 
-  // Cleanup video element on unmount
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      const el = videoRef.current;
+      const s = streamRef.current;
+      if (!el || !s) return;
+      if (el.srcObject !== s) { el.srcObject = s; }
+      safePlay(el);
+      safeSetActive(hasLiveVideoTrack(s));
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [safeSetActive]);
+
+  // Cleanup on unmount
   useEffect(() => {
     const el = videoRef.current;
     return () => {
@@ -180,8 +241,8 @@ function SpotlightCard({
     borderRadius: 14, boxSizing: "border-box", ...style,
   }), [style]);
 
-  const emotionBadge = useMemo(() =>
-    (isHost || DEBUG_SHOW_EMOTION_FOR_EVERYONE) && renderEmotionBadgeForId
+  const emotionBadge = useMemo(
+    () => (isHost || DEBUG_SHOW_EMOTION_FOR_EVERYONE) && renderEmotionBadgeForId
       ? renderEmotionBadgeForId(id) : null,
     [id, isHost, DEBUG_SHOW_EMOTION_FOR_EVERYONE, renderEmotionBadgeForId]
   );
@@ -190,6 +251,14 @@ function SpotlightCard({
     <motion.div className={rootClassName} style={rootStyle}>
       {debouncedIsActive && <div className={styles.speakingRingOverlay} />}
 
+      {/* 
+        MOBILE CRITICAL ATTRIBUTES:
+        - autoPlay: needed for all browsers
+        - playsInline: REQUIRED for iOS — without this, Safari forces fullscreen
+        - muted: NOT set here (remote stream needs audio)
+          iOS Safari allows autoplay of unmuted media only if user interacted first.
+          Since joining the call is a user gesture, this works correctly.
+      */}
       <video
         ref={videoRef}
         autoPlay
@@ -198,6 +267,7 @@ function SpotlightCard({
           width: "100%", height: "100%",
           objectFit: "cover",
           display: videoActive ? "block" : "none",
+          minWidth: 0, minHeight: 0,
         }}
       />
 

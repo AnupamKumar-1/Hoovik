@@ -38,6 +38,13 @@ import s from "../styles/videoComponent.module.css";
 
 const HOST_ONLY_EMOTION = true;
 
+function unwrapStream(entry) {
+  if (!entry) return null;
+  if (entry instanceof MediaStream) return entry;
+  if (entry.stream instanceof MediaStream) return entry.stream;
+  return null;
+}
+
 function isValidStream(stream) {
   return (
     stream instanceof MediaStream &&
@@ -60,16 +67,8 @@ function EmptyState() {
     <div className={s.emptyState}>
       <div className={s.emptyOrb} />
       <div className={s.emptyIcon}>
-        <svg
-          width="26"
-          height="26"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.4"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
           <path d="M23 7l-7 5 7 5V7z" />
           <rect x="1" y="5" width="15" height="14" rx="2" />
         </svg>
@@ -89,6 +88,7 @@ export default function VideoMeet() {
   const localStreamRef = useRef(null);
   const prevLocalStreamRef = useRef(null);
   const pcsRef = useRef({});
+  const remoteStreamsRef = useRef({});
   const chatContainerRef = useRef(null);
   const chatEndRef = useRef(null);
   const cleanupRef = useRef(null);
@@ -119,10 +119,7 @@ export default function VideoMeet() {
 
   const isMobile = useIsMobile(900);
   const participantsMetaRef = useRef([]);
-
-  useEffect(() => {
-    participantsMetaRef.current = participantsMeta;
-  }, [participantsMeta]);
+  useEffect(() => { participantsMetaRef.current = participantsMeta; }, [participantsMeta]);
 
   const { addToUserHistory } = useContext(AuthContext);
 
@@ -151,29 +148,28 @@ export default function VideoMeet() {
     return () => clearInterval(id);
   }, []);
 
-
-  const remoteStreamsRef = useRef({});
-  useEffect(() => {
-    remoteStreamsRef.current = remoteStreams;
+  const unwrappedRemoteStreams = useMemo(() => {
+    const out = {};
+    for (const [id, entry] of Object.entries(remoteStreams)) {
+      const s = unwrapStream(entry);
+      if (s) out[id] = s;
+    }
+    return out;
   }, [remoteStreams]);
 
+  useEffect(() => {
+    remoteStreamsRef.current = unwrappedRemoteStreams;
+  }, [unwrappedRemoteStreams]);
+
   const {
-    chatMessages,
-    setChatMessages,
-    sendChatMessage,
-    handleIncomingMessage,
-    handleAck,
-    retryMessage,
-    seenMsgIdsRef,
+    chatMessages, setChatMessages, sendChatMessage,
+    handleIncomingMessage, handleAck, retryMessage, seenMsgIdsRef,
   } = useChat({
-    socketRef,
-    roomId,
-    userId: myUserId,
+    socketRef, roomId, userId: myUserId,
     displayName: localStorage.getItem("displayName") ?? undefined,
   });
 
   const prevMsgCountRef = useRef(0);
-
   useEffect(() => {
     const isChatVisible = isMobile ? mobileSheet === "chat" : chatOpen;
     if (isChatVisible) {
@@ -195,47 +191,26 @@ export default function VideoMeet() {
   }, [participantsMeta]);
 
   const {
-    activeSpeakerId,
-    createAnalyzerForStream,
-    removeAnalyzer,
-    notifyPcsChanged,
+    activeSpeakerId, createAnalyzerForStream, removeAnalyzer, notifyPcsChanged,
   } = useAudioAnalyzer({
-    remoteStreams,
-    localStreamRef,
-    mutedRef,
-    pcsRef,
-    participantsMetaMap,
+    remoteStreams: unwrappedRemoteStreams,
+    localStreamRef, mutedRef, pcsRef, participantsMetaMap,
   });
 
   const {
-    recordersRef,
-    startRecordingForStream,
-    stopAllRecorders,
+    recordersRef, startRecordingForStream, stopAllRecorders,
     uploadRecordingsAndStoreTranscript,
   } = useRecording({
-    isHost,
-    roomId,
-    participantsMetaRef,
-    TRANSCRIPTS_ENABLED,
-    TRANSCRIPT_ENDPOINT,
-    API_BASE,
+    isHost, roomId, participantsMetaRef,
+    TRANSCRIPTS_ENABLED, TRANSCRIPT_ENDPOINT, API_BASE,
   });
 
   const {
-    createPeerConnection,
-    handleSignal,
-    politeRef,
-    pendingCandidatesRef,
-    makingOfferRef,
+    createPeerConnection, handleSignal, politeRef,
+    pendingCandidatesRef, makingOfferRef,
   } = useWebRTC({
-    socketRef,
-    localStreamRef,
-    pcsRef,
-    setRemoteStreams,
-    createAnalyzerForStream,
-    removeAnalyzer,
-    recordersRef,
-    ICE_CONFIG,
+    socketRef, localStreamRef, pcsRef, setRemoteStreams,
+    createAnalyzerForStream, removeAnalyzer, recordersRef, ICE_CONFIG,
   });
 
   const emotionSocketRef = useEmotionSocket({ setEmotionsMap });
@@ -243,62 +218,29 @@ export default function VideoMeet() {
   const { startPeriodicEmotionCapture, stopPeriodicEmotionCapture } =
     useEmotionCapture({
       socketRef: emotionSocketRef,
-      remoteStreamsRef,
-      participantsMetaRef,
-      myId,
-      roomId,
-      isHost,
+      remoteStreamsRef, participantsMetaRef,
+      myId, roomId, isHost,
       DEBUG_SHOW_EMOTION_FOR_EVERYONE: false,
       activeSpeakerIdRef,
     });
 
   const { toggleMute, toggleVideo, startScreenShare } = useMediaControls({
-    localStreamRef,
-    localVideoRef,
-    pcsRef,
-    socketRef,
-    myUserId,
-    createAnalyzerForStream,
-    removeAnalyzer,
-    startRecordingForStream,
-    stopPeriodicEmotionCapture,
-    startPeriodicEmotionCapture,
+    localStreamRef, localVideoRef, pcsRef, socketRef, myUserId,
+    createAnalyzerForStream, removeAnalyzer,
+    startRecordingForStream, stopPeriodicEmotionCapture, startPeriodicEmotionCapture,
   });
 
   const {
-    leaveCall,
-    endMeeting,
-    cleanupAll,
-    persistHistorySnapshot,
+    leaveCall, endMeeting, cleanupAll, persistHistorySnapshot,
   } = useMeetingLifecycle({
-    roomId,
-    navigate,
-    socketRef,
-    localStreamRef,
-    localVideoRef,
-    prevLocalStreamRef,
-    pcsRef,
-    participantsMeta,
-    isHost,
-    addToUserHistory,
-    TRANSCRIPTS_ENABLED,
-    TRANSCRIPT_ENDPOINT,
-    API_BASE,
-    createAnalyzerForStream,
-    removeAnalyzer,
-    startRecordingForStream,
-    stopAllRecorders,
-    uploadRecordingsAndStoreTranscript,
-    stopPeriodicEmotionCapture,
-    setConnecting,
-    setParticipantsMeta,
-    setRemoteStreams,
-    recordersRef,
-    makingOfferRef,
-    politeRef,
-    pendingCandidatesRef,
-    ignoreOfferRef,
-    isSettingRemoteAnswerPending,
+    roomId, navigate, socketRef, localStreamRef, localVideoRef,
+    prevLocalStreamRef, pcsRef, participantsMeta, isHost, addToUserHistory,
+    TRANSCRIPTS_ENABLED, TRANSCRIPT_ENDPOINT, API_BASE,
+    createAnalyzerForStream, removeAnalyzer, startRecordingForStream,
+    stopAllRecorders, uploadRecordingsAndStoreTranscript,
+    stopPeriodicEmotionCapture, setConnecting, setParticipantsMeta,
+    setRemoteStreams, recordersRef, makingOfferRef, politeRef,
+    pendingCandidatesRef, ignoreOfferRef, isSettingRemoteAnswerPending,
     SOCKET_SERVER_URL,
     onSocketReady: () => setSocketReady((n) => n + 1),
   });
@@ -306,14 +248,9 @@ export default function VideoMeet() {
   useEffect(() => { cleanupRef.current = cleanupAll; }, [cleanupAll]);
 
   useMediaBridge({
-    localStreamRef,
-    createAnalyzerForStream,
-    removeAnalyzer,
-    startRecordingForStream,
-    stopAllRecorders,
-    recordersRef,
-    startPeriodicEmotionCapture,
-    stopPeriodicEmotionCapture,
+    localStreamRef, createAnalyzerForStream, removeAnalyzer,
+    startRecordingForStream, stopAllRecorders, recordersRef,
+    startPeriodicEmotionCapture, stopPeriodicEmotionCapture,
   });
 
   const closePeer = useCallback(
@@ -352,10 +289,9 @@ export default function VideoMeet() {
     setStableSpeakerId(activeSpeakerId);
   }, [activeSpeakerId]);
 
-  useEffect(
-    () => () => { if (speakerTimerRef.current) clearTimeout(speakerTimerRef.current); },
-    []
-  );
+  useEffect(() => () => {
+    if (speakerTimerRef.current) clearTimeout(speakerTimerRef.current);
+  }, []);
 
   useEffect(() => {
     if (!isHost) return;
@@ -401,6 +337,7 @@ export default function VideoMeet() {
     setEmotionsMap,
     handleSignal,
     navigate,
+
     cleanupAll: () => cleanupRef.current?.(),
     persistHistorySnapshot,
     handleIncomingMessage,
@@ -410,10 +347,9 @@ export default function VideoMeet() {
     socketReady,
   });
 
-
   const remoteEntries = useMemo(
     () =>
-      Object.entries(remoteStreams)
+      Object.entries(unwrappedRemoteStreams)
         .filter(([peerId, stream]) => {
           if (!peerId) return false;
           if (myIdRef.current && peerId === myIdRef.current) return false;
@@ -422,7 +358,7 @@ export default function VideoMeet() {
           return isValidStream(stream);
         })
         .sort(([a], [b]) => a.localeCompare(b)),
-    [remoteStreams, myId]
+    [unwrappedRemoteStreams, myId]
   );
 
   const effectiveSpotlightId = useMemo(() => {
@@ -503,11 +439,8 @@ export default function VideoMeet() {
       <div className={s.bgMesh} aria-hidden="true" />
 
       <MeetTopBar
-        roomId={roomId}
-        isHost={isHost}
-        duration={meetDuration}
-        participantCount={participantsMeta.length + 1}
-        connecting={connecting}
+        roomId={roomId} isHost={isHost} duration={meetDuration}
+        participantCount={participantsMeta.length + 1} connecting={connecting}
       />
 
       <div className={s.body}>
@@ -517,11 +450,11 @@ export default function VideoMeet() {
           {multiPartyLayout && (
             <div
               className={`${s.stageLayout} ${isMobile ? s.stageLayoutMobile : ""}`}
-              style={isMobile ? getMobileStageStyle(mobileParticipantCount) : undefined}
+              style={isMobile ? { flexDirection: "column", height: "100%" } : undefined}
             >
               <div
                 className={s.spotlightWrap}
-                style={isMobile ? getMobileSpotlightStyle(mobileParticipantCount) : undefined}
+                style={isMobile ? { flex: "1 1 0", minHeight: 0 } : undefined}
               >
                 {activeEntry && (
                   <SpotlightCard
@@ -539,7 +472,11 @@ export default function VideoMeet() {
               {otherEntries.length > 0 && (
                 <div
                   className={`${s.filmstrip} ${isMobile ? s.filmstripHoriz : ""}`}
-                  style={isMobile ? getMobileFilmstripStyle(mobileParticipantCount) : undefined}
+                  style={isMobile ? {
+                    flexDirection: "row", height: "120px", minHeight: "120px",
+                    flexShrink: 0, width: "100%", overflowX: "auto", overflowY: "hidden",
+                    display: "flex", gap: "6px", padding: "4px",
+                  } : undefined}
                 >
                   {otherEntries.map(([peerId, stream]) => (
                     <ParticipantCard
@@ -551,7 +488,10 @@ export default function VideoMeet() {
                       isActive={stableSpeakerId === peerId}
                       isHost={isHost}
                       compact
-                      style={isMobile ? getMobileCardStyle(mobileParticipantCount) : undefined}
+                      style={isMobile ? {
+                        width: "160px", height: "112px", minWidth: "160px",
+                        flexShrink: 0, borderRadius: "10px",
+                      } : undefined}
                       onClick={() => {
                         spotlightPeerRef.current = peerId;
                         setSpotlightPeerId(peerId);
@@ -567,13 +507,10 @@ export default function VideoMeet() {
         <AnimatePresence>
           {chatOpen && !isMobile && (
             <MeetChatPanel
-              chatMessages={chatMessages}
-              participantsMeta={participantsMeta}
-              myUserId={myUserId}
-              retryMessage={retryMessage}
+              chatMessages={chatMessages} participantsMeta={participantsMeta}
+              myUserId={myUserId} retryMessage={retryMessage}
               sendChatMessage={sendChatMessage}
-              chatContainerRef={chatContainerRef}
-              chatEndRef={chatEndRef}
+              chatContainerRef={chatContainerRef} chatEndRef={chatEndRef}
               onClose={() => setChatOpen(false)}
             />
           )}
@@ -583,18 +520,15 @@ export default function VideoMeet() {
           {showEmotionPanel && (
             <motion.div
               key="emotion-panel"
-              initial={{ opacity: 0, x: -40 }}
-              animate={{ opacity: 1, x: 0 }}
+              initial={{ opacity: 0, x: -40 }} animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -40 }}
               transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
               style={{ position: "absolute", inset: 0, pointerEvents: "none" }}
             >
               <div style={{ pointerEvents: "all" }}>
                 <EmotionServicePanel
-                  emotionsMap={socketEmotionMap}
-                  participantsMeta={participantsMeta}
-                  isHost={isHost}
-                  DEBUG_SHOW_EMOTION_FOR_EVERYONE={false}
+                  emotionsMap={socketEmotionMap} participantsMeta={participantsMeta}
+                  isHost={isHost} DEBUG_SHOW_EMOTION_FOR_EVERYONE={false}
                 />
               </div>
             </motion.div>
@@ -605,24 +539,18 @@ export default function VideoMeet() {
       <MeetLocalPreview
         localVideoRef={localVideoRef}
         displayName={localStorage.getItem("displayName") || "You"}
-        isHost={isHost}
-        isSpeaking={stableSpeakerId === "local"}
-        muted={muted}
-        videoOff={videoOff}
-        shareEmotion={shareEmotion}
+        isHost={isHost} isSpeaking={stableSpeakerId === "local"}
+        muted={muted} videoOff={videoOff} shareEmotion={shareEmotion}
         onToggleMute={() => toggleMute(muted, setMuted, mutedRef, TRANSCRIPTS_ENABLED, recordersRef)}
         onToggleVideo={() => toggleVideo(videoOff, setVideoOff)}
         onToggleEmotion={handleToggleEmotion}
       />
 
       <MeetControlBar
-        muted={muted}
-        videoOff={videoOff}
+        muted={muted} videoOff={videoOff}
         chatOpen={isMobile ? mobileSheet === "chat" : chatOpen}
-        shareEmotion={shareEmotion}
-        isHost={isHost}
-        endingMeeting={endingMeeting}
-        unreadCount={unreadCount}
+        shareEmotion={shareEmotion} isHost={isHost}
+        endingMeeting={endingMeeting} unreadCount={unreadCount}
         onToggleMute={() => toggleMute(muted, setMuted, mutedRef, TRANSCRIPTS_ENABLED, recordersRef)}
         onToggleVideo={() => toggleVideo(videoOff, setVideoOff)}
         onScreenShare={() => startScreenShare(prevLocalStreamRef)}
@@ -640,45 +568,12 @@ export default function VideoMeet() {
             if (tab === "chat") setUnreadCount(0);
           }}
           showEmotionTab={isHost && shareEmotion}
-          chatMessages={chatMessages}
-          participantsMeta={participantsMeta}
-          myUserId={myUserId}
-          retryMessage={retryMessage}
+          chatMessages={chatMessages} participantsMeta={participantsMeta}
+          myUserId={myUserId} retryMessage={retryMessage}
           sendChatMessage={sendChatMessage}
-          emotionsMap={socketEmotionMap}
-          isHost={isHost}
+          emotionsMap={socketEmotionMap} isHost={isHost}
         />
       )}
     </div>
   );
-}
-
-function getMobileStageStyle() {
-  return { flexDirection: "column", height: "100%" };
-}
-function getMobileSpotlightStyle() {
-  return { flex: "1 1 0", minHeight: 0 };
-}
-function getMobileFilmstripStyle() {
-  return {
-    flexDirection: "row",
-    height: "120px",
-    minHeight: "120px",
-    flexShrink: 0,
-    width: "100%",
-    overflowX: "auto",
-    overflowY: "hidden",
-    display: "flex",
-    gap: "6px",
-    padding: "4px",
-  };
-}
-function getMobileCardStyle() {
-  return {
-    width: "160px",
-    height: "112px",
-    minWidth: "160px",
-    flexShrink: 0,
-    borderRadius: "10px",
-  };
 }
