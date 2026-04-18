@@ -40,8 +40,7 @@ const HOST_ONLY_EMOTION = true;
 
 function isValidStream(stream) {
   return (
-    stream &&
-    typeof stream.getTracks === "function" &&
+    stream instanceof MediaStream &&
     stream.getTracks().some((t) => t.readyState === "live")
   );
 }
@@ -90,7 +89,6 @@ export default function VideoMeet() {
   const localStreamRef = useRef(null);
   const prevLocalStreamRef = useRef(null);
   const pcsRef = useRef({});
-  const remoteStreamsRef = useRef({});
   const chatContainerRef = useRef(null);
   const chatEndRef = useRef(null);
   const cleanupRef = useRef(null);
@@ -110,17 +108,18 @@ export default function VideoMeet() {
   const [socketReady, setSocketReady] = useState(0);
   const [spotlightPeerId, setSpotlightPeerId] = useState(null);
   const [myId, setMyId] = useState(null);
+  const myIdRef = useRef(null);
+
   const [shareEmotion, setShareEmotion] = useState(false);
   const [emotionsMap, setEmotionsMap] = useState({});
   const [stableSpeakerId, setStableSpeakerId] = useState(null);
   const [meetDuration, setMeetDuration] = useState(0);
-  const [streamVersion, setStreamVersion] = useState(0);
-
   const [mobileSheet, setMobileSheet] = useState(null);
   const [unreadCount, setUnreadCount] = useState(0);
 
   const isMobile = useIsMobile(900);
   const participantsMetaRef = useRef([]);
+
   useEffect(() => {
     participantsMetaRef.current = participantsMeta;
   }, [participantsMeta]);
@@ -136,6 +135,11 @@ export default function VideoMeet() {
     [myId]
   );
 
+  const setMyIdSynced = useCallback((id) => {
+    myIdRef.current = id;
+    setMyId(id);
+  }, []);
+
   const mutedRef = useRef(muted);
   const videoOffRef = useRef(videoOff);
   useEffect(() => { mutedRef.current = muted; }, [muted]);
@@ -147,16 +151,11 @@ export default function VideoMeet() {
     return () => clearInterval(id);
   }, []);
 
-  const unwrappedRemoteStreams = useMemo(() => {
-    const out = {};
-    for (const [id, entry] of Object.entries(remoteStreams))
-      out[id] = entry?.stream ?? entry;
-    return out;
-  }, [remoteStreams, streamVersion]);
 
+  const remoteStreamsRef = useRef({});
   useEffect(() => {
-    remoteStreamsRef.current = unwrappedRemoteStreams;
-  }, [unwrappedRemoteStreams]);
+    remoteStreamsRef.current = remoteStreams;
+  }, [remoteStreams]);
 
   const {
     chatMessages,
@@ -201,7 +200,7 @@ export default function VideoMeet() {
     removeAnalyzer,
     notifyPcsChanged,
   } = useAudioAnalyzer({
-    remoteStreams: unwrappedRemoteStreams,
+    remoteStreams,
     localStreamRef,
     mutedRef,
     pcsRef,
@@ -232,10 +231,7 @@ export default function VideoMeet() {
     socketRef,
     localStreamRef,
     pcsRef,
-    setRemoteStreams: (updater) => {
-      setRemoteStreams(updater);
-      setStreamVersion((v) => v + 1);
-    },
+    setRemoteStreams,
     createAnalyzerForStream,
     removeAnalyzer,
     recordersRef,
@@ -335,11 +331,11 @@ export default function VideoMeet() {
       removeAnalyzer(peerId);
       notifyPcsChanged();
       setRemoteStreams((prev) => {
+        if (!prev[peerId]) return prev;
         const next = { ...prev };
         delete next[peerId];
         return next;
       });
-      setStreamVersion((v) => v + 1);
       setStableSpeakerId((prev) => (prev === peerId ? null : prev));
       setSpotlightPeerId((prev) => {
         if (prev !== peerId) return prev;
@@ -384,12 +380,14 @@ export default function VideoMeet() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [toggleMute, toggleVideo, isMobile]);
 
-  useEffect(() => () => { Object.keys(pcsRef.current).forEach((pid) => closePeer(pid)); }, []);
+  useEffect(() => () => {
+    Object.keys(pcsRef.current).forEach((pid) => closePeer(pid));
+  }, []);
 
   useSocket({
     socketRef,
     roomId,
-    setMyId,
+    setMyId: setMyIdSynced,
     setParticipantsMeta,
     setChatMessages,
     seenMsgIdsRef,
@@ -412,12 +410,19 @@ export default function VideoMeet() {
     socketReady,
   });
 
+
   const remoteEntries = useMemo(
     () =>
-      Object.entries(unwrappedRemoteStreams)
-        .filter(([peerId, stream]) => peerId && peerId !== myId && isValidStream(stream))
+      Object.entries(remoteStreams)
+        .filter(([peerId, stream]) => {
+          if (!peerId) return false;
+          if (myIdRef.current && peerId === myIdRef.current) return false;
+          if (myId && peerId === myId) return false;
+          if (socketRef.current?.id && peerId === socketRef.current.id) return false;
+          return isValidStream(stream);
+        })
         .sort(([a], [b]) => a.localeCompare(b)),
-    [unwrappedRemoteStreams, myId, streamVersion]
+    [remoteStreams, myId]
   );
 
   const effectiveSpotlightId = useMemo(() => {
@@ -430,12 +435,16 @@ export default function VideoMeet() {
   }, [remoteEntries, spotlightPeerId, stableSpeakerId]);
 
   const activeEntry = useMemo(
-    () => !effectiveSpotlightId ? null : remoteEntries.find(([id]) => id === effectiveSpotlightId) || null,
+    () => !effectiveSpotlightId
+      ? null
+      : remoteEntries.find(([id]) => id === effectiveSpotlightId) || null,
     [remoteEntries, effectiveSpotlightId]
   );
 
   const otherEntries = useMemo(
-    () => !activeEntry ? remoteEntries : remoteEntries.filter(([id]) => id !== activeEntry[0]),
+    () => !activeEntry
+      ? remoteEntries
+      : remoteEntries.filter(([id]) => id !== activeEntry[0]),
     [remoteEntries, activeEntry]
   );
 
@@ -487,7 +496,6 @@ export default function VideoMeet() {
 
   const multiPartyLayout = remoteEntries.length > 0 && activeEntry;
   const showEmotionPanel = isHost && shareEmotion && !isMobile;
-
   const mobileParticipantCount = remoteEntries.length;
 
   return (
@@ -645,27 +653,13 @@ export default function VideoMeet() {
   );
 }
 
-function getMobileStageStyle(count) {
-  if (count === 1) {
-    return {
-      flexDirection: "column",
-      height: "100%",
-    };
-  }
-  return {
-    flexDirection: "column",
-    height: "100%",
-  };
+function getMobileStageStyle() {
+  return { flexDirection: "column", height: "100%" };
 }
-
-function getMobileSpotlightStyle(count) {
-  if (count === 1) {
-    return { flex: "1 1 0", minHeight: 0 };
-  }
+function getMobileSpotlightStyle() {
   return { flex: "1 1 0", minHeight: 0 };
 }
-
-function getMobileFilmstripStyle(count) {
+function getMobileFilmstripStyle() {
   return {
     flexDirection: "row",
     height: "120px",
@@ -679,8 +673,7 @@ function getMobileFilmstripStyle(count) {
     padding: "4px",
   };
 }
-
-function getMobileCardStyle(count) {
+function getMobileCardStyle() {
   return {
     width: "160px",
     height: "112px",

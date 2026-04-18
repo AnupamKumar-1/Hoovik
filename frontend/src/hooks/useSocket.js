@@ -55,7 +55,10 @@ export default function useSocket({
 
     let disconnectTimer = null;
 
+    let mySocketId = socket.connected ? socket.id : null;
+
     const onConnect = () => {
+      mySocketId = socket.id;
       h.current.setMyId(socket.id);
       if (disconnectTimer) {
         clearTimeout(disconnectTimer);
@@ -96,9 +99,10 @@ export default function useSocket({
 
     const onParticipantsUpdated = (participants) => {
       if (!Array.isArray(participants)) return;
+
       h.current.setParticipantsMeta(
         participants
-          .filter((p) => p.id !== socket.id)
+          .filter((p) => p.id !== mySocketId)
           .map((p) => ({ id: p.id, meta: p.meta || {}, polite: !!p.polite }))
       );
     };
@@ -117,7 +121,10 @@ export default function useSocket({
     socket.on("update-participant-state", onParticipantStateUpdate);
 
     const setupPeer = (p) => {
-      if (!p?.id || p.id === socket.id) return;
+
+      if (!p?.id) return;
+      if (p.id === mySocketId) return;
+      if (p.id === socket.id) return;
 
       const { politeRef, pendingCandidatesRef, createPeerConnection } =
         h.current;
@@ -132,13 +139,14 @@ export default function useSocket({
     };
 
     const onExistingParticipants = (existing) => {
-      const normalized = (Array.isArray(existing) ? existing : []).map(
-        (item) => ({
+      const normalized = (Array.isArray(existing) ? existing : [])
+
+        .filter((item) => item.id && item.id !== mySocketId && item.id !== socket.id)
+        .map((item) => ({
           id: item.id,
           polite: item.polite,
           meta: item.meta || {},
-        })
-      );
+        }));
 
       h.current.setParticipantsMeta((prev) => {
         const map = {};
@@ -146,6 +154,9 @@ export default function useSocket({
         normalized.forEach((p) => {
           map[p.id] = { id: p.id, meta: p.meta || {}, polite: p.polite };
         });
+
+        delete map[mySocketId];
+        delete map[socket.id];
         return Object.values(map);
       });
 
@@ -156,7 +167,8 @@ export default function useSocket({
 
     const onUserJoined = (peer) => {
       const peerId = peer?.id;
-      if (!peerId || peerId === socket.id) return;
+
+      if (!peerId || peerId === mySocketId || peerId === socket.id) return;
 
       h.current.setParticipantsMeta((prev) => {
         if (prev.some((p) => p.id === peerId)) return prev;
@@ -186,6 +198,7 @@ export default function useSocket({
 
     const onSignal = async (fromId, messageStr) => {
       if (!fromId || !messageStr) return;
+      if (fromId === mySocketId || fromId === socket.id) return;
       if (h.current.politeRef.current[fromId] === undefined) {
         h.current.politeRef.current[fromId] = true;
       }
@@ -228,7 +241,6 @@ export default function useSocket({
       }, 8000);
     };
     socket.on("disconnect", onDisconnect);
-
 
     return () => {
       if (disconnectTimer) {

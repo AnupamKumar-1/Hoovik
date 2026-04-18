@@ -24,12 +24,8 @@ function getAvatarColor(initial) {
 
 function deriveName(meta, emotion, id) {
   const raw =
-    meta?.name ??
-    emotion?.__name ??
-    emotion?.name ??
-    emotion?.displayName ??
-    emotion?.display_name ??
-    null;
+    meta?.name ?? emotion?.__name ?? emotion?.name ??
+    emotion?.displayName ?? emotion?.display_name ?? null;
   if (raw && typeof raw === "string" && raw.trim().length > 0) return raw.trim();
   if (typeof id === "string" && id.length > 0) return id.slice(0, 6);
   return "Unknown";
@@ -37,10 +33,6 @@ function deriveName(meta, emotion, id) {
 
 function getLiveVideoTrack(stream) {
   return stream?.getVideoTracks?.().find((t) => t.readyState === "live") ?? null;
-}
-
-function isTrackActive(t) {
-  return !!t && t.readyState === "live";
 }
 
 const WAVE_DELAYS = [0.55, 0.4, 0.7, 0.5, 0.62, 0.48, 0.75];
@@ -56,21 +48,15 @@ function SpotlightWaveBars() {
 }
 
 function SpotlightCard({
-  id,
-  stream,
-  meta,
-  emotion,
-  isActive = false,
-  isHost = false,
+  id, stream, meta, emotion,
+  isActive = false, isHost = false,
   DEBUG_SHOW_EMOTION_FOR_EVERYONE = false,
-  renderEmotionBadgeForId,
-  style,
+  renderEmotionBadgeForId, style,
 }) {
   const videoRef = useRef(null);
-  const streamRef = useRef(null);
   const unmountedRef = useRef(false);
-  const pollTimerRef = useRef(null);
-  const trackCleanupRef = useRef([]);
+  const pollRef = useRef(null);
+  const cleanupRef = useRef([]);
 
   const name = useMemo(() => deriveName(meta, emotion, id), [meta, emotion, id]);
   const initial = useMemo(() => (name[0] ?? "?").toUpperCase(), [name]);
@@ -79,165 +65,107 @@ function SpotlightCard({
   const [videoActive, setVideoActive] = useState(false);
   const [debouncedIsActive, setDebouncedIsActive] = useState(isActive);
 
-  const safeSetVideoActive = useCallback((val) => {
-    if (!unmountedRef.current) setVideoActive(val);
-  }, []);
-
   useEffect(() => {
     unmountedRef.current = false;
-    return () => {
-      unmountedRef.current = true;
-      if (pollTimerRef.current) clearInterval(pollTimerRef.current);
-      trackCleanupRef.current.forEach((fn) => fn());
-      trackCleanupRef.current = [];
-    };
+    return () => { unmountedRef.current = true; };
   }, []);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
+    const t = setTimeout(() => {
       if (!unmountedRef.current) setDebouncedIsActive(isActive);
     }, 120);
-    return () => clearTimeout(timer);
+    return () => clearTimeout(t);
   }, [isActive]);
 
-  const attachStream = useCallback((s) => {
-    const el = videoRef.current;
-    if (!el) return;
-    if (el.srcObject !== s) {
-      el.srcObject = s || null;
-    }
-    if (s) {
-      const p = el.play();
-      if (p) p.catch(() => { });
-    } else {
-      try { el.pause(); } catch { }
-    }
+  const safeSetActive = useCallback((v) => {
+    if (!unmountedRef.current) setVideoActive(v);
   }, []);
 
-  const attachVideoTrackListeners = useCallback((track, currentStream) => {
-    const onMute = () => {
-      if (streamRef.current !== currentStream) return;
-      const stillLive = getLiveVideoTrack(currentStream);
-      safeSetVideoActive(isTrackActive(stillLive));
-    };
-    const onUnmute = () => {
-      if (streamRef.current !== currentStream) return;
-      safeSetVideoActive(true);
-      attachStream(currentStream);
-    };
-    const onEnded = () => {
-      if (streamRef.current !== currentStream) return;
-      const stillLive = getLiveVideoTrack(currentStream);
-      safeSetVideoActive(isTrackActive(stillLive));
-    };
 
-    track.addEventListener("mute", onMute);
-    track.addEventListener("unmute", onUnmute);
-    track.addEventListener("ended", onEnded);
+  const sync = useCallback(() => {
+    const el = videoRef.current;
+    if (!el || !stream) return;
 
-    return () => {
-      track.removeEventListener("mute", onMute);
-      track.removeEventListener("unmute", onUnmute);
-      track.removeEventListener("ended", onEnded);
-    };
-  }, [safeSetVideoActive, attachStream]);
+    if (el.srcObject !== stream) {
+      el.srcObject = stream;
+      el.play().catch(() => { });
+    }
+    const hasVideo = !!getLiveVideoTrack(stream);
+    safeSetActive(hasVideo);
+  }, [stream, safeSetActive]);
 
   useEffect(() => {
-    streamRef.current = stream;
 
-    if (pollTimerRef.current) {
-      clearInterval(pollTimerRef.current);
-      pollTimerRef.current = null;
-    }
+    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+    cleanupRef.current.forEach((fn) => fn());
+    cleanupRef.current = [];
 
-    trackCleanupRef.current.forEach((fn) => fn());
-    trackCleanupRef.current = [];
+    const el = videoRef.current;
 
     if (!stream) {
-      safeSetVideoActive(false);
-      attachStream(null);
+      safeSetActive(false);
+      if (el) { try { el.pause(); el.srcObject = null; } catch { } }
       return;
     }
 
-    attachStream(stream);
 
-    const evalVideoActive = () => {
-      const track = getLiveVideoTrack(stream);
-      return isTrackActive(track);
-    };
-
-    const active = evalVideoActive();
-    safeSetVideoActive(active);
-
-    const videoTrack = getLiveVideoTrack(stream);
-    if (videoTrack) {
-      const cleanup = attachVideoTrackListeners(videoTrack, stream);
-      trackCleanupRef.current.push(cleanup);
+    if (el && el.srcObject !== stream) {
+      el.srcObject = stream;
+      el.play().catch(() => { });
     }
 
-    const onAddTrack = (evt) => {
-      if (streamRef.current !== stream) return;
+    const hasVideo = !!getLiveVideoTrack(stream);
+    safeSetActive(hasVideo);
 
-      if (evt.track && evt.track.kind === "video") {
-        const newActive = isTrackActive(evt.track);
-        safeSetVideoActive(newActive);
-        if (newActive) attachStream(stream);
+    const onTrackEvent = () => sync();
+    stream.addEventListener("addtrack", onTrackEvent);
+    stream.addEventListener("removetrack", onTrackEvent);
+    cleanupRef.current.push(() => {
+      stream.removeEventListener("addtrack", onTrackEvent);
+      stream.removeEventListener("removetrack", onTrackEvent);
+    });
 
-        const cleanup = attachVideoTrackListeners(evt.track, stream);
-        trackCleanupRef.current.push(cleanup);
+
+    const vt = getLiveVideoTrack(stream);
+    if (vt) {
+      const onMute = () => safeSetActive(!!getLiveVideoTrack(stream));
+      const onUnmute = () => { sync(); safeSetActive(true); };
+      const onEnded = () => safeSetActive(!!getLiveVideoTrack(stream));
+      vt.addEventListener("mute", onMute);
+      vt.addEventListener("unmute", onUnmute);
+      vt.addEventListener("ended", onEnded);
+      cleanupRef.current.push(() => {
+        vt.removeEventListener("mute", onMute);
+        vt.removeEventListener("unmute", onUnmute);
+        vt.removeEventListener("ended", onEnded);
+      });
+    }
+
+    // Poll as fallback — covers late-arriving tracks and renegotiation
+    // 160 × 250ms = 40s
+    let attempts = 0;
+    pollRef.current = setInterval(() => {
+      if (unmountedRef.current) { clearInterval(pollRef.current); return; }
+      attempts++;
+      sync();
+      if (getLiveVideoTrack(stream) || attempts >= 160) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
       }
-
-      const currentActive = evalVideoActive();
-      safeSetVideoActive(currentActive);
-      if (currentActive) attachStream(stream);
-    };
-
-    const onRemoveTrack = () => {
-      if (streamRef.current !== stream) return;
-      safeSetVideoActive(evalVideoActive());
-    };
-
-    stream.addEventListener("addtrack", onAddTrack);
-    stream.addEventListener("removetrack", onRemoveTrack);
-
-    if (!active) {
-      let attempts = 0;
-      pollTimerRef.current = setInterval(() => {
-        attempts++;
-        if (streamRef.current !== stream || unmountedRef.current) {
-          clearInterval(pollTimerRef.current);
-          pollTimerRef.current = null;
-          return;
-        }
-        const nowActive = evalVideoActive();
-        if (nowActive) {
-          safeSetVideoActive(true);
-          attachStream(stream);
-          clearInterval(pollTimerRef.current);
-          pollTimerRef.current = null;
-          return;
-        }
-        if (attempts >= 40) {
-          clearInterval(pollTimerRef.current);
-          pollTimerRef.current = null;
-        }
-      }, 250);
-    }
+    }, 250);
 
     return () => {
-      stream.removeEventListener("addtrack", onAddTrack);
-      stream.removeEventListener("removetrack", onRemoveTrack);
-      trackCleanupRef.current.forEach((fn) => fn());
-      trackCleanupRef.current = [];
+      if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+      cleanupRef.current.forEach((fn) => fn());
+      cleanupRef.current = [];
     };
-  }, [stream, safeSetVideoActive, attachStream, attachVideoTrackListeners]);
+  }, [stream, sync, safeSetActive]);
 
+  // Cleanup video element on unmount
   useEffect(() => {
     const el = videoRef.current;
     return () => {
-      if (el) {
-        try { el.pause(); el.srcObject = null; } catch { }
-      }
+      if (el) { try { el.pause(); el.srcObject = null; } catch { } }
     };
   }, []);
 
@@ -247,20 +175,14 @@ function SpotlightCard({
   );
 
   const rootStyle = useMemo(() => ({
-    position: "relative",
-    overflow: "hidden",
-    width: "100%",
-    height: "100%",
-    borderRadius: 14,
-    boxSizing: "border-box",
-    ...style,
+    position: "relative", overflow: "hidden",
+    width: "100%", height: "100%",
+    borderRadius: 14, boxSizing: "border-box", ...style,
   }), [style]);
 
-  const emotionBadge = useMemo(
-    () =>
-      (isHost || DEBUG_SHOW_EMOTION_FOR_EVERYONE) && renderEmotionBadgeForId
-        ? renderEmotionBadgeForId(id)
-        : null,
+  const emotionBadge = useMemo(() =>
+    (isHost || DEBUG_SHOW_EMOTION_FOR_EVERYONE) && renderEmotionBadgeForId
+      ? renderEmotionBadgeForId(id) : null,
     [id, isHost, DEBUG_SHOW_EMOTION_FOR_EVERYONE, renderEmotionBadgeForId]
   );
 
@@ -273,8 +195,7 @@ function SpotlightCard({
         autoPlay
         playsInline
         style={{
-          width: "100%",
-          height: "100%",
+          width: "100%", height: "100%",
           objectFit: "cover",
           display: videoActive ? "block" : "none",
         }}
@@ -286,11 +207,8 @@ function SpotlightCard({
             <div
               className={styles.avatarCircle}
               style={{
-                width: 72,
-                height: 72,
-                fontSize: "1.7rem",
-                background: avatarColor.bg,
-                boxShadow: avatarColor.glow,
+                width: 72, height: 72, fontSize: "1.7rem",
+                background: avatarColor.bg, boxShadow: avatarColor.glow,
               }}
             >
               {initial}

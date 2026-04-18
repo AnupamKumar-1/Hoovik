@@ -34,7 +34,7 @@ export default function useWebRTC({
   const pendingSignalsRef = useRef({});
   const pendingPeerQueueRef = useRef([]);
   const handleSignalRef = useRef(null);
-  const streamMapRef = useRef({});
+  const peerStreamRef = useRef({});
 
   const teardown = useCallback(
     (peerId) => {
@@ -55,7 +55,7 @@ export default function useWebRTC({
       delete isSettingRemoteAnswerPending.current[peerId];
       delete analyzerAttachedRef.current[peerId];
       delete pendingSignalsRef.current[peerId];
-      delete streamMapRef.current[peerId];
+      delete peerStreamRef.current[peerId];
 
       removeAnalyzer(peerId);
 
@@ -91,7 +91,6 @@ export default function useWebRTC({
         stream.removeEventListener("addtrack", onAddTrack);
         tryAttach();
       };
-
       stream.addEventListener("addtrack", onAddTrack);
       stream.addEventListener(
         "inactive",
@@ -100,6 +99,34 @@ export default function useWebRTC({
       );
     },
     [pcsRef, createAnalyzerForStream]
+  );
+
+
+  const pushStreamUpdate = useCallback(
+    (peerId, stream, pcId) => {
+      setRemoteStreams((prev) => {
+
+        if (prev[peerId] === stream) {
+
+          return prev;
+        }
+        return { ...prev, [peerId]: stream };
+      });
+    },
+    [setRemoteStreams]
+  );
+
+
+  const forceStreamUpdate = useCallback(
+    (peerId) => {
+      setRemoteStreams((prev) => {
+        const s = prev[peerId];
+        if (!s) return prev;
+
+        return { ...prev };
+      });
+    },
+    [setRemoteStreams]
   );
 
   const createPeerConnection = useCallback(
@@ -126,6 +153,10 @@ export default function useWebRTC({
         delete pcsRef.current[peerId];
       }
 
+
+      delete peerStreamRef.current[peerId];
+      delete analyzerAttachedRef.current[peerId];
+
       const pc = new RTCPeerConnection(ICE_CONFIG);
       const pcId = Symbol();
       pc.__id = pcId;
@@ -139,15 +170,12 @@ export default function useWebRTC({
       ignoreOfferRef.current[peerId] = false;
       pendingCandidatesRef.current[peerId] = [];
       isSettingRemoteAnswerPending.current[peerId] = false;
-      analyzerAttachedRef.current[peerId] = false;
 
       try {
         const ls = localStreamRef.current;
         if (ls) {
           ls.getTracks().forEach((track) => {
-            const sender = pc
-              .getSenders()
-              .find((s) => s.track?.kind === track.kind);
+            const sender = pc.getSenders().find((s) => s.track?.kind === track.kind);
             if (sender) {
               sender.replaceTrack(track);
             } else {
@@ -162,63 +190,31 @@ export default function useWebRTC({
 
       pcsRef.current[peerId] = pc;
 
+
+      const peerStream = new MediaStream();
+      peerStreamRef.current[peerId] = peerStream;
+
       pc.ontrack = (ev) => {
-        let stream = ev.streams?.[0];
+        const currentPc = pcsRef.current[peerId];
+        if (!currentPc || currentPc.__id !== pcId) return;
 
-        if (!stream) {
-          const existing = streamMapRef.current[peerId]?.stream;
-          if (existing) {
-            existing.addTrack(ev.track);
-            stream = existing;
-          } else {
-            stream = new MediaStream([ev.track]);
-          }
+        const myStream = peerStreamRef.current[peerId];
+        if (!myStream) return;
+
+
+        if (!myStream.getTrackById(ev.track.id)) {
+          myStream.addTrack(ev.track);
         }
 
-        const prevEntry = streamMapRef.current[peerId];
-        const newTrackCount = stream.getTracks().length;
 
-        if (prevEntry && prevEntry.stream === stream && prevEntry.trackCount === newTrackCount) {
-          return;
-        }
-
-        streamMapRef.current[peerId] = { stream, trackCount: newTrackCount };
-
-        setRemoteStreams((prev) => {
-          const prevVal = prev[peerId];
-          if (prevVal && prevVal.stream === stream && prevVal.trackCount === newTrackCount) return prev;
-          return { ...prev, [peerId]: { stream, trackCount: newTrackCount } };
-        });
-
-        const onTrackChange = () => {
-          const currentPc = pcsRef.current[peerId];
-          if (!currentPc || currentPc.__id !== pcId) {
-            stream.removeEventListener("addtrack", onTrackChange);
-            stream.removeEventListener("removetrack", onTrackChange);
-            return;
-          }
-          const updatedCount = stream.getTracks().length;
-          const cached = streamMapRef.current[peerId];
-          if (cached && cached.stream === stream && cached.trackCount === updatedCount) return;
-          streamMapRef.current[peerId] = { stream, trackCount: updatedCount };
-          setRemoteStreams((prev) => {
-            const prevVal = prev[peerId];
-            if (
-              prevVal &&
-              prevVal.stream === stream &&
-              prevVal.trackCount === updatedCount
-            )
-              return prev;
-            return { ...prev, [peerId]: { stream, trackCount: updatedCount } };
+        if (ev.streams?.[0]) {
+          ev.streams[0].getTracks().forEach((t) => {
+            if (!myStream.getTrackById(t.id)) myStream.addTrack(t);
           });
-        };
-
-        if (!prevEntry || prevEntry.stream !== stream) {
-          stream.addEventListener("addtrack", onTrackChange);
-          stream.addEventListener("removetrack", onTrackChange);
         }
 
-        attachAnalyzerWhenReady(peerId, stream, pcId);
+        pushStreamUpdate(peerId, myStream, pcId);
+        attachAnalyzerWhenReady(peerId, myStream, pcId);
       };
 
       pc.onicecandidate = (ev) => {
@@ -237,7 +233,6 @@ export default function useWebRTC({
           pc.connectionState === "closed"
         )
           return;
-
         try {
           makingOfferRef.current[peerId] = true;
           await pc.setLocalDescription(await pc.createOffer());
@@ -260,6 +255,8 @@ export default function useWebRTC({
             clearTimeout(disconnectTimeoutRef.current[peerId]);
             delete disconnectTimeoutRef.current[peerId];
           }
+          
+          forceStreamUpdate(peerId);
         }
 
         if (state === "disconnected") {
@@ -274,17 +271,13 @@ export default function useWebRTC({
 
         if (state === "failed") {
           const current = pcsRef.current[peerId];
-          if (current && current.__id === pcId) {
-            teardown(peerId);
-          }
+          if (current && current.__id === pcId) teardown(peerId);
         }
       };
 
       pc.oniceconnectionstatechange = () => {
         if (pc.iceConnectionState === "failed") {
-          try {
-            pc.restartIce();
-          } catch { }
+          try { pc.restartIce(); } catch { }
         }
       };
 
@@ -301,9 +294,10 @@ export default function useWebRTC({
       pcsRef,
       localStreamRef,
       socketRef,
-      setRemoteStreams,
       attachAnalyzerWhenReady,
       teardown,
+      pushStreamUpdate,
+      forceStreamUpdate,
     ]
   );
 
@@ -317,17 +311,12 @@ export default function useWebRTC({
     if (localStreamRef.current) {
       flushPendingPeers();
     }
-
     const onLocalStreamReady = (ev) => {
-      if (ev.detail?.stream) {
-        localStreamRef.current = ev.detail.stream;
-      }
+      if (ev.detail?.stream) localStreamRef.current = ev.detail.stream;
       flushPendingPeers();
     };
-
     window.addEventListener("localstream:ready", onLocalStreamReady);
-    return () =>
-      window.removeEventListener("localstream:ready", onLocalStreamReady);
+    return () => window.removeEventListener("localstream:ready", onLocalStreamReady);
   }, [flushPendingPeers, localStreamRef]);
 
   const handleSignal = useCallback(
@@ -364,14 +353,11 @@ export default function useWebRTC({
               isSettingRemoteAnswerPending.current[fromId]);
 
           const offerCollision = isOffer && !readyForOffer;
-
           ignoreOfferRef.current[fromId] = !polite && offerCollision;
           if (ignoreOfferRef.current[fromId]) return;
 
           if (isOffer && offerCollision) {
-            try {
-              await pc.setLocalDescription({ type: "rollback" });
-            } catch { }
+            try { await pc.setLocalDescription({ type: "rollback" }); } catch { }
           }
 
           if (isAnswer && pc.signalingState !== "have-local-offer") return;
@@ -383,9 +369,7 @@ export default function useWebRTC({
           const pending = pendingCandidatesRef.current[fromId] || [];
           pendingCandidatesRef.current[fromId] = [];
           for (const candidate of pending) {
-            try {
-              await pc.addIceCandidate(candidate);
-            } catch { }
+            try { await pc.addIceCandidate(candidate); } catch { }
           }
 
           if (isOffer) {
@@ -401,9 +385,7 @@ export default function useWebRTC({
             pendingCandidatesRef.current[fromId] || [];
 
           if (pc.remoteDescription) {
-            try {
-              await pc.addIceCandidate(msg.candidate);
-            } catch { }
+            try { await pc.addIceCandidate(msg.candidate); } catch { }
           } else {
             pendingCandidatesRef.current[fromId].push(msg.candidate);
           }
