@@ -1,5 +1,5 @@
-import React from "react";
-import { motion } from "framer-motion";
+import React, { useState, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
     FaMicrophone, FaMicrophoneSlash,
     FaVideo, FaVideoSlash,
@@ -11,6 +11,12 @@ export default function MeetLocalPreview({
     muted, videoOff, shareEmotion,
     onToggleMute, onToggleVideo, onToggleEmotion,
 }) {
+    const [showControls, setShowControls] = useState(false);
+
+    const handleTap = useCallback(() => {
+        setShowControls(v => !v);
+    }, []);
+
     return (
         <motion.div
             className={`${s.localPreview} ${isSpeaking ? s.localPreviewSpeaking : ""}`}
@@ -20,10 +26,10 @@ export default function MeetLocalPreview({
             drag
             dragMomentum={false}
             dragElastic={0.05}
-            whileHover={{ scale: 1.02 }}
             whileDrag={{ scale: 1.03, cursor: "grabbing" }}
-            aria-label="Your local video — drag to reposition"
-            title="Your camera (drag to reposition)"
+            onClick={handleTap}
+            aria-label="Your local video"
+            title="Tap to show controls"
         >
             <video
                 ref={localVideoRef}
@@ -33,42 +39,67 @@ export default function MeetLocalPreview({
                 className={s.localVideo}
                 aria-label="Your local video"
             />
-            <div className={s.localOverlay}>
-                <div className={s.localBadge}>
-                    <span className={s.localBadgeName}>{displayName}</span>
-                    {isHost && <span className={s.localBadgeHost}>Host</span>}
-                </div>
-                <div className={s.localControls}>
-                    <button
-                        className={`${s.localBtn} ${muted ? s.localBtnActive : ""}`}
-                        onClick={onToggleMute}
-                        aria-label={muted ? "Unmute" : "Mute"}
-                        title={muted ? "Unmute" : "Mute"}
+
+            <AnimatePresence>
+                {showControls && (
+                    <motion.div
+                        className={s.localOverlay}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.15 }}
+                        style={{ opacity: 1 }}
                     >
-                        {muted ? <FaMicrophoneSlash size={10} /> : <FaMicrophone size={10} />}
-                    </button>
-                    <button
-                        className={`${s.localBtn} ${videoOff ? s.localBtnActive : ""}`}
-                        onClick={onToggleVideo}
-                        aria-label={videoOff ? "Turn camera on" : "Turn camera off"}
-                        title={videoOff ? "Turn camera on" : "Turn camera off"}
-                    >
-                        {videoOff ? <FaVideoSlash size={10} /> : <FaVideo size={10} />}
-                    </button>
-                    {isHost && (
-                        <button
-                            className={`${s.localBtn} ${shareEmotion ? s.localBtnEmotionActive : ""}`}
-                            onClick={onToggleEmotion}
-                            aria-label="Toggle emotion AI"
-                            title="Toggle emotion AI"
-                            style={{ fontSize: "10px" }}
-                        >
-                            ✦
-                        </button>
+                        <div className={s.localBadge}>
+                            <span className={s.localBadgeName}>{displayName}</span>
+                            {isHost && <span className={s.localBadgeHost}>Host</span>}
+                        </div>
+                        <div className={s.localControls}>
+                            <button
+                                className={`${s.localBtn} ${muted ? s.localBtnActive : ""}`}
+                                onClick={(e) => { e.stopPropagation(); onToggleMute(); }}
+                                aria-label={muted ? "Unmute" : "Mute"}
+                            >
+                                {muted ? <FaMicrophoneSlash size={10} /> : <FaMicrophone size={10} />}
+                            </button>
+                            <button
+                                className={`${s.localBtn} ${videoOff ? s.localBtnActive : ""}`}
+                                onClick={(e) => { e.stopPropagation(); onToggleVideo(); }}
+                                aria-label={videoOff ? "Turn camera on" : "Turn camera off"}
+                            >
+                                {videoOff ? <FaVideoSlash size={10} /> : <FaVideo size={10} />}
+                            </button>
+                            {isHost && (
+                                <button
+                                    className={`${s.localBtn} ${shareEmotion ? s.localBtnEmotionActive : ""}`}
+                                    onClick={(e) => { e.stopPropagation(); onToggleEmotion(); }}
+                                    aria-label="Toggle emotion AI"
+                                    style={{ fontSize: "10px" }}
+                                >
+                                    ✦
+                                </button>
+                            )}
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {isSpeaking && <div className={s.speakRing} />}
+
+            {!showControls && (
+                <div className={s.localStatusDots}>
+                    {muted && (
+                        <span className={s.localStatusBadge} aria-label="Muted">
+                            <FaMicrophoneSlash size={8} />
+                        </span>
+                    )}
+                    {videoOff && (
+                        <span className={s.localStatusBadge} aria-label="Camera off">
+                            <FaVideoSlash size={8} />
+                        </span>
                     )}
                 </div>
-            </div>
-            {isSpeaking && <div className={s.speakRing} />}
+            )}
         </motion.div>
     );
 }

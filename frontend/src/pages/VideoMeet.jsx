@@ -38,17 +38,23 @@ import s from "../styles/videoComponent.module.css";
 
 const HOST_ONLY_EMOTION = true;
 
-function unwrapStream(entry) {
-  if (!entry) return null;
-  if (entry instanceof MediaStream) return entry;
-  if (entry.stream instanceof MediaStream) return entry.stream;
-  return null;
+export function unwrapStream(entry) {
+  return entry instanceof MediaStream ? entry : null;
 }
 
-function isValidStream(stream) {
+export function videoKey(stream) {
+  if (!stream) return "no-stream";
+  const tracks = stream.getVideoTracks?.() ?? [];
+  const ids = tracks.map((t) => `${t.id}_${t.readyState}`).join("|");
+  return `${stream.id}__${ids || "novt"}`;
+}
+
+export function isRenderableVideo(el) {
   return (
-    stream instanceof MediaStream &&
-    stream.getTracks().some((t) => t.readyState === "live")
+    el != null &&
+    el.readyState >= 2 &&
+    el.videoWidth > 0 &&
+    el.videoHeight > 0
   );
 }
 
@@ -92,7 +98,6 @@ export default function VideoMeet() {
   const chatContainerRef = useRef(null);
   const chatEndRef = useRef(null);
   const cleanupRef = useRef(null);
-  const speakerTimerRef = useRef(null);
   const activeSpeakerIdRef = useRef(null);
   const spotlightPeerRef = useRef(null);
   const ignoreOfferRef = useRef({});
@@ -151,8 +156,8 @@ export default function VideoMeet() {
   const unwrappedRemoteStreams = useMemo(() => {
     const out = {};
     for (const [id, entry] of Object.entries(remoteStreams)) {
-      const s = unwrapStream(entry);
-      if (s) out[id] = s;
+      const stream = unwrapStream(entry);
+      if (stream) out[id] = stream;
     }
     return out;
   }, [remoteStreams]);
@@ -283,14 +288,34 @@ export default function VideoMeet() {
     [pcsRef, recordersRef, removeAnalyzer, notifyPcsChanged]
   );
 
+  const stableSpeakerTimerRef = useRef(null);
+  const pendingSpeakerRef = useRef(null);
+
   useEffect(() => {
-    if (speakerTimerRef.current) clearTimeout(speakerTimerRef.current);
-    if (!activeSpeakerId) { setStableSpeakerId(null); return; }
+    if (activeSpeakerId === stableSpeakerId) return;
+
+    if (activeSpeakerId === null) {
+      if (stableSpeakerTimerRef.current) return;
+      stableSpeakerTimerRef.current = setTimeout(() => {
+        stableSpeakerTimerRef.current = null;
+        if (pendingSpeakerRef.current === null) setStableSpeakerId(null);
+      }, 2000);
+      pendingSpeakerRef.current = null;
+      return;
+    }
+
+    pendingSpeakerRef.current = activeSpeakerId;
+
+    if (stableSpeakerTimerRef.current) {
+      clearTimeout(stableSpeakerTimerRef.current);
+      stableSpeakerTimerRef.current = null;
+    }
+
     setStableSpeakerId(activeSpeakerId);
   }, [activeSpeakerId]);
 
   useEffect(() => () => {
-    if (speakerTimerRef.current) clearTimeout(speakerTimerRef.current);
+    if (stableSpeakerTimerRef.current) clearTimeout(stableSpeakerTimerRef.current);
   }, []);
 
   useEffect(() => {
@@ -337,7 +362,6 @@ export default function VideoMeet() {
     setEmotionsMap,
     handleSignal,
     navigate,
-
     cleanupAll: () => cleanupRef.current?.(),
     persistHistorySnapshot,
     handleIncomingMessage,
@@ -350,14 +374,14 @@ export default function VideoMeet() {
   const remoteEntries = useMemo(
     () =>
       Object.entries(unwrappedRemoteStreams)
-        .filter(([peerId, stream]) => {
+        .filter(([peerId]) => {
           if (!peerId) return false;
           if (myIdRef.current && peerId === myIdRef.current) return false;
           if (myId && peerId === myId) return false;
           if (socketRef.current?.id && peerId === socketRef.current.id) return false;
-          return isValidStream(stream);
+          return true;
         })
-        .sort(([a], [b]) => a.localeCompare(b)),
+        .sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true })),
     [unwrappedRemoteStreams, myId]
   );
 
@@ -367,13 +391,13 @@ export default function VideoMeet() {
       return spotlightPeerId;
     if (stableSpeakerId && remoteEntries.some(([id]) => id === stableSpeakerId))
       return stableSpeakerId;
-    return remoteEntries[0][0];
+    return remoteEntries[0]?.[0] ?? null;
   }, [remoteEntries, spotlightPeerId, stableSpeakerId]);
 
   const activeEntry = useMemo(
     () => !effectiveSpotlightId
       ? null
-      : remoteEntries.find(([id]) => id === effectiveSpotlightId) || null,
+      : remoteEntries.find(([id]) => id === effectiveSpotlightId) ?? null,
     [remoteEntries, effectiveSpotlightId]
   );
 
@@ -432,7 +456,6 @@ export default function VideoMeet() {
 
   const multiPartyLayout = remoteEntries.length > 0 && activeEntry;
   const showEmotionPanel = isHost && shareEmotion && !isMobile;
-  const mobileParticipantCount = remoteEntries.length;
 
   return (
     <div className={s.shell}>
@@ -458,7 +481,7 @@ export default function VideoMeet() {
               >
                 {activeEntry && (
                   <SpotlightCard
-                    key={activeEntry[0]}
+                    key={videoKey(activeEntry[1])}
                     id={activeEntry[0]}
                     stream={activeEntry[1]}
                     meta={participantMap[activeEntry[0]]}
@@ -480,7 +503,7 @@ export default function VideoMeet() {
                 >
                   {otherEntries.map(([peerId, stream]) => (
                     <ParticipantCard
-                      key={peerId}
+                      key={videoKey(stream)}
                       peerId={peerId}
                       stream={stream}
                       meta={participantMap[peerId]}

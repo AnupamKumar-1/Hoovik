@@ -4,14 +4,15 @@ const SSRC_INTERVAL = 200;
 const RMS_INTERVAL = 120;
 const FFT_SIZE = 256;
 
-const SPEAK_DECAY = 0.92;
-const SPEAK_BOOST = 2.4;        // more sensitive to small voice
-const SWITCH_THRESHOLD = 1.1;
-const MIN_ACTIVITY = 0.006;
-const NOISE_FLOOR_ALPHA = 0.97; // better noise tracking
-const SWITCH_COOLDOWN = 500;
-const MAX_ACTIVE_SPEAKERS = 3;
+const SPEAK_DECAY = 0.88;
+const SPEAK_BOOST = 2.2;
+const MIN_ACTIVITY = 0.008;
+const NOISE_FLOOR_ALPHA = 0.97;
 
+const SWITCH_COOLDOWN = 1800;
+const HOLD_DURATION = 2500;
+const PROMOTE_RATIO = 1.6;
+const SILENCE_CLEAR_MS = 3500;
 
 function computeRMS(arr) {
   let sum = 0;
@@ -35,18 +36,18 @@ export default function useAudioAnalyzer({
   const [pcsVersion, setPcsVersion] = useState(0);
 
   const participantsMapRef = useRef({});
-
   const activeSpeakerIdRef = useRef(null);
   const lastSpokeRef = useRef({});
   const lastLevelsRef = useRef({});
-
   const receiversRef = useRef({});
   const audioContextRef = useRef(null);
   const analyzersRef = useRef({});
-
   const speakerScoresRef = useRef({});
   const noiseFloorRef = useRef({});
+
   const lastSwitchTimeRef = useRef(0);
+  const holdUntilRef = useRef(0);
+  const silenceSinceRef = useRef({});
 
   const rafRef = useRef(null);
   const rafRunningRef = useRef(false);
@@ -59,9 +60,7 @@ export default function useAudioAnalyzer({
 
   useEffect(() => {
     mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
+    return () => { mountedRef.current = false; };
   }, []);
 
   useEffect(() => {
@@ -92,23 +91,19 @@ export default function useAudioAnalyzer({
     for (const k of Object.keys(noiseFloorRef.current)) {
       if (!activePeerIds.has(k)) delete noiseFloorRef.current[k];
     }
+    for (const k of Object.keys(silenceSinceRef.current)) {
+      if (!activePeerIds.has(k)) delete silenceSinceRef.current[k];
+    }
   }
 
   function updateSpeakerScores(levelMap, now) {
     let bestId = null;
     let bestScore = 0;
-    const activeCandidates = [];
 
     for (const [id, levelRaw] of Object.entries(levelMap)) {
       const meta = participantsMapRef.current[id];
 
-      if (meta?.muted === true) {
-        speakerScoresRef.current[id] = 0;
-        lastLevelsRef.current[id] = 0;
-        continue;
-      }
-
-      if (id === "local" && mutedRef?.current) {
+      if (meta?.muted === true || (id === "local" && mutedRef?.current)) {
         speakerScoresRef.current[id] = 0;
         lastLevelsRef.current[id] = 0;
         continue;
@@ -120,20 +115,19 @@ export default function useAudioAnalyzer({
       const boostedLevel = Math.pow(level, 0.7);
 
       noiseFloorRef.current[id] =
-        prevNoiseFloor * NOISE_FLOOR_ALPHA +
-        levelRaw * (1 - NOISE_FLOOR_ALPHA);
+        prevNoiseFloor * NOISE_FLOOR_ALPHA + levelRaw * (1 - NOISE_FLOOR_ALPHA);
 
       if (level < MIN_ACTIVITY) {
-        speakerScoresRef.current[id] *= 0.6;
+        speakerScoresRef.current[id] = prevScore * SPEAK_DECAY * 0.7;
+        if (!silenceSinceRef.current[id]) silenceSinceRef.current[id] = now;
         continue;
       }
 
-      let score = prevScore * SPEAK_DECAY + boostedLevel * SPEAK_BOOST;
-
+      silenceSinceRef.current[id] = 0;
       lastSpokeRef.current[id] = now;
-      speakerScoresRef.current[id] = score;
 
-      if (score > 0.1) activeCandidates.push({ id, score });
+      const score = prevScore * SPEAK_DECAY + boostedLevel * SPEAK_BOOST;
+      speakerScoresRef.current[id] = score;
 
       if (!meta?.muted && score > bestScore) {
         bestScore = score;
@@ -141,56 +135,59 @@ export default function useAudioAnalyzer({
       }
     }
 
-    activeCandidates.sort((a, b) => b.score - a.score);
-
-    const topSpeakers = activeCandidates
-      .slice(0, MAX_ACTIVE_SPEAKERS)
-      .map((s) => s.id);
+    if (bestId === "local" && mutedRef?.current) bestId = null;
 
     const current = activeSpeakerIdRef.current;
 
     if (current && participantsMapRef.current[current]?.muted) {
+      holdUntilRef.current = 0;
       commitSpeaker(null);
-      return { topSpeakers };
+      return;
     }
-
     if (current === "local" && mutedRef?.current) {
-      speakerScoresRef.current["local"] = 0;
-      bestId = bestId === "local" ? null : bestId;
+      holdUntilRef.current = 0;
+      commitSpeaker(null);
+      return;
     }
 
     if (!bestId) {
-      commitSpeaker(null);
-      return { topSpeakers };
+      if (current) {
+        const silenceSince = silenceSinceRef.current[current];
+        if (silenceSince && now - silenceSince >= SILENCE_CLEAR_MS) {
+          holdUntilRef.current = 0;
+          commitSpeaker(null);
+        }
+      }
+      return;
     }
 
-    const thresholdMet =
-      !current ||
-      bestId === current ||
-      speakerScoresRef.current[bestId] >=
-      (speakerScoresRef.current[current] ?? 0) * SWITCH_THRESHOLD;
-
-    const cooldownElapsed =
-      now - lastSwitchTimeRef.current >= SWITCH_COOLDOWN;
-
-    if (bestId !== current && (!thresholdMet || !cooldownElapsed)) {
-      return { topSpeakers };
+    if (bestId === current) {
+      holdUntilRef.current = now + HOLD_DURATION;
+      return;
     }
 
-    if (bestId !== current) {
-      lastSwitchTimeRef.current = now;
-      commitSpeaker(bestId);
+    if (now < holdUntilRef.current) {
+      const currentScore = speakerScoresRef.current[current] ?? 0;
+      const dominated = bestScore >= currentScore * PROMOTE_RATIO;
+      if (!dominated) return;
     }
 
-    return { topSpeakers };
+    const cooldownElapsed = now - lastSwitchTimeRef.current >= SWITCH_COOLDOWN;
+    if (!cooldownElapsed) {
+      const currentScore = speakerScoresRef.current[current] ?? 0;
+      const dominated = bestScore >= currentScore * PROMOTE_RATIO;
+      if (!dominated) return;
+    }
+
+    lastSwitchTimeRef.current = now;
+    holdUntilRef.current = now + HOLD_DURATION;
+    silenceSinceRef.current[bestId] = 0;
+    commitSpeaker(bestId);
   }
 
   function registerReceiver(peerId, pc) {
     for (const receiver of pc.getReceivers?.() ?? []) {
-      if (
-        receiver?.track?.kind === "audio" &&
-        receiver.track.readyState !== "ended"
-      ) {
+      if (receiver?.track?.kind === "audio" && receiver.track.readyState !== "ended") {
         receiversRef.current[peerId] = receiver;
         return;
       }
@@ -203,6 +200,7 @@ export default function useAudioAnalyzer({
     delete lastLevelsRef.current[peerId];
     delete speakerScoresRef.current[peerId];
     delete noiseFloorRef.current[peerId];
+    delete silenceSinceRef.current[peerId];
   }
 
   function startSSRCLoop() {
@@ -223,10 +221,7 @@ export default function useAudioAnalyzer({
         const receivers = receiversRef.current;
         const peerIds = Object.keys(receivers);
 
-        if (!peerIds.length) {
-          stopSSRCLoop();
-          return;
-        }
+        if (!peerIds.length) { stopSSRCLoop(); return; }
 
         const now = performance.now();
         const levelMap = {};
@@ -235,36 +230,23 @@ export default function useAudioAnalyzer({
         for (const peerId of peerIds) {
           const receiver = receivers[peerId];
           const track = receiver?.track;
+          const isMuted = participantsMapRef.current[peerId]?.muted === true;
 
-          const isMutedFromSignal =
-            participantsMapRef.current[peerId]?.muted === true;
-
-          if (
-            !receiver ||
-            !track ||
-            track.readyState === "ended" ||
-            track.muted === true ||
-            track.enabled === false ||
-            isMutedFromSignal
-          ) {
+          if (!receiver || !track || track.readyState === "ended" || track.muted === true || track.enabled === false || isMuted) {
             speakerScoresRef.current[peerId] = 0;
             lastLevelsRef.current[peerId] = 0;
             levelMap[peerId] = 0;
             continue;
           }
 
-          const sources =
-            receiver.getSynchronizationSources?.() ?? [];
-
+          const sources = receiver.getSynchronizationSources?.() ?? [];
           let peerLevel = 0;
           for (const src of sources) {
-            if ((src.audioLevel ?? 0) > peerLevel)
-              peerLevel = src.audioLevel;
+            if ((src.audioLevel ?? 0) > peerLevel) peerLevel = src.audioLevel;
           }
 
           const prev = lastLevelsRef.current[peerId] ?? 0;
           const smooth = prev * 0.6 + peerLevel * 0.4;
-
           lastLevelsRef.current[peerId] = smooth;
           levelMap[peerId] = smooth;
         }
@@ -279,9 +261,7 @@ export default function useAudioAnalyzer({
     const onVisibility = () => {
       if (!document.hidden && timerRunningRef.current) tick();
     };
-
     document.addEventListener("visibilitychange", onVisibility);
-
     visibilityCleanupRef.current = () =>
       document.removeEventListener("visibilitychange", onVisibility);
 
@@ -290,16 +270,12 @@ export default function useAudioAnalyzer({
 
   function stopSSRCLoop() {
     if (!timerRunningRef.current) return;
-
     timerRunningRef.current = false;
     clearInterval(timerRef.current);
     timerRef.current = null;
-
     visibilityCleanupRef.current?.();
     visibilityCleanupRef.current = null;
-
-    if (activeSystemRef.current === "ssrc")
-      activeSystemRef.current = null;
+    if (activeSystemRef.current === "ssrc") activeSystemRef.current = null;
   }
 
   useEffect(() => {
@@ -310,17 +286,13 @@ export default function useAudioAnalyzer({
 
     for (const [peerId, pc] of Object.entries(pcs)) {
       if (!pc) continue;
-
       registerReceiver(peerId, pc);
-
       const onTrack = () => registerReceiver(peerId, pc);
-
       pc.addEventListener("track", onTrack);
       trackListeners.set(pc, { onTrack });
     }
 
-    if (Object.keys(receiversRef.current).length)
-      startSSRCLoop();
+    if (Object.keys(receiversRef.current).length) startSSRCLoop();
 
     return () => {
       for (const [pc, { onTrack }] of trackListeners) {
@@ -333,10 +305,7 @@ export default function useAudioAnalyzer({
   function ensureAudioContext() {
     if (!audioContextRef.current) {
       try {
-        audioContextRef.current = new (
-          window.AudioContext ||
-          window.webkitAudioContext
-        )();
+        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
       } catch { }
     }
     return audioContextRef.current;
@@ -345,20 +314,14 @@ export default function useAudioAnalyzer({
   function removeAnalyzerById(id) {
     const entry = analyzersRef.current[id];
     if (!entry) return;
-
-    try {
-      entry.source.disconnect();
-    } catch { }
-
-    try {
-      entry.analyser.disconnect();
-    } catch { }
-
+    try { entry.source.disconnect(); } catch { }
+    try { entry.analyser.disconnect(); } catch { }
     delete analyzersRef.current[id];
     delete lastSpokeRef.current[id];
     delete lastLevelsRef.current[id];
     delete speakerScoresRef.current[id];
     delete noiseFloorRef.current[id];
+    delete silenceSinceRef.current[id];
   }
 
   function startRMSLoop() {
@@ -367,41 +330,25 @@ export default function useAudioAnalyzer({
 
     activeSystemRef.current = "rms";
     rafRunningRef.current = true;
-
     let lastRun = 0;
 
     const step = (ts) => {
       if (!rafRunningRef.current) return;
 
       const entries = Object.entries(analyzersRef.current);
-
-      if (!entries.length) {
-        stopRMSLoop();
-        return;
-      }
+      if (!entries.length) { stopRMSLoop(); return; }
 
       if (ts - lastRun >= RMS_INTERVAL && !document.hidden) {
         lastRun = ts;
-
         const now = performance.now();
         const levelMap = {};
-        const activePeerIds = new Set(
-          entries.map(([id]) => id)
-        );
+        const activePeerIds = new Set(entries.map(([id]) => id));
 
         for (const [id, entry] of entries) {
           const track = entry.track;
+          const isMuted = participantsMapRef.current[id]?.muted === true;
 
-          const isMutedFromSignal =
-            participantsMapRef.current[id]?.muted === true;
-
-          if (
-            !track ||
-            track.readyState === "ended" ||
-            track.muted === true ||
-            track.enabled === false ||
-            isMutedFromSignal
-          ) {
+          if (!track || track.readyState === "ended" || track.muted === true || track.enabled === false || isMuted) {
             speakerScoresRef.current[id] = 0;
             lastLevelsRef.current[id] = 0;
             levelMap[id] = 0;
@@ -410,8 +357,7 @@ export default function useAudioAnalyzer({
 
           try {
             entry.analyser.getFloatTimeDomainData(entry.data);
-            const rms = computeRMS(entry.data);
-            levelMap[id] = rms;
+            levelMap[id] = computeRMS(entry.data);
           } catch { }
         }
 
@@ -427,28 +373,16 @@ export default function useAudioAnalyzer({
 
   function stopRMSLoop() {
     if (!rafRunningRef.current) return;
-
     rafRunningRef.current = false;
-
-    if (rafRef.current) {
-      cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
-    }
-
-    if (activeSystemRef.current === "rms")
-      activeSystemRef.current = null;
+    if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+    if (activeSystemRef.current === "rms") activeSystemRef.current = null;
   }
 
   const createAnalyzerForStream = useCallback((id, stream) => {
     if (HAS_SSRC) return;
-
-    if (!stream || !stream.getAudioTracks?.().length) {
-      removeAnalyzerById(id);
-      return;
-    }
+    if (!stream || !stream.getAudioTracks?.().length) { removeAnalyzerById(id); return; }
 
     const existing = analyzersRef.current[id];
-
     if (existing?.stream === stream) return;
     if (existing) removeAnalyzerById(id);
 
@@ -457,22 +391,16 @@ export default function useAudioAnalyzer({
 
     try {
       const track = stream.getAudioTracks()[0];
-
       if (!track || track.readyState === "ended") return;
 
       const source = ctx.createMediaStreamSource(stream);
       const analyser = ctx.createAnalyser();
-
       analyser.fftSize = FFT_SIZE;
       analyser.smoothingTimeConstant = 0.8;
-
       source.connect(analyser);
 
       analyzersRef.current[id] = {
-        stream,
-        track,
-        source,
-        analyser,
+        stream, track, source, analyser,
         data: new Float32Array(analyser.fftSize),
       };
 
@@ -482,43 +410,28 @@ export default function useAudioAnalyzer({
 
   const removeAnalyzer = useCallback((id) => {
     removeAnalyzerById(id);
-    if (!Object.keys(analyzersRef.current).length)
-      stopRMSLoop();
+    if (!Object.keys(analyzersRef.current).length) stopRMSLoop();
   }, []);
 
   useEffect(() => {
     if (HAS_SSRC) return;
-
-    for (const [id, stream] of Object.entries(
-      remoteStreams || {}
-    )) {
+    for (const [id, stream] of Object.entries(remoteStreams || {})) {
       createAnalyzerForStream(id, stream);
     }
   }, [remoteStreams, createAnalyzerForStream]);
 
   useEffect(() => {
     if (HAS_SSRC) return;
-
-    if (localStream)
-      createAnalyzerForStream("local", localStream);
-    else if (localStreamRef?.current)
-      createAnalyzerForStream(
-        "local",
-        localStreamRef.current
-      );
+    if (localStream) createAnalyzerForStream("local", localStream);
+    else if (localStreamRef?.current) createAnalyzerForStream("local", localStreamRef.current);
   }, [localStream, createAnalyzerForStream]);
 
   useEffect(() => {
     return () => {
       stopRMSLoop();
       stopSSRCLoop();
-
-      for (const id of Object.keys(analyzersRef.current)) {
-        removeAnalyzerById(id);
-      }
-
+      for (const id of Object.keys(analyzersRef.current)) removeAnalyzerById(id);
       const ctx = audioContextRef.current;
-
       if (ctx && ctx.state !== "closed") {
         ctx.close().catch(() => { });
         audioContextRef.current = null;
@@ -526,10 +439,5 @@ export default function useAudioAnalyzer({
     };
   }, []);
 
-  return {
-    activeSpeakerId,
-    createAnalyzerForStream,
-    removeAnalyzer,
-    notifyPcsChanged,
-  };
+  return { activeSpeakerId, createAnalyzerForStream, removeAnalyzer, notifyPcsChanged };
 }

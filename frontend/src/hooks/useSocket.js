@@ -26,6 +26,7 @@ export default function useSocket({
   socketReady,
 }) {
   const h = useRef({});
+
   h.current = {
     setMyId,
     setParticipantsMeta,
@@ -54,62 +55,94 @@ export default function useSocket({
     if (!socket) return;
 
     let disconnectTimer = null;
-
     let mySocketId = socket.connected ? socket.id : null;
+    let wasEverConnected = false;
 
     const onConnect = () => {
       mySocketId = socket.id;
       h.current.setMyId(socket.id);
+      wasEverConnected = true;
+
       if (disconnectTimer) {
         clearTimeout(disconnectTimer);
         disconnectTimer = null;
       }
+
       try {
         window.myId = socket.id;
       } catch { }
     };
-    socket.on("connect", onConnect);
 
-    if (socket.connected) {
-      onConnect();
-    }
+    socket.on("connect", onConnect);
+    if (socket.connected) onConnect();
 
     const onChatHistory = (history = []) => {
       const seen = h.current.seenMsgIdsRef.current;
       const unique = [];
+
       for (const m of history) {
         const id = m.id || `${m.userId}:${m.ts}`;
         if (seen.has(id)) continue;
         seen.add(id);
         unique.push(m);
       }
+
       h.current.setChatMessages((prev) => {
-        if (unique.length === 0) return prev;
+        if (!unique.length) return prev;
+
         const existingIds = new Set(
           prev.map((m) => m.id || `${m.userId}:${m.ts}`)
         );
+
         const fresh = unique.filter((m) => {
           const id = m.id || `${m.userId}:${m.ts}`;
           return !existingIds.has(id);
         });
-        return fresh.length > 0 ? [...prev, ...fresh] : prev;
+
+        return fresh.length ? [...prev, ...fresh] : prev;
       });
     };
+
     socket.on("chat-history", onChatHistory);
 
-    const onParticipantsUpdated = (participants) => {
-      if (!Array.isArray(participants)) return;
+    const syncParticipants = (list) => {
+      const map = {};
+      (list || []).forEach((p) => {
+        if (!p?.id) return;
+        if (p.id === mySocketId) return;
+        map[p.id] = {
+          id: p.id,
+          meta: p.meta || {},
+          polite:
+            typeof p.polite === "boolean" ? p.polite : true,
+        };
+      });
 
-      h.current.setParticipantsMeta(
-        participants
-          .filter((p) => p.id !== mySocketId)
-          .map((p) => ({ id: p.id, meta: p.meta || {}, polite: !!p.polite }))
-      );
+      h.current.setParticipantsMeta((prev) => {
+        const merged = { ...map };
+        prev.forEach((p) => {
+          if (!merged[p.id]) merged[p.id] = p;
+        });
+        return Object.values(merged);
+      });
+
+      Object.values(map).forEach((p) => {
+        if (!h.current.pcsRef.current[p.id]) {
+          h.current.politeRef.current[p.id] = p.polite;
+          h.current.pendingCandidatesRef.current[p.id] ||= [];
+          h.current.createPeerConnection(p.id);
+        }
+      });
+
+      h.current.notifyPcsChanged?.();
     };
-    socket.on("participants-updated", onParticipantsUpdated);
+
+    socket.on("participants-updated", syncParticipants);
+    socket.on("existing-participants", syncParticipants);
 
     const onParticipantStateUpdate = ({ peerId, muted }) => {
       if (!peerId) return;
+
       h.current.setParticipantsMeta((prev) =>
         prev.map((p) =>
           p.id === peerId
@@ -118,72 +151,49 @@ export default function useSocket({
         )
       );
     };
+
     socket.on("update-participant-state", onParticipantStateUpdate);
-
-    const setupPeer = (p) => {
-
-      if (!p?.id) return;
-      if (p.id === mySocketId) return;
-      if (p.id === socket.id) return;
-
-      const { politeRef, pendingCandidatesRef, createPeerConnection } =
-        h.current;
-
-      politeRef.current[p.id] =
-        typeof p.polite === "boolean" ? p.polite : true;
-
-      pendingCandidatesRef.current[p.id] =
-        pendingCandidatesRef.current[p.id] || [];
-
-      createPeerConnection(p.id);
-    };
-
-    const onExistingParticipants = (existing) => {
-      const normalized = (Array.isArray(existing) ? existing : [])
-
-        .filter((item) => item.id && item.id !== mySocketId && item.id !== socket.id)
-        .map((item) => ({
-          id: item.id,
-          polite: item.polite,
-          meta: item.meta || {},
-        }));
-
-      h.current.setParticipantsMeta((prev) => {
-        const map = {};
-        prev.forEach((p) => (map[p.id] = p));
-        normalized.forEach((p) => {
-          map[p.id] = { id: p.id, meta: p.meta || {}, polite: p.polite };
-        });
-
-        delete map[mySocketId];
-        delete map[socket.id];
-        return Object.values(map);
-      });
-
-      normalized.forEach(setupPeer);
-      h.current.notifyPcsChanged?.();
-    };
-    socket.on("existing-participants", onExistingParticipants);
 
     const onUserJoined = (peer) => {
       const peerId = peer?.id;
-
-      if (!peerId || peerId === mySocketId || peerId === socket.id) return;
+      if (!peerId || peerId === mySocketId) return;
 
       h.current.setParticipantsMeta((prev) => {
         if (prev.some((p) => p.id === peerId)) return prev;
-        return [...prev, { id: peerId, meta: peer.meta || {} }];
+        return [
+          ...prev,
+          {
+            id: peerId,
+            meta: peer.meta || {},
+            polite:
+              typeof peer.polite === "boolean"
+                ? peer.polite
+                : true,
+          },
+        ];
       });
 
-      setupPeer(peer);
+      if (!h.current.pcsRef.current[peerId]) {
+        h.current.politeRef.current[peerId] =
+          typeof peer.polite === "boolean"
+            ? peer.polite
+            : true;
+
+        h.current.pendingCandidatesRef.current[peerId] ||= [];
+
+        h.current.createPeerConnection(peerId);
+      }
+
       h.current.notifyPcsChanged?.();
     };
+
     socket.on("user-joined", onUserJoined);
 
     const onUserLeft = (peerId) => {
       h.current.setParticipantsMeta((prev) =>
         prev.filter((p) => p.id !== peerId)
       );
+
       h.current.closePeer(peerId);
       h.current.removeAnalyzer(peerId);
       delete h.current.recordersRef.current[peerId];
@@ -194,29 +204,35 @@ export default function useSocket({
         return copy;
       });
     };
+
     socket.on("user-left", onUserLeft);
 
     const onSignal = async (fromId, messageStr) => {
       if (!fromId || !messageStr) return;
-      if (fromId === mySocketId || fromId === socket.id) return;
+      if (fromId === mySocketId) return;
+
       if (h.current.politeRef.current[fromId] === undefined) {
         h.current.politeRef.current[fromId] = true;
       }
+
       try {
         await h.current.handleSignal(fromId, messageStr);
       } catch { }
     };
+
     socket.on("signal", onSignal);
 
     const onChatMessage = (m) => {
       h.current.handleIncomingMessage(m);
     };
+
     socket.on("chat-message", onChatMessage);
 
     const onChatAck = (msg) => {
       if (!msg?.id) return;
       h.current.handleAck(msg.id);
     };
+
     socket.on("chat-ack", onChatAck);
 
     const onEndMeeting = async () => {
@@ -226,20 +242,30 @@ export default function useSocket({
       h.current.cleanupAll();
       h.current.navigate("/home");
     };
+
     socket.on("end-meeting", onEndMeeting);
 
     const onDisconnect = () => {
       if (disconnectTimer) return;
+
       disconnectTimer = setTimeout(() => {
-        if (!socket.connected) {
-          Object.keys(h.current.pcsRef.current).forEach((peerId) => {
-            h.current.closePeer(peerId);
-          });
-          h.current.cleanupAll();
-          h.current.navigate("/home");
+        if (socket.connected) return;
+        if (!wasEverConnected) return;
+
+        const pcCount = Object.keys(
+          h.current.pcsRef.current || {}
+        ).length;
+
+        if (pcCount > 0) {
+          disconnectTimer = null;
+          return;
         }
-      }, 8000);
+
+        h.current.cleanupAll();
+        h.current.navigate("/home");
+      }, 15000);
     };
+
     socket.on("disconnect", onDisconnect);
 
     return () => {
@@ -250,8 +276,8 @@ export default function useSocket({
 
       socket.off("connect", onConnect);
       socket.off("chat-history", onChatHistory);
-      socket.off("participants-updated", onParticipantsUpdated);
-      socket.off("existing-participants", onExistingParticipants);
+      socket.off("participants-updated", syncParticipants);
+      socket.off("existing-participants", syncParticipants);
       socket.off("user-joined", onUserJoined);
       socket.off("user-left", onUserLeft);
       socket.off("signal", onSignal);

@@ -1,3 +1,5 @@
+
+
 import React, {
   useEffect,
   useRef,
@@ -7,7 +9,13 @@ import React, {
   useCallback,
 } from "react";
 import { motion } from "framer-motion";
+import { isRenderableVideo } from "./VideoMeet";
 import styles from "../styles/videoComponent.module.css";
+
+
+const MAX_RESET_ATTEMPTS = 8;
+const RESET_CHECK_MS = 300;
+const RESET_GAP_MS = 80;
 
 const AVATAR_PALETTES = [
   { bg: "linear-gradient(135deg,#0ea5e9,#38bdf8)", glow: "0 0 22px rgba(14,165,233,0.38)" },
@@ -25,8 +33,12 @@ function getAvatarColor(initial) {
 
 function deriveName(meta, emotion, peerId) {
   const raw =
-    meta?.name ?? emotion?.__name ?? emotion?.name ??
-    emotion?.displayName ?? emotion?.display_name ?? null;
+    meta?.name ??
+    emotion?.__name ??
+    emotion?.name ??
+    emotion?.displayName ??
+    emotion?.display_name ??
+    null;
   if (raw && typeof raw === "string" && raw.trim().length > 0) return raw.trim();
   if (typeof peerId === "string" && peerId.length > 0) return peerId.slice(0, 6);
   return "Unknown";
@@ -35,6 +47,7 @@ function deriveName(meta, emotion, peerId) {
 function hasLiveVideoTrack(stream) {
   return !!stream?.getVideoTracks?.().find((t) => t.readyState === "live");
 }
+
 
 const WAVE_DELAYS = [0.55, 0.4, 0.7, 0.5, 0.62, 0.48, 0.75];
 
@@ -61,164 +74,183 @@ function UserIcon() {
 function safePlay(el) {
   if (!el) return;
   const p = el.play();
-  if (p && typeof p.catch === "function") {
-    p.catch(() => {
-      setTimeout(() => {
-        const p2 = el.play();
-        if (p2 && typeof p2.catch === "function") p2.catch(() => { });
-      }, 300);
-    });
-  }
+  if (p?.catch) p.catch(() => { });
 }
 
+
 const ParticipantCard = forwardRef(({
-  peerId, stream, compact = false, style = {},
-  meta, emotion, isActive = false, isHost = false,
-  showStatusBar, DEBUG_SHOW_EMOTION_FOR_EVERYONE = false,
-  renderEmotionBadgeForId, onClick,
+  peerId,
+  stream,
+  compact = false,
+  style = {},
+  meta,
+  emotion,
+  isActive = false,
+  isHost = false,
+  showStatusBar,
+  DEBUG_SHOW_EMOTION_FOR_EVERYONE = false,
+  renderEmotionBadgeForId,
+  onClick,
 }, ref) => {
   const videoRef = useRef(null);
-  const unmountedRef = useRef(false);
-  const pollRef = useRef(null);
   const streamRef = useRef(null);
-  const cleanupFnsRef = useRef([]);
+  const resetRef = useRef(null);
+  const cancelRef = useRef(null);
+
+  const [videoActive, setVideoActive] = useState(false);
 
   const name = useMemo(() => deriveName(meta, emotion, peerId), [meta, emotion, peerId]);
   const initial = useMemo(() => (name[0] ?? "?").toUpperCase(), [name]);
   const avatarColor = useMemo(() => getAvatarColor(initial), [initial]);
 
-  const [videoActive, setVideoActive] = useState(false);
 
-  useEffect(() => {
-    unmountedRef.current = false;
-    return () => { unmountedRef.current = true; };
+  const attach = useCallback(() => {
+    const el = videoRef.current;
+    const s = streamRef.current;
+    if (!el || !s) return;
+
+    if (el.srcObject !== s) {
+      el.srcObject = s;
+    }
+    safePlay(el);
+    setVideoActive(hasLiveVideoTrack(s));
   }, []);
 
-  const safeSetActive = useCallback((v) => {
-    if (!unmountedRef.current) setVideoActive(v);
-  }, []);
-
-  const syncVideo = useCallback(() => {
-    const el = videoRef.current;
-    if (!el || !stream) return;
-    if (el.srcObject !== stream) {
-      el.srcObject = stream;
-      safePlay(el);
-    }
-    const hasVideo = hasLiveVideoTrack(stream);
-    safeSetActive(hasVideo);
-    if (!hasVideo) {
-      setTimeout(() => {
-        if (unmountedRef.current || streamRef.current !== stream) return;
-        safeSetActive(hasLiveVideoTrack(stream));
-      }, 500);
-    }
-  }, [stream, safeSetActive]);
-
-  useEffect(() => {
-    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
-    cleanupFnsRef.current.forEach((fn) => fn());
-    cleanupFnsRef.current = [];
-
-    streamRef.current = stream;
-    const el = videoRef.current;
-
-    if (!stream) {
-      safeSetActive(false);
-      if (el) { try { el.pause(); el.srcObject = null; } catch { } }
-      return;
-    }
-
-    syncVideo();
-
-    const onAddTrack = () => {
-      if (streamRef.current !== stream) return;
-      syncVideo();
-    };
-    const onRemoveTrack = () => {
-      if (streamRef.current !== stream) return;
-      safeSetActive(hasLiveVideoTrack(stream));
-    };
-    stream.addEventListener("addtrack", onAddTrack);
-    stream.addEventListener("removetrack", onRemoveTrack);
-    cleanupFnsRef.current.push(() => {
-      stream.removeEventListener("addtrack", onAddTrack);
-      stream.removeEventListener("removetrack", onRemoveTrack);
-    });
-
-    const vt = stream.getVideoTracks().find((t) => t.readyState === "live");
-    if (vt) {
-      const onMute = () => {
-        if (streamRef.current !== stream) return;
-        safeSetActive(hasLiveVideoTrack(stream));
-      };
-      const onUnmute = () => {
-        if (streamRef.current !== stream) return;
-        syncVideo();
-      };
-      const onEnded = () => {
-        if (streamRef.current !== stream) return;
-        safeSetActive(hasLiveVideoTrack(stream));
-      };
-      vt.addEventListener("mute", onMute);
-      vt.addEventListener("unmute", onUnmute);
-      vt.addEventListener("ended", onEnded);
-      cleanupFnsRef.current.push(() => {
-        vt.removeEventListener("mute", onMute);
-        vt.removeEventListener("unmute", onUnmute);
-        vt.removeEventListener("ended", onEnded);
-      });
+  const startHardResetLoop = useCallback((s) => {
+    if (resetRef.current) {
+      clearInterval(resetRef.current);
+      resetRef.current = null;
     }
 
     let attempts = 0;
-    pollRef.current = setInterval(() => {
-      if (unmountedRef.current || streamRef.current !== stream) {
-        clearInterval(pollRef.current);
-        pollRef.current = null;
+
+    resetRef.current = setInterval(() => {
+      const el = videoRef.current;
+      if (!el) { clearInterval(resetRef.current); return; }
+
+      if (isRenderableVideo(el)) {
+        clearInterval(resetRef.current);
+        resetRef.current = null;
         return;
       }
+
       attempts++;
-      const el2 = videoRef.current;
-      
-      if (el2 && el2.srcObject !== stream) {
-        el2.srcObject = stream;
+      if (attempts > MAX_RESET_ATTEMPTS) {
+        clearInterval(resetRef.current);
+        resetRef.current = null;
+        return;
+      }
+
+      // Teardown
+      try { el.pause(); } catch { }
+      el.srcObject = null;
+
+      // Re-attach after gap
+      cancelRef.current = setTimeout(() => {
+        const el2 = videoRef.current;
+        const s2 = streamRef.current;
+        if (!el2 || !s2) return;
+        el2.srcObject = s2;
         safePlay(el2);
+        setVideoActive(hasLiveVideoTrack(s2));
+      }, RESET_GAP_MS);
+    }, RESET_CHECK_MS);
+  }, []);
+
+  const stopHardResetLoop = useCallback(() => {
+    if (resetRef.current) { clearInterval(resetRef.current); resetRef.current = null; }
+    if (cancelRef.current) { clearTimeout(cancelRef.current); cancelRef.current = null; }
+  }, []);
+
+
+  useEffect(() => {
+    streamRef.current = stream;
+    stopHardResetLoop();
+
+    const el = videoRef.current;
+
+    if (!stream) {
+      setVideoActive(false);
+      if (el) {
+        try { el.pause(); el.srcObject = null; } catch { }
       }
-      const hasVideo = hasLiveVideoTrack(stream);
-      safeSetActive(hasVideo);
-      if (hasVideo || attempts >= 160) {
-        clearInterval(pollRef.current);
-        pollRef.current = null;
+      return;
+    }
+
+    // Initial attach
+    attach();
+
+    startHardResetLoop(stream);
+
+    const onTrackChange = () => {
+
+      const s = streamRef.current;
+
+      if (!s) return;
+
+      const vt = s.getVideoTracks()[0];
+
+      if (vt && vt.readyState === "live") {
+
+        try {
+
+          vt.enabled = false;
+          vt.enabled = true;
+
+        } catch { }
+
       }
-    }, 250);
+
+      stopHardResetLoop();
+      attach();
+      startHardResetLoop(s);
+
+    };
+
+    const tracks = stream.getTracks();
+    tracks.forEach((t) => {
+      t.addEventListener("unmute", onTrackChange);
+      t.addEventListener("ended", onTrackChange);
+      t.addEventListener("mute", onTrackChange);
+    });
+
+    stream.addEventListener("addtrack", onTrackChange);
+    stream.addEventListener("removetrack", onTrackChange);
 
     return () => {
-      if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
-      cleanupFnsRef.current.forEach((fn) => fn());
-      cleanupFnsRef.current = [];
+      stopHardResetLoop();
+      tracks.forEach((t) => {
+        t.removeEventListener("unmute", onTrackChange);
+        t.removeEventListener("ended", onTrackChange);
+        t.removeEventListener("mute", onTrackChange);
+      });
+      stream.removeEventListener("addtrack", onTrackChange);
+      stream.removeEventListener("removetrack", onTrackChange);
     };
-  }, [stream, syncVideo, safeSetActive]);
+  }, [stream, attach, startHardResetLoop, stopHardResetLoop]);
+
 
   useEffect(() => {
     const onVisible = () => {
       if (document.visibilityState !== "visible") return;
-      const el = videoRef.current;
-      const s = streamRef.current;
-      if (!el || !s) return;
-      if (el.srcObject !== s) el.srcObject = s;
-      safePlay(el);
-      safeSetActive(hasLiveVideoTrack(s));
+      stopHardResetLoop();
+      attach();
+      if (streamRef.current) startHardResetLoop(streamRef.current);
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
-  }, [safeSetActive]);
+  }, [attach, startHardResetLoop, stopHardResetLoop]);
+
 
   useEffect(() => {
-    const el = videoRef.current;
     return () => {
-      if (el) { try { el.pause(); el.srcObject = null; } catch { } }
+      stopHardResetLoop();
+      const el = videoRef.current;
+      if (el) {
+        try { el.pause(); el.srcObject = null; } catch { }
+      }
     };
-  }, []);
+  }, [stopHardResetLoop]);
 
   const renderStatusBar = showStatusBar !== undefined ? showStatusBar : !compact && isActive;
 
@@ -229,7 +261,9 @@ const ParticipantCard = forwardRef(({
   ].filter(Boolean).join(" ");
 
   const cardStyle = useMemo(() => ({
-    position: "relative", overflow: "hidden", boxSizing: "border-box",
+    position: "relative",
+    overflow: "hidden",
+    boxSizing: "border-box",
     cursor: onClick ? "pointer" : undefined,
     ...(compact
       ? { width: 160, height: 90, borderRadius: 10 }
@@ -238,23 +272,23 @@ const ParticipantCard = forwardRef(({
   }), [compact, style, onClick]);
 
   const emotionBadge = useMemo(() => {
-    if ((isHost || DEBUG_SHOW_EMOTION_FOR_EVERYONE) && renderEmotionBadgeForId)
+    if ((isHost || DEBUG_SHOW_EMOTION_FOR_EVERYONE) && renderEmotionBadgeForId) {
       return renderEmotionBadgeForId(peerId);
+    }
     return null;
   }, [peerId, isHost, DEBUG_SHOW_EMOTION_FOR_EVERYONE, renderEmotionBadgeForId]);
 
   return (
     <motion.div
       ref={ref}
-      layout={false}
+      className={cardClasses}
+      style={cardStyle}
+      onClick={onClick}
+      title={name}
       initial={{ opacity: 0, scale: 0.97 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.97 }}
       transition={{ duration: 0.2 }}
-      className={cardClasses}
-      title={name}
-      style={cardStyle}
-      onClick={onClick}
     >
       {isActive && <div className={styles.speakingRingOverlay} />}
 
@@ -262,11 +296,13 @@ const ParticipantCard = forwardRef(({
         ref={videoRef}
         autoPlay
         playsInline
+        muted
+        onLoadedMetadata={() => safePlay(videoRef.current)}
         style={{
-          width: "100%", height: "100%",
+          width: "100%",
+          height: "100%",
           objectFit: "cover",
           display: videoActive ? "block" : "none",
-          minWidth: 0, minHeight: 0,
         }}
       />
 
@@ -309,4 +345,5 @@ const ParticipantCard = forwardRef(({
 });
 
 ParticipantCard.displayName = "ParticipantCard";
+
 export default React.memo(ParticipantCard);
