@@ -168,7 +168,11 @@ export default function useMeetingLifecycle({
 
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: true,
-        video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+        video: {
+          width: 640,
+          height: 360,
+          frameRate: 15,
+        }
       });
 
       if (!_activeRooms.has(key)) {
