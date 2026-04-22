@@ -54,15 +54,22 @@ server.on("upgrade", (req, socket, head) => {
 });
 
 app.use(cors({
+
   origin: function (origin, callback) {
+
     if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, origin);
+
+      callback(null, true);
     } else {
       callback(new Error("Not allowed by CORS"));
     }
+
   },
+
   credentials: true,
 }));
+
+app.options("*", cors());
 
 app.use(passport.initialize());
 app.use(express.json());
