@@ -29,11 +29,11 @@ export const ICE_CONFIG = {
     },
     {
       urls: [
-        "turn:openrelay.metered.ca:3478?transport=udp",
-        "turn:openrelay.metered.ca:80",
-        "turn:openrelay.metered.ca:443",
-        "turn:openrelay.metered.ca:443?transport=tcp",
-        "turns:openrelay.metered.ca:443"
+        "turn:in.relay.metered.ca:3478?transport=udp",
+        "turn:in.relay.metered.ca:80",
+        "turn:in.relay.metered.ca:443",
+        "turn:in.relay.metered.ca:443?transport=tcp",
+        "turns:in.relay.metered.ca:443"
       ],
       username: "openrelayproject",
       credential: "openrelayproject",

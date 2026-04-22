@@ -296,7 +296,7 @@ const ParticipantCard = forwardRef(({
         ref={videoRef}
         autoPlay
         playsInline
-        muted
+        
         onLoadedMetadata={() => safePlay(videoRef.current)}
         style={{
           width: "100%",
