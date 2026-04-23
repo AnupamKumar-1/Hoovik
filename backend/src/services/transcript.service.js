@@ -18,10 +18,18 @@ const TRANSCRIPT_CACHE_TTL_SEC = parseInt(process.env.TRANSCRIPT_CACHE_TTL_SEC |
 const TRANSCRIPT_RATE_LIMIT_MAX = parseInt(process.env.TRANSCRIPT_RATE_LIMIT_MAX || "30", 10);
 const TRANSCRIPT_RATE_LIMIT_WIN_SEC = parseInt(process.env.TRANSCRIPT_RATE_LIMIT_WIN_SEC || "60", 10);
 
+const NOISE_MIN_WORDS = parseInt(process.env.TRANSCRIPT_NOISE_MIN_WORDS || "4", 10);
+const NOISE_MIN_UNIQUE_RATIO = parseFloat(process.env.TRANSCRIPT_NOISE_MIN_UNIQUE_RATIO || "0.4");
+const NOISE_MAX_CHAR_REPEAT = parseInt(process.env.TRANSCRIPT_NOISE_MAX_CHAR_REPEAT || "4", 10);
+const NOISE_MIN_ALPHA_RATIO = parseFloat(process.env.TRANSCRIPT_NOISE_MIN_ALPHA_RATIO || "0.6");
+const NOISE_MIN_LINES = parseInt(process.env.TRANSCRIPT_NOISE_MIN_LINES || "1", 10);
+
 export const LIST_DEFAULT_LIMIT = cfg.transcript?.listDefaultLimit ?? 50;
 export const LIST_MAX_LIMIT = cfg.transcript?.listMaxLimit ?? 200;
 
 const MEETING_CODE_RE = /^[A-Z0-9\-]{3,32}$/;
+
+const FILLER_ONLY_RE = /^(uh+|um+|mm+|hmm+|hm+|ah+|oh+|eh+|er+|erm+|mhm+|yeah+|yep+|nope?|ok+ay?|like|so|well|right|sure)[.\s]*$/i;
 
 export const RKEYS = {
     cacheById: (id) => `transcript:cache:${id}`,
@@ -81,6 +89,44 @@ export async function isRateLimited(userId) {
     return count > TRANSCRIPT_RATE_LIMIT_MAX;
 }
 
+function hasExcessiveCharRepeat(word) {
+    let maxRun = 1, cur = 1;
+    for (let i = 1; i < word.length; i++) {
+        if (word[i].toLowerCase() === word[i - 1].toLowerCase()) {
+            cur++;
+            if (cur > maxRun) maxRun = cur;
+        } else {
+            cur = 1;
+        }
+    }
+    return maxRun > NOISE_MAX_CHAR_REPEAT;
+}
+
+export function isNoiseLine(line) {
+    if (!line || typeof line !== "string") return true;
+
+    const stripped = line.trim();
+    if (!stripped) return true;
+
+    const alphaCount = (stripped.match(/[a-zA-Z]/g) || []).length;
+    const totalChars = stripped.replace(/\s/g, "").length;
+    if (totalChars === 0) return true;
+    if (alphaCount / totalChars < NOISE_MIN_ALPHA_RATIO) return true;
+
+    const words = stripped.split(/\s+/).filter(Boolean);
+    if (words.length < NOISE_MIN_WORDS) return true;
+
+    if (FILLER_ONLY_RE.test(stripped)) return true;
+
+    const uniqueWords = new Set(words.map((w) => w.toLowerCase().replace(/[^a-z]/g, "")));
+    if (uniqueWords.size / words.length < NOISE_MIN_UNIQUE_RATIO) return true;
+
+    const noiseWordCount = words.filter((w) => hasExcessiveCharRepeat(w)).length;
+    if (noiseWordCount / words.length > 0.3) return true;
+
+    return false;
+}
+
 export async function createTranscriptService(req) {
     await incr(RKEYS.metricTotal());
 
@@ -104,6 +150,17 @@ export async function createTranscriptService(req) {
         return { status: 413, body: { success: false, message: `Transcript text exceeds the ${TRANSCRIPT_MAX_TEXT_LENGTH} character limit` } };
     }
 
+    const cleanedLines = transcriptText
+        .split("\n")
+        .map((l) => l.trim())
+        .filter((l) => !isNoiseLine(l));
+
+    if (cleanedLines.length < NOISE_MIN_LINES) {
+        return { status: 400, body: { success: false, message: "Transcript empty or contains only noise after cleaning" } };
+    }
+
+    const finalText = cleanedLines.join("\n");
+
     const fileName = sanitizeText(req.body.fileName || "");
     const metadata = req.body.metadata && typeof req.body.metadata === "object" ? req.body.metadata : {};
 
@@ -120,7 +177,7 @@ export async function createTranscriptService(req) {
             meetingCode: code,
             ownerId: finalOwnerId,
             hostSecretHash: finalSecretHash,
-            transcriptText,
+            transcriptText: finalText,
             fileName,
             metadata,
         });
@@ -149,7 +206,11 @@ export async function getTranscriptService(req) {
     if (!secret && !userId) return { status: 403, body: { success: false, message: "Not authorized" } };
 
     if (await isRateLimited(userId)) {
-        return { status: 429, body: { success: false, message: "Too many requests, slow down" } };
+        return { status: 429,
+            body: {
+                success: false,
+                message: "Too many requests, slow down"
+            } };
     }
 
     const isMongoId = /^[a-f\d]{24}$/i.test(idOrCode);
@@ -178,11 +239,20 @@ export async function getTranscriptService(req) {
 
         if (!doc) {
             await safeRedisSet(cacheKey, JSON.stringify(null), { EX: 30 });
-            return { status: 404, body: { success: false, message: "Transcript not found" } };
+            return {
+                status: 404,
+                body: {
+                    success: false,
+                    message: "Transcript not found"
+                } };
         }
 
         if (!isAuthorized(doc, userId, secretHash)) {
-            return { status: 403, body: { success: false, message: "Not authorized" } };
+            return {
+                status: 403,
+                body: {
+                    success: false,
+                    message: "Not authorized" } };
         }
 
         const payload = JSON.stringify(doc);
@@ -191,11 +261,21 @@ export async function getTranscriptService(req) {
             safeRedisSet(RKEYS.cacheByCode(String(doc.meetingCode)), payload, { EX: TRANSCRIPT_CACHE_TTL_SEC }),
         ]);
 
-        return { status: 200, body: { success: true, transcript: doc } };
+        return {
+            status: 200,
+            body: {
+                success: true, transcript: doc
+            }
+        };
     } catch (err) {
         await incr(RKEYS.metricFailed());
         log.error("getTranscript error", { err: err.message });
-        return { status: 500, body: { success: false, message: "Server error" } };
+        return {
+            status: 500,
+            body: {
+                success: false, message: "Server error"
+            }
+        };
     }
 }
 
@@ -206,12 +286,22 @@ export async function listTranscriptsService(req) {
     const finalLimit = Math.min(Math.max(parseInt(limit, 10) || LIST_DEFAULT_LIMIT, 1), LIST_MAX_LIMIT);
 
     const { secret, userId, secretHash } = resolveAuth(req);
-    if (!secret && !userId) return { status: 403, body: { success: false, message: "Unauthorized" } };
+    if (!secret && !userId) return {
+        status: 403,
+        body: {
+            success: false,
+            message: "Unauthorized"
+        }
+    };
 
     if (meeting_code) {
         const cleanCode = String(meeting_code).toUpperCase().trim();
         if (!validateMeetingCode(cleanCode)) {
-            return { status: 400, body: { success: false, message: "Invalid meeting_code format" } };
+            return { status: 400,
+                body: {
+                    success: false, message: "Invalid meeting_code format"
+                }
+            };
         }
     }
 
@@ -221,7 +311,11 @@ export async function listTranscriptsService(req) {
             ? { hostSecretHash: secretHash }
             : null;
 
-    if (!query) return { status: 403, body: { success: false, message: "Unauthorized" } };
+    if (!query) return {
+        status: 403, body: {
+            success: false, message: "Unauthorized"
+        }
+    };
 
     log.info("list query debug", { userId, hasSecret: !!secretHash, query });
 
@@ -231,10 +325,18 @@ export async function listTranscriptsService(req) {
         const dbStart = Date.now();
         const docs = await listTranscriptDocs({ query, meetingCode: meetingCodeFilter, limit: finalLimit });
         log.info("listTranscripts complete", { count: docs.length, dbMs: Date.now() - dbStart });
-        return { status: 200, body: { success: true, transcripts: docs } };
+        return {
+            status: 200, body: {
+                success: true, transcripts: docs
+            }
+        };
     } catch (err) {
         await incr(RKEYS.metricFailed());
         log.error("listTranscripts error", { err: err.message });
-        return { status: 500, body: { success: false, message: "Server error" } };
+        return { status: 500,
+            body: {
+                success: false, message: "Server error"
+            }
+        };
     }
 }

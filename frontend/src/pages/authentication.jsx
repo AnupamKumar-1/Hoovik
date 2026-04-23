@@ -176,7 +176,7 @@ export default function Authentication() {
                   id="au-name"
                   className="au-input"
                   type="text"
-                  placeholder="e.g. Alex Kumar"
+                  placeholder="e.g. Anupam Kumar"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   autoComplete="name"

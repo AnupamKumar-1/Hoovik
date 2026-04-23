@@ -290,6 +290,7 @@ export default function useMeetingLifecycle({
   function runBackgroundTranscript(code, hostSecret, recordersSnapshot) {
     const speakerMap = {};
     const currentMeta = participantsMetaRef?.current || [];
+
     currentMeta.forEach((p) => {
       const name =
         p?.meta?.name ||
@@ -298,6 +299,7 @@ export default function useMeetingLifecycle({
         `Guest-${(p.id || "").slice(0, 6)}`;
       if (p.id) speakerMap[p.id] = name;
     });
+
     speakerMap["local"] = localStorage.getItem("displayName") || "Host";
 
     const fd = new FormData();
@@ -305,9 +307,11 @@ export default function useMeetingLifecycle({
     fd.append("speaker_map", JSON.stringify(speakerMap));
 
     let fileCount = 0;
+
     for (const [id, rec] of Object.entries(recordersSnapshot)) {
       const chunks = rec?.chunks;
       if (!chunks?.length) continue;
+
       const blob = new Blob(chunks, { type: "audio/webm" });
       fd.append("audio_files", blob, `${id}.webm`);
       fileCount++;
@@ -325,12 +329,25 @@ export default function useMeetingLifecycle({
       },
       body: fd,
     })
-      .then((resp) => { if (!resp?.ok) return; return resp.json(); })
+      .then((resp) => {
+        if (!resp?.ok) return;
+        return resp.json();
+      })
       .then((data) => {
         if (!data?.success) return;
+
+        const text =
+          data?.transcriptText ||
+          data?.transcript ||
+          data?.metadata?.transcriptText ||
+          "";
+
+        if (!text.trim()) return;
+
         try {
           const existingRaw = localStorage.getItem(`host:${code}`);
           const existing = existingRaw ? JSON.parse(existingRaw) : {};
+
           localStorage.setItem(
             `host:${code}`,
             JSON.stringify({

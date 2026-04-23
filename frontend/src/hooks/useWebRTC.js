@@ -21,6 +21,7 @@ export default function useWebRTC({
   setRemoteStreams,
   createAnalyzerForStream,
   removeAnalyzer,
+  startRecordingForStream,
   ICE_CONFIG,
 }) {
   const makingOfferRef = useRef({});
@@ -30,6 +31,7 @@ export default function useWebRTC({
   const isSettingRemoteAnswerPending = useRef({});
   const disconnectTimeoutRef = useRef({});
   const analyzerAttachedRef = useRef({});
+  const recordingAttachedRef = useRef({});
   const pendingSignalsRef = useRef({});
   const pendingPeerQueueRef = useRef([]);
   const handleSignalRef = useRef(null);
@@ -53,6 +55,7 @@ export default function useWebRTC({
       delete pendingCandidatesRef.current[peerId];
       delete isSettingRemoteAnswerPending.current[peerId];
       delete analyzerAttachedRef.current[peerId];
+      delete recordingAttachedRef.current[peerId];
       delete pendingSignalsRef.current[peerId];
       delete peerStreamRef.current[peerId];
 
@@ -78,6 +81,11 @@ export default function useWebRTC({
         if (analyzerAttachedRef.current[peerId]) return;
         analyzerAttachedRef.current[peerId] = true;
         createAnalyzerForStream(peerId, stream);
+
+        if (!recordingAttachedRef.current[peerId] && typeof startRecordingForStream === "function") {
+          recordingAttachedRef.current[peerId] = true;
+          startRecordingForStream(peerId, stream);
+        }
       };
 
       if (stream.getAudioTracks().length > 0) {
@@ -98,7 +106,7 @@ export default function useWebRTC({
         { once: true }
       );
     },
-    [pcsRef, createAnalyzerForStream]
+    [pcsRef, createAnalyzerForStream, startRecordingForStream]
   );
 
   const pushStreamUpdate = useCallback(
@@ -108,11 +116,7 @@ export default function useWebRTC({
       setRemoteStreams((prev) => {
         const existing = prev[peerId];
         if (existing && existing.id === stream.id) return prev;
-
-        return {
-          ...prev,
-          [peerId]: stream,
-        };
+        return { ...prev, [peerId]: stream };
       });
     },
     [setRemoteStreams]
@@ -120,8 +124,6 @@ export default function useWebRTC({
 
   const createPeerConnection = useCallback(
     (peerId) => {
-
-
       if (pcsRef.current[peerId]) return pcsRef.current[peerId];
 
       const pc = new RTCPeerConnection({
@@ -179,7 +181,6 @@ export default function useWebRTC({
         try {
           makingOfferRef.current[peerId] = true;
           await pc.setLocalDescription(await pc.createOffer());
-
           socketRef.current?.emit(
             "signal",
             peerId,
@@ -190,7 +191,6 @@ export default function useWebRTC({
         }
       };
 
-
       pc.onconnectionstatechange = () => {
         const state = pc.connectionState;
 
@@ -199,7 +199,6 @@ export default function useWebRTC({
             clearTimeout(disconnectTimeoutRef.current[peerId]);
             delete disconnectTimeoutRef.current[peerId];
           }
-
           const s = peerStreamRef.current[peerId];
           if (s) pushStreamUpdate(peerId, s);
         }
@@ -222,18 +221,14 @@ export default function useWebRTC({
 
       pc.oniceconnectionstatechange = () => {
         if (pc.iceConnectionState === "failed") {
-          try {
-            pc.restartIce();
-          } catch { }
+          try { pc.restartIce(); } catch { }
         }
       };
 
       const queued = pendingSignalsRef.current[peerId];
       if (queued?.length) {
         delete pendingSignalsRef.current[peerId];
-        queued.forEach((msg) =>
-          handleSignalRef.current?.(peerId, msg)
-        );
+        queued.forEach((msg) => handleSignalRef.current?.(peerId, msg));
       }
 
       return pc;
@@ -264,12 +259,7 @@ export default function useWebRTC({
     };
 
     window.addEventListener("localstream:ready", onLocalStreamReady);
-
-    return () =>
-      window.removeEventListener(
-        "localstream:ready",
-        onLocalStreamReady
-      );
+    return () => window.removeEventListener("localstream:ready", onLocalStreamReady);
   }, [flushPendingPeers, localStreamRef]);
 
   const handleSignal = useCallback(
@@ -304,54 +294,38 @@ export default function useWebRTC({
 
           const offerCollision =
             isOffer &&
-            (makingOfferRef.current[fromId] ||
-              pc.signalingState !== "stable");
+            (makingOfferRef.current[fromId] || pc.signalingState !== "stable");
 
-          ignoreOfferRef.current[fromId] =
-            !polite && offerCollision;
-
+          ignoreOfferRef.current[fromId] = !polite && offerCollision;
           if (ignoreOfferRef.current[fromId]) return;
 
           if (offerCollision) {
-            try {
-              await pc.setLocalDescription({ type: "rollback" });
-            } catch { }
+            try { await pc.setLocalDescription({ type: "rollback" }); } catch { }
           }
 
           await pc.setRemoteDescription(description);
 
-          const pending =
-            pendingCandidatesRef.current[fromId] || [];
+          const pending = pendingCandidatesRef.current[fromId] || [];
           pendingCandidatesRef.current[fromId] = [];
 
           for (const candidate of pending) {
-            try {
-              await pc.addIceCandidate(candidate);
-            } catch { }
+            try { await pc.addIceCandidate(candidate); } catch { }
           }
 
           if (isOffer) {
             await pc.setLocalDescription(await pc.createAnswer());
-
             socketRef.current?.emit(
               "signal",
               fromId,
-              JSON.stringify({
-                description: pc.localDescription,
-              })
+              JSON.stringify({ description: pc.localDescription })
             );
           }
         } else if (msg.candidate) {
           pendingCandidatesRef.current[fromId] ||= [];
-
           if (pc.remoteDescription) {
-            try {
-              await pc.addIceCandidate(msg.candidate);
-            } catch { }
+            try { await pc.addIceCandidate(msg.candidate); } catch { }
           } else {
-            pendingCandidatesRef.current[fromId].push(
-              msg.candidate
-            );
+            pendingCandidatesRef.current[fromId].push(msg.candidate);
           }
         }
       } catch { }

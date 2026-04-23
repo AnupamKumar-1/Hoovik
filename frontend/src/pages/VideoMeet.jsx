@@ -196,26 +196,48 @@ export default function VideoMeet() {
   }, [participantsMeta]);
 
   const {
-    activeSpeakerId, createAnalyzerForStream, removeAnalyzer, notifyPcsChanged,
+    activeSpeakerId,
+    createAnalyzerForStream,
+    removeAnalyzer,
+    notifyPcsChanged,
   } = useAudioAnalyzer({
     remoteStreams: unwrappedRemoteStreams,
-    localStreamRef, mutedRef, pcsRef, participantsMetaMap,
+    localStreamRef,
+    mutedRef,
+    pcsRef,
+    participantsMetaMap,
   });
 
   const {
-    recordersRef, startRecordingForStream, stopAllRecorders,
+    recordersRef,
+    startRecordingForStream,
+    stopAllRecorders,
     uploadRecordingsAndStoreTranscript,
+    getSpeechActiveRecordings,
   } = useRecording({
-    isHost, roomId, participantsMetaRef,
-    TRANSCRIPTS_ENABLED, TRANSCRIPT_ENDPOINT, API_BASE,
+    isHost,
+    roomId,
+    participantsMetaRef,
+    TRANSCRIPTS_ENABLED,
+    TRANSCRIPT_ENDPOINT,
+    API_BASE,
   });
 
   const {
-    createPeerConnection, handleSignal, politeRef,
-    pendingCandidatesRef, makingOfferRef,
+    createPeerConnection,
+    handleSignal,
+    politeRef,
+    pendingCandidatesRef,
+    makingOfferRef,
   } = useWebRTC({
-    socketRef, localStreamRef, pcsRef, setRemoteStreams,
-    createAnalyzerForStream, removeAnalyzer, recordersRef, ICE_CONFIG,
+    socketRef,
+    localStreamRef,
+    pcsRef,
+    setRemoteStreams,
+    createAnalyzerForStream,
+    removeAnalyzer,
+    startRecordingForStream,
+    ICE_CONFIG,
   });
 
   const emotionSocketRef = useEmotionSocket({ setEmotionsMap });
@@ -223,39 +245,76 @@ export default function VideoMeet() {
   const { startPeriodicEmotionCapture, stopPeriodicEmotionCapture } =
     useEmotionCapture({
       socketRef: emotionSocketRef,
-      remoteStreamsRef, participantsMetaRef,
-      myId, roomId, isHost,
+      remoteStreamsRef,
+      participantsMetaRef,
+      myId,
+      roomId,
+      isHost,
       DEBUG_SHOW_EMOTION_FOR_EVERYONE: false,
       activeSpeakerIdRef,
     });
 
   const { toggleMute, toggleVideo, startScreenShare } = useMediaControls({
-    localStreamRef, localVideoRef, pcsRef, socketRef, myUserId,
-    createAnalyzerForStream, removeAnalyzer,
-    startRecordingForStream, stopPeriodicEmotionCapture, startPeriodicEmotionCapture,
+    localStreamRef,
+    localVideoRef,
+    pcsRef,
+    socketRef,
+    myUserId,
+    createAnalyzerForStream,
+    removeAnalyzer,
+    startRecordingForStream,
+    stopPeriodicEmotionCapture,
+    startPeriodicEmotionCapture,
   });
 
   const {
     leaveCall, endMeeting, cleanupAll, persistHistorySnapshot,
   } = useMeetingLifecycle({
-    roomId, navigate, socketRef, localStreamRef, localVideoRef,
-    prevLocalStreamRef, pcsRef, participantsMeta, isHost, addToUserHistory,
-    TRANSCRIPTS_ENABLED, TRANSCRIPT_ENDPOINT, API_BASE,
-    createAnalyzerForStream, removeAnalyzer, startRecordingForStream,
-    stopAllRecorders, uploadRecordingsAndStoreTranscript,
-    stopPeriodicEmotionCapture, setConnecting, setParticipantsMeta,
-    setRemoteStreams, recordersRef, makingOfferRef, politeRef,
-    pendingCandidatesRef, ignoreOfferRef, isSettingRemoteAnswerPending,
+    roomId,
+    navigate,
+    socketRef,
+    localStreamRef,
+    localVideoRef,
+    prevLocalStreamRef,
+    pcsRef,
+    participantsMeta,
+    isHost,
+    addToUserHistory,
+    TRANSCRIPTS_ENABLED,
+    TRANSCRIPT_ENDPOINT,
+    API_BASE,
+    createAnalyzerForStream,
+    removeAnalyzer,
+    startRecordingForStream,
+    stopAllRecorders,
+    uploadRecordingsAndStoreTranscript,
+    getSpeechActiveRecordings,
+    stopPeriodicEmotionCapture,
+    setConnecting,
+    setParticipantsMeta,
+    setRemoteStreams,
+    recordersRef,
+    makingOfferRef,
+    politeRef,
+    pendingCandidatesRef,
+    ignoreOfferRef,
+    isSettingRemoteAnswerPending,
     SOCKET_SERVER_URL,
     onSocketReady: () => setSocketReady((n) => n + 1),
   });
 
+
   useEffect(() => { cleanupRef.current = cleanupAll; }, [cleanupAll]);
 
   useMediaBridge({
-    localStreamRef, createAnalyzerForStream, removeAnalyzer,
-    startRecordingForStream, stopAllRecorders, recordersRef,
-    startPeriodicEmotionCapture, stopPeriodicEmotionCapture,
+    localStreamRef,
+    createAnalyzerForStream,
+    removeAnalyzer,
+    startRecordingForStream,
+    stopAllRecorders,
+    recordersRef,
+    startPeriodicEmotionCapture,
+    stopPeriodicEmotionCapture,
   });
 
   const closePeer = useCallback(
@@ -285,7 +344,11 @@ export default function VideoMeet() {
         return null;
       });
     },
-    [pcsRef, recordersRef, removeAnalyzer, notifyPcsChanged]
+    [
+      pcsRef,
+      recordersRef,
+      removeAnalyzer,
+      notifyPcsChanged]
   );
 
   const stableSpeakerTimerRef = useRef(null);
