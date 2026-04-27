@@ -91,6 +91,38 @@ This unlocks:
 
 ---
 
+## Product Overview
+
+A real-time meeting where **emotion, speech, and interaction are analyzed live and post-call**.
+
+---
+
+## Screenshots
+
+### Real-time Emotion Analysis
+
+![Emotion Analysis](docs/screenshots/emotion-panel.jpeg)
+
+> Real-time emotion inference with per-participant tracking and group mood aggregation
+
+---
+
+### Meeting Interface
+
+![Meeting Room](docs/screenshots/meeting-room.jpeg)
+
+> Low-latency WebRTC mesh with in-meeting controls, chat, and media orchestration
+
+---
+
+### Transcript & Post-Meeting Insights
+
+![Transcripts](docs/screenshots/transcripts.jpeg)
+
+> Speaker-attributed transcripts enriched with segment-level emotion classification
+
+---
+
 ## Architecture
 
 ```
@@ -190,31 +222,7 @@ Emotion inference supports dual ingestion paths:
 
 ---
 
-## Screenshots
 
-### Real-time Emotion Analysis
-
-![Emotion Analysis](docs/screenshots/emotion-panel.jpeg)
-
-> Real-time emotion inference with per-participant tracking and group mood aggregation
-
----
-
-### Meeting Interface
-
-![Meeting Room](docs/screenshots/meeting-room.jpeg)
-
-> Low-latency WebRTC mesh with in-meeting controls, chat, and media orchestration
-
----
-
-### Transcript & Post-Meeting Insights
-
-![Transcripts](docs/screenshots/transcripts.jpeg)
-
-> Speaker-attributed transcripts enriched with segment-level emotion classification
-
----
 
 ## Quick Start
 
