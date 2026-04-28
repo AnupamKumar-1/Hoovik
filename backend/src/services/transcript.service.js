@@ -135,19 +135,37 @@ export async function createTranscriptService(req) {
 
     const code = String(rawCode).toUpperCase().trim();
     if (!validateMeetingCode(code)) {
-        return { status: 400, body: { success: false, message: "Invalid meetingCode format" } };
+        return {
+            status: 400,
+            body: {
+                success: false,
+                message: "Invalid meetingCode format"
+            }
+        };
     }
 
     const { secret, userId, secretHash } = resolveAuth(req);
     if (!secret && !userId) {
-        return { status: 403, body: { success: false, message: "Not authorized" } };
+        return {
+            status: 403,
+            body: {
+                success: false,
+                message: "Not authorized"
+            }
+        };
     }
 
     const rawText = req.body.transcriptText || req.body.transcript || req.body.metadata?.transcriptText || "";
     const transcriptText = sanitizeText(rawText);
 
     if (transcriptText.length > TRANSCRIPT_MAX_TEXT_LENGTH) {
-        return { status: 413, body: { success: false, message: `Transcript text exceeds the ${TRANSCRIPT_MAX_TEXT_LENGTH} character limit` } };
+        return {
+            status: 413,
+            body: {
+                success: false,
+                message: `Transcript text exceeds the ${TRANSCRIPT_MAX_TEXT_LENGTH} character limit`
+            }
+        };
     }
 
     const cleanedLines = transcriptText
@@ -156,7 +174,13 @@ export async function createTranscriptService(req) {
         .filter((l) => !isNoiseLine(l));
 
     if (cleanedLines.length < NOISE_MIN_LINES) {
-        return { status: 400, body: { success: false, message: "Transcript empty or contains only noise after cleaning" } };
+        return {
+            status: 400,
+            body: {
+                success: false,
+                message: "Transcript empty or contains only noise after cleaning"
+            }
+        };
     }
 
     const finalText = cleanedLines.join("\n");
@@ -188,7 +212,13 @@ export async function createTranscriptService(req) {
             safeRedisDel(RKEYS.cacheById(String(doc._id))),
         ]);
 
-        return { status: 201, body: { success: true, transcript: doc } };
+        return {
+            status: 201,
+            body: {
+                success: true,
+                transcript: doc
+            }
+        };
     } catch (err) {
         await incr(RKEYS.metricFailed());
         log.error("createTranscript error", { err: err.message });
@@ -200,10 +230,19 @@ export async function getTranscriptService(req) {
     await incr(RKEYS.metricTotal());
 
     const idOrCode = String(req.params.id || "").trim();
-    if (!idOrCode) return { status: 400, body: { success: false, message: "id or meetingCode required" } };
+    if (!idOrCode) return {
+        status: 400,
+        body: {
+            success: false,
+            message: "id or meetingCode required"
+        }
+    };
 
     const { secret, userId, secretHash } = resolveAuth(req);
-    if (!secret && !userId) return { status: 403, body: { success: false, message: "Not authorized" } };
+    if (!secret && !userId) return {
+        status: 403,
+        body: { success: false, message: "Not authorized" }
+    };
 
     if (await isRateLimited(userId)) {
         return { status: 429,
@@ -223,10 +262,22 @@ export async function getTranscriptService(req) {
         if (cached !== null) {
             const doc = JSON.parse(cached);
             if (doc === null) return { status: 404, body: { success: false, message: "Transcript not found" } };
-            if (!isAuthorized(doc, userId, secretHash)) return { status: 403, body: { success: false, message: "Not authorized" } };
+            if (!isAuthorized(doc, userId, secretHash)) return {
+                status: 403, body: {
+                    success: false,
+                    message: "Not authorized"
+                }
+            };
             await incr(RKEYS.metricCached());
+
             log.info("cache hit", { key: cacheKey });
-            return { status: 200, body: { success: true, transcript: doc } };
+            return {
+                status: 200,
+                body: {
+                    success: true,
+                    transcript: doc
+                }
+            };
         }
 
         log.info("cache miss", { key: cacheKey });
