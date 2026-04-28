@@ -14,7 +14,7 @@ from werkzeug.utils import secure_filename
 from config import *
 from utils.audio import convert_to_wav
 from utils.helpers import allowed_file, clean_speaker, schedule_file_cleanup
-from services.asr_service import transcribe_and_emotion
+from services.asr_service import transcribe_and_emotion, build_intelligent_summary
 from services.processing_service import merge_segments, build_transcript_text
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -83,15 +83,17 @@ async def process_meeting(
         except Exception:
             wav_path = save_path
 
-        segments = transcribe_and_emotion(wav_path)
+        result = transcribe_and_emotion(wav_path)
 
         results[base] = {
             "speaker": clean_speaker(speaker_map_dict.get(base, base)),
-            "segments": segments,
+            "segments": result["segments"],
+            "analysis": result["analysis"],
         }
 
     merged = merge_segments(results)
     transcript_text = build_transcript_text(merged)
+    analysis = build_intelligent_summary(merged)
 
     if not merged:
         schedule_file_cleanup(created_files, CLEANUP_DELAY_SEC)
@@ -102,6 +104,7 @@ async def process_meeting(
                 "error": "No valid audio files processed",
                 "transcript_text": "",
                 "segments": [],
+                "analysis": {},
             },
         )
 
@@ -122,7 +125,10 @@ async def process_meeting(
             json={
                 "meetingCode": meeting_code,
                 "transcriptText": transcript_text,
-                "metadata": {"segments": merged},
+                "metadata": {
+                    "segments": merged,
+                    "analysis": analysis,
+                },
             },
             headers=node_headers,
             timeout=10,
@@ -150,6 +156,7 @@ async def process_meeting(
                 "error": node_error or "Node API failed",
                 "transcript_text": transcript_text,
                 "segments": merged,
+                "analysis": analysis,
             },
         )
 
@@ -158,6 +165,7 @@ async def process_meeting(
             "success": True,
             "transcript_text": transcript_text,
             "segments": merged,
+            "analysis": analysis,
         }
     )
 
