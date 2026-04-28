@@ -10,3 +10,27 @@
 2026-04-06 12:27:51,073 | INFO |   [video_only  ] n= 383 | flagged=0.78%
 2026-04-06 12:27:51,073 | INFO |   [both        ] n= 385 | flagged=16.10%
 2026-04-06 12:27:51,377 | INFO | Anomaly detector ready
+2026-04-25 14:57:10,252 | INFO | Loading dataset from /Users/anupamkumar/Desktop/meet/emotion_service/extracted_dataset/dataset.npz
+2026-04-25 14:57:10,849 | INFO | Building features...
+2026-04-25 14:57:11,122 | INFO | Feature dim: 5255
+2026-04-25 14:57:11,122 | INFO | Fitting anomaly scaler...
+2026-04-25 14:57:11,282 | INFO | Training IsolationForest...
+2026-04-25 14:57:11,555 | INFO | Val score stats → mean=0.0398, std=0.0223
+2026-04-25 14:57:11,556 | INFO | Threshold @ FPR=10% → 0.01478 | overall flagged=10.07%
+2026-04-25 14:57:11,556 | INFO | Val anomaly rates by modality:
+2026-04-25 14:57:11,556 | INFO |   [audio_only  ] n= 384 | flagged=13.28%
+2026-04-25 14:57:11,556 | INFO |   [video_only  ] n= 383 | flagged=0.78%
+2026-04-25 14:57:11,556 | INFO |   [both        ] n= 385 | flagged=16.10%
+2026-04-25 14:57:12,943 | INFO | Anomaly detector ready
+2026-04-26 22:36:05,370 | INFO | Loading dataset from /Users/anupamkumar/Desktop/meet/emotion_service/extracted_dataset/dataset.npz
+2026-04-26 22:36:05,699 | INFO | Building features...
+2026-04-26 22:36:05,926 | INFO | Feature dim: 5255
+2026-04-26 22:36:05,926 | INFO | Fitting anomaly scaler...
+2026-04-26 22:36:06,194 | INFO | Training IsolationForest...
+2026-04-26 22:36:06,425 | INFO | Val score stats → mean=0.0398, std=0.0223
+2026-04-26 22:36:06,427 | INFO | Threshold @ FPR=10% → 0.01478 | overall flagged=10.07%
+2026-04-26 22:36:06,427 | INFO | Val anomaly rates by modality:
+2026-04-26 22:36:06,427 | INFO |   [audio_only  ] n= 384 | flagged=13.28%
+2026-04-26 22:36:06,427 | INFO |   [video_only  ] n= 383 | flagged=0.78%
+2026-04-26 22:36:06,427 | INFO |   [both        ] n= 385 | flagged=16.10%
+2026-04-26 22:36:07,020 | INFO | Anomaly detector ready

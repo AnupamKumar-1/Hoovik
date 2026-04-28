@@ -39,3 +39,59 @@
 weighted avg       0.72      0.70      0.70      1152
 
 2026-04-06 12:26:47,449 | INFO |  DONE
+2026-04-24 00:59:30,150 | INFO | Loading dataset from: /Users/anupamkumar/Desktop/meet/emotion_service/extracted_dataset/dataset.npz
+2026-04-24 01:01:19,063 | INFO | Loading dataset from: /Users/anupamkumar/Desktop/meet/emotion_service/extracted_dataset/dataset.npz
+2026-04-24 01:01:26,411 | INFO | Epoch 1 | Val Loss 1.4712 | Val Acc 0.4123
+2026-04-24 01:01:31,685 | INFO | Epoch 2 | Val Loss 1.5004 | Val Acc 0.4557
+2026-04-24 01:01:36,636 | INFO | Epoch 3 | Val Loss 1.0833 | Val Acc 0.6085
+2026-04-24 01:01:42,116 | INFO | Epoch 4 | Val Loss 1.0007 | Val Acc 0.6345
+2026-04-24 01:01:47,248 | INFO | Epoch 5 | Val Loss 1.0093 | Val Acc 0.6354
+2026-04-24 01:01:52,243 | INFO | Epoch 6 | Val Loss 0.9388 | Val Acc 0.6389
+2026-04-24 01:01:57,262 | INFO | Epoch 7 | Val Loss 0.9835 | Val Acc 0.6345
+2026-04-24 01:02:02,207 | INFO | Epoch 8 | Val Loss 1.1494 | Val Acc 0.6398
+2026-04-24 01:02:07,146 | INFO | Epoch 9 | Val Loss 0.9781 | Val Acc 0.6606
+2026-04-24 01:02:12,104 | INFO | Epoch 10 | Val Loss 1.0039 | Val Acc 0.6840
+2026-04-24 01:02:17,135 | INFO | Epoch 11 | Val Loss 0.9791 | Val Acc 0.6641
+2026-04-24 01:02:22,079 | INFO | Epoch 12 | Val Loss 1.0135 | Val Acc 0.6832
+2026-04-24 01:02:27,030 | INFO | Epoch 13 | Val Loss 0.9919 | Val Acc 0.6667
+2026-04-24 01:02:31,975 | INFO | Epoch 14 | Val Loss 0.9374 | Val Acc 0.6866
+2026-04-24 01:02:37,000 | INFO | Epoch 15 | Val Loss 0.9854 | Val Acc 0.6762
+2026-04-24 01:02:41,947 | INFO | Epoch 16 | Val Loss 0.9895 | Val Acc 0.6832
+2026-04-24 01:02:46,903 | INFO | Epoch 17 | Val Loss 0.9766 | Val Acc 0.6927
+2026-04-24 01:02:51,845 | INFO | Epoch 18 | Val Loss 1.0033 | Val Acc 0.6936
+2026-04-24 01:02:56,809 | INFO | Epoch 19 | Val Loss 0.9923 | Val Acc 0.6997
+2026-04-24 01:03:01,794 | INFO | Epoch 20 | Val Loss 0.9865 | Val Acc 0.6970
+2026-04-24 01:03:06,967 | INFO | Epoch 21 | Val Loss 0.9882 | Val Acc 0.6745
+2026-04-24 01:03:12,216 | INFO | Epoch 22 | Val Loss 1.0478 | Val Acc 0.6884
+2026-04-24 01:03:17,314 | INFO | Epoch 23 | Val Loss 1.1372 | Val Acc 0.6441
+2026-04-24 01:03:22,435 | INFO | Epoch 24 | Val Loss 1.1053 | Val Acc 0.6693
+2026-04-24 01:03:27,401 | INFO | Epoch 25 | Val Loss 0.8547 | Val Acc 0.7031
+2026-04-24 01:03:32,402 | INFO | Epoch 26 | Val Loss 0.9205 | Val Acc 0.7248
+2026-04-24 01:03:37,387 | INFO | Epoch 27 | Val Loss 1.0025 | Val Acc 0.6849
+2026-04-24 01:03:42,356 | INFO | Epoch 28 | Val Loss 1.0063 | Val Acc 0.6866
+2026-04-24 01:03:47,376 | INFO | Epoch 29 | Val Loss 0.9326 | Val Acc 0.7274
+2026-04-24 01:03:52,302 | INFO | Epoch 30 | Val Loss 0.9876 | Val Acc 0.7049
+2026-04-24 01:03:57,525 | INFO | Epoch 31 | Val Loss 0.9694 | Val Acc 0.7274
+2026-04-24 01:04:02,700 | INFO | Epoch 32 | Val Loss 1.0038 | Val Acc 0.7127
+2026-04-24 01:04:07,787 | INFO | Epoch 33 | Val Loss 1.0680 | Val Acc 0.7092
+2026-04-24 01:04:12,764 | INFO | Epoch 34 | Val Loss 0.9886 | Val Acc 0.7231
+2026-04-24 01:04:17,735 | INFO | Epoch 35 | Val Loss 1.0609 | Val Acc 0.7083
+2026-04-24 01:04:22,711 | INFO | Epoch 36 | Val Loss 1.0808 | Val Acc 0.7283
+2026-04-24 01:04:27,682 | INFO | Epoch 37 | Val Loss 1.1774 | Val Acc 0.7161
+2026-04-24 01:04:27,986 | INFO | 
+ TEST ACC: 0.7109
+2026-04-24 01:04:27,994 | INFO | 
+              precision    recall  f1-score   support
+
+           0       0.86      0.84      0.85       192
+           1       0.89      0.65      0.75        96
+           2       0.89      0.65      0.75       192
+           3       0.72      0.79      0.75       192
+           4       0.47      0.72      0.57       192
+           5       0.72      0.62      0.67       288
+
+    accuracy                           0.71      1152
+   macro avg       0.76      0.71      0.72      1152
+weighted avg       0.74      0.71      0.72      1152
+
+2026-04-24 01:04:27,994 | INFO |  DONE

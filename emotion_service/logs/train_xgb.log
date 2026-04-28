@@ -17,3 +17,22 @@ neutral/calm       0.71      0.77      0.74       288
 weighted avg       0.72      0.71      0.71      1152
 
 2026-04-06 12:24:09,838 | INFO | DONE
+2026-04-24 01:05:09,625 | INFO | Loading dataset from: /Users/anupamkumar/Desktop/meet/emotion_service/extracted_dataset/dataset.npz
+2026-04-24 01:05:10,057 | INFO | Building features...
+2026-04-24 01:05:10,525 | INFO | Training XGBoost...
+2026-04-24 01:10:25,358 | INFO |  TEST ACC: 0.7083
+2026-04-24 01:10:25,367 | INFO | 
+              precision    recall  f1-score   support
+
+       angry       0.86      0.74      0.80       192
+     fearful       0.86      0.53      0.66        96
+     disgust       0.68      0.73      0.70       192
+       happy       0.79      0.77      0.78       192
+         sad       0.51      0.59      0.55       192
+neutral/calm       0.71      0.77      0.74       288
+
+    accuracy                           0.71      1152
+   macro avg       0.74      0.69      0.70      1152
+weighted avg       0.72      0.71      0.71      1152
+
+2026-04-24 01:10:26,096 | INFO | DONE

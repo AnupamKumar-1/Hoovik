@@ -1,7 +1,5 @@
-
 import json
 import sys
-from pathlib import Path
 from pathlib import Path
 import numpy as np
 import torch
@@ -10,6 +8,7 @@ from tqdm import tqdm
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BASE_DIR))
+
 
 def load_config():
     with open(BASE_DIR / "config" / "config.json") as f:
@@ -22,6 +21,7 @@ DEVICE = "cpu"
 
 
 # NORMALIZATION
+
 
 def load_face_norm():
     mean = np.load(BASE_DIR / cfg["paths"]["norm_dir"] / "face_mean.npy")
@@ -38,6 +38,7 @@ def apply_face_norm(x):
 
 # DATA
 
+
 def load_val_data():
     data = np.load(BASE_DIR / cfg["paths"]["dataset"])
     return (
@@ -46,6 +47,17 @@ def load_val_data():
         data["face_mask_val"],
         data["audio_mask_val"],
         data["y_val"],
+    )
+
+
+def load_test_data():
+    data = np.load(BASE_DIR / cfg["paths"]["dataset"])
+    return (
+        data["X_face_test"],
+        data["X_audio_test"],
+        data["face_mask_test"],
+        data["audio_mask_test"],
+        data["y_test"],
     )
 
 
@@ -113,7 +125,7 @@ def build_features(Xf, Xa, fm, am):
     )
 
 
-# FAST MODAL INFERENCE
+# INFERENCE
 
 
 def get_modal_probs(model, Xf, Xa, fm, am, batch_size=64):
@@ -144,7 +156,7 @@ def get_xgb_probs(model, scaler, pca, Xf, Xa, fm, am):
     return model.predict_proba(X)
 
 
-# CALIBRATION
+# CALIBRATION — runs on val set only
 
 
 def calibrate(p_modal, p_xgb, y):
@@ -166,25 +178,54 @@ def calibrate(p_modal, p_xgb, y):
 
 
 def main():
-    Xf, Xa, fm, am, y = load_val_data()
+    # --- Step 1: calibrate weights on val set ---
+    print("Loading val data...")
+    Xf_val, Xa_val, fm_val, am_val, y_val = load_val_data()
+
     modal = load_modal()
     xgb, scaler, pca = load_xgb()
 
-    p_modal = get_modal_probs(modal, Xf, Xa, fm, am)
-    p_xgb = get_xgb_probs(xgb, scaler, pca, Xf, Xa, fm, am)
+    print("Running val inference...")
+    p_modal_val = get_modal_probs(modal, Xf_val, Xa_val, fm_val, am_val)
+    p_xgb_val = get_xgb_probs(xgb, scaler, pca, Xf_val, Xa_val, fm_val, am_val)
 
-    (w_modal, w_xgb), acc = calibrate(p_modal, p_xgb, y)
+    (w_modal, w_xgb), val_acc = calibrate(p_modal_val, p_xgb_val, y_val)
 
-    print(f"\n BEST: modal={w_modal:.2f}, xgb={w_xgb:.2f}, acc={acc:.4f}")
+    print(f"\n BEST (val): modal={w_modal:.2f}, xgb={w_xgb:.2f}, val_acc={val_acc:.4f}")
 
+    # --- Step 2: evaluate on test set with calibrated weights ---
+    print("\nLoading test data...")
+    Xf_te, Xa_te, fm_te, am_te, y_te = load_test_data()
+
+    print("Running test inference...")
+    p_modal_te = get_modal_probs(modal, Xf_te, Xa_te, fm_te, am_te)
+    p_xgb_te = get_xgb_probs(xgb, scaler, pca, Xf_te, Xa_te, fm_te, am_te)
+
+    probs_te = w_modal * p_modal_te + w_xgb * p_xgb_te
+    test_acc = (probs_te.argmax(1) == y_te).mean()
+
+    print(f" TEST ACC (ensemble): {test_acc:.4f}")
+
+    # --- Step 3: save weights ---
     save_dir = BASE_DIR / "models" / "ensemble"
     save_dir.mkdir(parents=True, exist_ok=True)
 
     json.dump(
-        {"w_modal": float(w_modal), "w_xgb": float(w_xgb)},
+        {
+            "w_modal": float(w_modal),
+            "w_xgb": float(w_xgb),
+            "val_acc": float(val_acc),
+            "test_acc": float(test_acc),
+        },
         open(save_dir / "weights.json", "w"),
         indent=2,
     )
+
+    print(f"\n Weights saved to {save_dir / 'weights.json'}")
+    print(f"\n SUMMARY")
+    print(f"   Val  acc (calibration): {val_acc:.4f}")
+    print(f"   Test acc (final):       {test_acc:.4f}")
+    print(f"   Weights: modal={w_modal:.2f}, xgb={w_xgb:.2f}")
 
 
 if __name__ == "__main__":
