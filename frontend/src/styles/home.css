@@ -750,3 +750,118 @@
   outline: 3px solid rgba(14, 165, 233, 0.3);
   outline-offset: 2px;
 }
+
+
+.hm-tx-item-v2 {
+  display: flex;
+  align-items: stretch;
+  cursor: pointer;
+  border-bottom: 1px solid var(--hm-border);
+  transition: background 0.12s;
+  user-select: none;
+  outline: none;
+  position: relative;
+}
+.hm-tx-item-v2:last-child { border-bottom: none; }
+.hm-tx-item-v2:hover { background: rgba(255, 255, 255, 0.018); }
+.hm-tx-item-v2:focus { background: rgba(255, 255, 255, 0.025); }
+
+.hm-tx-v2-bar {
+  width: 3px;
+  flex-shrink: 0;
+  border-radius: 0;
+  opacity: 0.8;
+}
+
+.hm-tx-v2-content {
+  flex: 1;
+  min-width: 0;
+  padding: 13px 20px 13px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hm-tx-v2-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.hm-tx-v2-code {
+  font-family: var(--hm-font-d);
+  font-weight: 700;
+  font-size: 0.82rem;
+  color: var(--hm-sky-bright);
+  letter-spacing: 0.08em;
+}
+
+.hm-tx-v2-meta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.hm-tx-v2-chip {
+  font-size: 0.65rem;
+  font-weight: 600;
+  font-family: var(--hm-font-d);
+  color: var(--hm-muted);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--hm-border);
+  padding: 2px 7px;
+  border-radius: 100px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.hm-tx-v2-preview {
+  font-size: 0.775rem;
+  color: rgba(232, 242, 255, 0.45);
+  line-height: 1.55;
+  font-weight: 300;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.hm-tx-v2-bottom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.hm-tx-v2-date {
+  font-size: 0.68rem;
+  color: var(--hm-muted);
+  font-weight: 400;
+}
+
+.hm-tx-v2-emo {
+  font-size: 0.65rem;
+  font-weight: 600;
+  font-family: var(--hm-font-d);
+  padding: 2px 7px;
+  border-radius: 100px;
+  border: 1px solid transparent;
+  letter-spacing: 0.03em;
+  text-transform: capitalize;
+}
+
+.hm-tx-v2-open {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  font-family: var(--hm-font-d);
+  color: var(--hm-muted);
+  letter-spacing: 0.02em;
+  transition: color 0.12s;
+}
+.hm-tx-item-v2:hover .hm-tx-v2-open { color: var(--hm-sky-bright); }

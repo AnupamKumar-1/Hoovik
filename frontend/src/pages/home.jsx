@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useContext, useRef, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import "../styles/home.css";
 import { AuthContext } from "../contexts/AuthContext";
 import { TRANSCRIPTS_ENABLED } from "../environment";
+import TranscriptViewer from "./TranscriptViewer";
 
 const SERVER_BASE = process.env.REACT_APP_SERVER_URL || "http://localhost:8000";
 const API_BASE = process.env.REACT_APP_API_URL || `${SERVER_BASE}/api/v1`;
@@ -10,6 +11,7 @@ const API_BASE = process.env.REACT_APP_API_URL || `${SERVER_BASE}/api/v1`;
 const TRANSCRIPT_CACHE_KEY = "tx_cache";
 const TRANSCRIPT_CACHE_TTL = 2 * 60 * 1000;
 const TRANSCRIPTS_PER_PAGE = 5;
+const PENDING_TRANSCRIPT_KEY = "pending_transcript_code";
 
 async function copyToClipboard(text) {
   try {
@@ -51,7 +53,7 @@ async function createRoomAndGetLink(name) {
   const link = `${window.location.origin}/room/${code}`;
 
   if (!hostSecret) {
-    throw new Error("Server did not return a hostSecret — transcript fetch will not work");
+    throw new Error("Server did not return a hostSecret");
   }
 
   localStorage.setItem("displayName", name.trim());
@@ -158,111 +160,117 @@ function Snack({ msg, severity, open }) {
   );
 }
 
-function TranscriptItem({ t, isExpanded, onToggle }) {
-  const segments = t.metadata?.segments;
+const EMOTION_COLORS = {
+  joy: "#f59e0b", happy: "#f59e0b", sadness: "#60a5fa",
+  anger: "#f87171", fear: "#a78bfa", surprise: "#34d399",
+  disgust: "#fb923c", neutral: "#64748b",
+};
+
+function TranscriptItem({ t, onOpen }) {
+  const segments = t.metadata?.segments ?? [];
+
+  const speakers = [...new Set(segments.map((s) => s.speaker).filter(Boolean))];
+
+  const emoCount = {};
+  segments.forEach((s) => {
+    const e = s.emotion?.toLowerCase() || "neutral";
+    emoCount[e] = (emoCount[e] || 0) + 1;
+  });
+  const dominantEmo = Object.entries(emoCount).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+  const emoColor = dominantEmo ? (EMOTION_COLORS[dominantEmo] || "#64748b") : null;
+
+  const lastSeg = segments.at(-1);
+  const duration = lastSeg?.end > 0 ? Math.floor(lastSeg.end) : null;
+  function fmtDur(sec) {
+    const m = Math.floor(sec / 60), s = sec % 60;
+    return m > 0 ? `${m}m ${s}s` : `${s}s`;
+  }
+
+  const preview = segments.length > 0
+    ? segments.map((s) => s.text).join(" ").slice(0, 140)
+    : (t.transcriptText || "").trim().slice(0, 140);
+
+  const dominantSpeaker = speakers[0] || null;
 
   return (
-    <div className={`hm-tx-item ${isExpanded ? "hm-tx-item-expanded" : ""}`}>
-      <div
-        className="hm-tx-head"
-        onClick={onToggle}
-        role="button"
-        aria-expanded={isExpanded}
-        tabIndex={0}
-        onKeyDown={(e) => e.key === "Enter" && onToggle()}
-      >
-        <div className="hm-tx-head-left">
-          <div className="hm-tx-code-wrap">
-            <span className="hm-tx-dot" />
-            <span className="hm-tx-code">{t.meetingCode}</span>
+    <div
+      className="hm-tx-item hm-tx-item-v2"
+      role="button"
+      tabIndex={0}
+      onClick={onOpen}
+      onKeyDown={(e) => e.key === "Enter" && onOpen()}
+    >
+      <div className="hm-tx-v2-bar" style={{ background: emoColor || "rgba(56,189,248,0.4)" }} />
+
+      <div className="hm-tx-v2-content">
+        <div className="hm-tx-v2-top">
+          <div className="hm-tx-v2-code">{t.meetingCode}</div>
+          <div className="hm-tx-v2-meta">
+            {duration !== null && <span className="hm-tx-v2-chip">{fmtDur(duration)}</span>}
+            {segments.length > 0 && <span className="hm-tx-v2-chip">{segments.length} turns</span>}
+            {dominantSpeaker && <span className="hm-tx-v2-chip">{dominantSpeaker}</span>}
           </div>
-          <div className="hm-tx-date">
+        </div>
+
+        {preview && (
+          <div className="hm-tx-v2-preview">
+            {preview}{preview.length >= 140 ? "…" : ""}
+          </div>
+        )}
+
+        <div className="hm-tx-v2-bottom">
+          <span className="hm-tx-v2-date">
             {t.createdAt ? new Date(t.createdAt).toLocaleString(undefined, {
               month: "short", day: "numeric", hour: "2-digit", minute: "2-digit"
             }) : "Unknown date"}
-          </div>
-        </div>
-        <div className="hm-tx-head-right">
-          {segments?.length > 0 && (
-            <span className="hm-tx-seg-count">{segments.length} turns</span>
+          </span>
+          {dominantEmo && (
+            <span className="hm-tx-v2-emo" style={{ color: emoColor, borderColor: emoColor + "44" }}>
+              {dominantEmo}
+            </span>
           )}
-          <svg
-            className={`hm-tx-chevron ${isExpanded ? "hm-tx-chevron-open" : ""}`}
-            width="15" height="15" viewBox="0 0 24 24"
-            fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"
-          >
-            <path d="M6 9l6 6 6-6" />
-          </svg>
+          <span className="hm-tx-v2-open">
+            View transcript
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <path d="M5 12h14M12 5l7 7-7 7" />
+            </svg>
+          </span>
         </div>
       </div>
-
-      {isExpanded && (
-        <div className="hm-tx-body">
-          <div className="hm-tx-preview">
-            {Array.isArray(segments) && segments.length > 0 ? (
-              segments.map((s, idx) => (
-                <div key={idx} className="hm-tx-segment">
-                  <span className="hm-tx-speaker">{s.speaker}</span>
-                  {s.emoji && <span className="hm-tx-emoji">{s.emoji}</span>}
-                  {s.emotion && <span className="hm-tx-emotion">{s.emotion}</span>}
-                  <span className="hm-tx-seg-text">: {s.text}</span>
-                </div>
-              ))
-            ) : (
-              <span className="hm-tx-raw">{t.transcriptText?.trim() || "(empty transcript)"}</span>
-            )}
-          </div>
-          <div className="hm-tx-actions">
-            <button
-              className="hm-tx-btn hm-tx-btn-dl"
-              onClick={() => {
-                const blob = new Blob([t.transcriptText || ""], { type: "text/plain" });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement("a");
-                a.href = url;
-                a.download = `${t.meetingCode.replace(/[^a-z0-9_-]/gi, "_")}.txt`;
-                a.click();
-                URL.revokeObjectURL(url);
-              }}
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
-              </svg>
-              Download .txt
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
 
 export default function Home() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { logout } = useContext(AuthContext);
 
   const [name, setName] = useState(localStorage.getItem("displayName") || "");
   const [room, setRoom] = useState("");
   const [transcripts, setTranscripts] = useState([]);
   const [txLoading, setTxLoading] = useState(false);
-  const [expandedTranscripts, setExpandedTranscripts] = useState({});
   const [visibleCount, setVisibleCount] = useState(TRANSCRIPTS_PER_PAGE);
   const [snackOpen, setSnackOpen] = useState(false);
   const [snackMsg, setSnackMsg] = useState("");
   const [snackSeverity, setSnackSeverity] = useState("success");
+  const [viewingTranscript, setViewingTranscript] = useState(null);
+
   const isFetchingRef = useRef(false);
   const prevCountRef = useRef(0);
+  const pollTimerRef = useRef(null);
+  const pollAttemptsRef = useRef(0);
 
   const loadTranscripts = useCallback(async (bustCache = false) => {
-    if (!TRANSCRIPTS_ENABLED) return;
-    if (isFetchingRef.current) return;
+    if (!TRANSCRIPTS_ENABLED) return null;
+    if (isFetchingRef.current) return null;
 
     if (!bustCache) {
       const cached = getCachedTranscripts();
       if (cached) {
         setTranscripts(cached);
         prevCountRef.current = cached.length;
-        return;
+        return cached;
       }
     } else {
       sessionStorage.removeItem(TRANSCRIPT_CACHE_KEY);
@@ -288,12 +296,16 @@ export default function Home() {
         if (deduped.length > 0) setCachedTranscripts(deduped);
 
         const isNew = deduped.length > prevCountRef.current;
-        if (bustCache && isNew && deduped.length > prevCountRef.current) {
-          showSnack(`${deduped.length - prevCountRef.current} new transcript${deduped.length - prevCountRef.current > 1 ? "s" : ""} available`, "success");
+        if (bustCache && isNew) {
+          showSnack(
+            `${deduped.length - prevCountRef.current} new transcript${deduped.length - prevCountRef.current > 1 ? "s" : ""} available`,
+            "success"
+          );
           setVisibleCount(TRANSCRIPTS_PER_PAGE);
         }
         prevCountRef.current = deduped.length;
         setTranscripts(deduped);
+        return deduped;
       }
     } catch (err) {
       console.error("loadTranscripts error:", err);
@@ -301,16 +313,82 @@ export default function Home() {
       isFetchingRef.current = false;
       setTxLoading(false);
     }
+    return null;
   }, []);
 
-  useEffect(() => { cleanInvalidHosts(); }, []);
-  useEffect(() => { loadTranscripts(); }, [loadTranscripts]);
+  const stopPolling = useCallback(() => {
+    if (pollTimerRef.current) {
+      clearTimeout(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
+    pollAttemptsRef.current = 0;
+    localStorage.removeItem(PENDING_TRANSCRIPT_KEY);
+  }, []);
+
+  const startPollingForTranscript = useCallback((meetingCode, maxAttempts = 12, intervalMs = 5000) => {
+    if (pollTimerRef.current) return;
+    stopPolling();
+    pollAttemptsRef.current = 0;
+    localStorage.setItem(PENDING_TRANSCRIPT_KEY, meetingCode);
+
+    const poll = async () => {
+      pollAttemptsRef.current++;
+      const fresh = await loadTranscripts(true);
+
+      if (fresh) {
+        const found = fresh.find(
+          (t) => t.meetingCode?.toUpperCase() === meetingCode?.toUpperCase()
+        );
+        if (found) {
+          stopPolling();
+          setViewingTranscript(found);
+          showSnack("Transcript ready!", "success");
+          return;
+        }
+      }
+
+      if (pollAttemptsRef.current < maxAttempts) {
+        pollTimerRef.current = setTimeout(poll, intervalMs);
+      } else {
+        stopPolling();
+      }
+    };
+
+    pollTimerRef.current = setTimeout(poll, intervalMs);
+  }, [loadTranscripts, stopPolling]);
+
+  useEffect(() => {
+    cleanInvalidHosts();
+  }, []);
+
+  useEffect(() => {
+    loadTranscripts();
+  }, [loadTranscripts]);
 
   useEffect(() => {
     const handleFocus = () => loadTranscripts(true);
     window.addEventListener("focus", handleFocus);
     return () => window.removeEventListener("focus", handleFocus);
   }, [loadTranscripts]);
+
+  useEffect(() => {
+    const state = location.state;
+    if (state?.meetingEnded && state?.meetingCode) {
+      startPollingForTranscript(state.meetingCode);
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, [location.state, startPollingForTranscript]);
+
+  useEffect(() => {
+    const pending = localStorage.getItem(PENDING_TRANSCRIPT_KEY);
+    if (pending && TRANSCRIPTS_ENABLED) {
+      startPollingForTranscript(pending);
+    }
+  }, [startPollingForTranscript]);
+
+  useEffect(() => {
+    return () => stopPolling();
+  }, [stopPolling]);
 
   function showSnack(message, severity = "success") {
     setSnackMsg(message);
@@ -374,10 +452,6 @@ export default function Home() {
     } catch { }
     try { localStorage.removeItem("displayName"); } catch { }
   }
-
-  const toggleExpand = useCallback((key) => {
-    setExpandedTranscripts((prev) => ({ ...prev, [key]: !prev[key] }));
-  }, []);
 
   const displayInitial = (name || "?")[0].toUpperCase();
   const visibleTranscripts = transcripts.slice(0, visibleCount);
@@ -549,8 +623,7 @@ export default function Home() {
                 <TranscriptItem
                   key={key}
                   t={t}
-                  isExpanded={!!expandedTranscripts[key]}
-                  onToggle={() => toggleExpand(key)}
+                  onOpen={() => setViewingTranscript(t)}
                 />
               );
             })}
@@ -573,7 +646,7 @@ export default function Home() {
               {visibleCount > TRANSCRIPTS_PER_PAGE && (
                 <button
                   className="hm-tx-collapse"
-                  onClick={() => { setVisibleCount(TRANSCRIPTS_PER_PAGE); setExpandedTranscripts({}); }}
+                  onClick={() => setVisibleCount(TRANSCRIPTS_PER_PAGE)}
                 >
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
                     <path d="M18 15l-6-6-6 6" />
@@ -587,6 +660,13 @@ export default function Home() {
       </div>
 
       <Snack msg={snackMsg} severity={snackSeverity} open={snackOpen} />
+
+      {viewingTranscript && (
+        <TranscriptViewer
+          t={viewingTranscript}
+          onClose={() => setViewingTranscript(null)}
+        />
+      )}
     </div>
   );
 }
