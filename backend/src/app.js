@@ -21,6 +21,7 @@ import transcriptProxyRoutes from "./routes/transcriptProxy.routes.js";
 import { createProxyMiddleware } from "http-proxy-middleware";
 
 const app = express();
+app.set("trust proxy", 1);
 const server = createServer(app);
 
 const allowedOrigins = [
