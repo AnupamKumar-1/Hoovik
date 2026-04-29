@@ -1,9 +1,11 @@
 import whisper
+import torch
+from pyannote.audio import Pipeline
 from transformers import pipeline
 from utils.emotion import normalize_emotion, get_emoji
 from collections import Counter
 import re
-import math
+import os
 
 print("Loading Whisper model...")
 asr_model = whisper.load_model("small")
@@ -14,6 +16,17 @@ emotion_pipeline = pipeline(
     model="j-hartmann/emotion-english-distilroberta-base",
     top_k=1,
 )
+
+print("Loading diarization model...")
+diarization_pipeline = Pipeline.from_pretrained(
+    "pyannote/speaker-diarization-3.1",
+    use_auth_token=os.getenv("HF_API_TOKEN"),
+)
+diarization_pipeline.to(torch.device("cpu"))
+
+CUSTOM_NAMES = {"Speaker 0": "Anupam"}
+
+MAX_AUDIO_LENGTH = 300
 
 emotion_cache = {}
 
@@ -56,7 +69,7 @@ def _merge_raw_segments(raw_segs):
         "start": raw_segs[0].get("start", 0),
         "end": raw_segs[0].get("end", 0),
         "text": (raw_segs[0].get("text") or "").strip(),
-        "speaker": raw_segs[0].get("speaker", "Speaker 1"),
+        "speaker": raw_segs[0].get("speaker", "Unknown"),
     }
 
     for seg in raw_segs[1:]:
@@ -67,13 +80,23 @@ def _merge_raw_segments(raw_segs):
         gap = seg.get("start", 0) - buf["end"]
         combined_words = len((buf["text"] + " " + text).split())
         ends_clean = buf["text"].strip().endswith((".", "!", "?"))
-        same_speaker = seg.get("speaker", "Speaker 1") == buf["speaker"]
+        same_speaker = seg.get("speaker", "Unknown") == buf["speaker"]
+
+        if not same_speaker:
+            if buf["text"]:
+                merged.append(buf)
+            buf = {
+                "start": seg.get("start", 0),
+                "end": seg.get("end", 0),
+                "text": text,
+                "speaker": seg.get("speaker", "Unknown"),
+            }
+            continue
 
         if (
             gap <= MERGE_GAP_SEC
             and combined_words <= MERGE_MAX_WORDS
             and not ends_clean
-            and same_speaker
         ):
             buf["text"] += " " + text
             buf["end"] = seg.get("end", buf["end"])
@@ -84,7 +107,7 @@ def _merge_raw_segments(raw_segs):
                 "start": seg.get("start", 0),
                 "end": seg.get("end", 0),
                 "text": text,
-                "speaker": seg.get("speaker", "Speaker 1"),
+                "speaker": seg.get("speaker", "Unknown"),
             }
 
     if buf["text"]:
@@ -110,6 +133,45 @@ def _get_emotion(text: str) -> str:
 
     emotion_cache[text] = emo
     return emo
+
+
+def get_speaker_segments(wav_path):
+    diarization = diarization_pipeline(wav_path, num_speakers=None)
+
+    speaker_segments = []
+    for turn, _, speaker in diarization.itertracks(yield_label=True):
+        speaker_segments.append(
+            {
+                "start": turn.start,
+                "end": turn.end,
+                "speaker": speaker,
+            }
+        )
+
+    return speaker_segments
+
+
+def assign_speaker_to_segments(asr_segments, speaker_segments):
+    for seg in asr_segments:
+        best_spk = "Unknown"
+        best_overlap = 0
+
+        for spk in speaker_segments:
+            overlap = max(
+                0, min(seg["end"], spk["end"]) - max(seg["start"], spk["start"])
+            )
+
+            if overlap > best_overlap:
+                best_overlap = overlap
+                best_spk = spk["speaker"]
+
+        seg["speaker"] = (
+            best_spk
+            if best_overlap >= min(0.3, (seg["end"] - seg["start"]) * 0.5)
+            else "Unknown"
+        )
+
+    return asr_segments
 
 
 STOP_WORDS = {
@@ -286,7 +348,7 @@ def build_intelligent_summary(segments):
     word_freq = Counter(filtered_words)
     top_topics = [w for w, _ in word_freq.most_common(8)]
 
-    speakers = list({s.get("speaker", "Speaker 1") for s in segments})
+    speakers = list({s.get("speaker", "Unknown") for s in segments})
     speaker_stats = {}
     for spk in speakers:
         spk_segs = [s for s in segments if s.get("speaker") == spk]
@@ -321,14 +383,73 @@ def build_intelligent_summary(segments):
     }
 
 
-def transcribe_and_emotion(wav_path):
+def detect_primary_speaker(segments):
+    duration_map = {}
+
+    for seg in segments:
+        spk = seg.get("speaker")
+        if not spk or spk == "Unknown":
+            continue
+        duration = seg.get("end", 0) - seg.get("start", 0)
+        duration_map[spk] = duration_map.get(spk, 0) + duration
+
+    if not duration_map:
+        return None
+
+    return max(duration_map, key=duration_map.get)
+
+
+def transcribe_and_emotion(wav_path, speaker_map=None):
     try:
-        asr = asr_model.transcribe(wav_path, language="en")
+        asr = asr_model.transcribe(wav_path, language="en", fp16=False)
     except Exception as e:
         print(f"asr_service: transcription failed for {wav_path} — {e}")
         return {"segments": [], "analysis": build_intelligent_summary([])}
 
     raw_segs = asr.get("segments", [])
+
+    if raw_segs and raw_segs[-1].get("end", 0) > MAX_AUDIO_LENGTH:
+        print(f"asr_service: audio exceeds {MAX_AUDIO_LENGTH}s, skipping diarization")
+        speaker_segments = []
+    else:
+        speaker_segments = get_speaker_segments(wav_path)
+
+
+    if speaker_segments:
+        raw_segs = assign_speaker_to_segments(raw_segs, speaker_segments)
+    else:
+        for seg in raw_segs:
+            seg["speaker"] = "Speaker 0"
+
+    if not speaker_map:
+        seen = []
+        for seg in raw_segs:
+            spk = seg.get("speaker")
+            if spk and spk != "Unknown" and spk not in seen:
+                seen.append(spk)
+        speaker_map = {spk: f"User {i+1}" for i, spk in enumerate(seen)}
+
+
+        for k, v in CUSTOM_NAMES.items():
+            if k in speaker_map:
+                speaker_map[k] = v
+
+        host = detect_primary_speaker(raw_segs)
+        if host and speaker_map.get(host, "").startswith("User"):
+            speaker_map[host] = "Host"
+
+    unknown_map = {}
+    unknown_counter = 1
+    for seg in raw_segs:
+        spk = seg.get("speaker")
+        if spk in speaker_map:
+            seg["speaker"] = speaker_map[spk]
+        else:
+            if spk not in unknown_map:
+                unknown_map[spk] = f"Guest {unknown_counter}"
+                unknown_counter += 1
+            seg["speaker"] = unknown_map[spk]
+
     merged_segs = _merge_raw_segments(raw_segs)
 
     segments = []
@@ -351,7 +472,7 @@ def transcribe_and_emotion(wav_path):
                 "text": text,
                 "emotion": emo,
                 "emoji": get_emoji(emo),
-                "speaker": seg.get("speaker", "Speaker 1"),
+                "speaker": seg.get("speaker", "Unknown"),
             }
         )
 
