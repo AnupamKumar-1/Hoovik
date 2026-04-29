@@ -136,7 +136,7 @@ async def process_meeting(
                 },
             },
             headers=node_headers,
-            timeout=10,
+            timeout=240,
         )
 
         if res.status_code in (200, 201):
