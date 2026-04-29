@@ -91,9 +91,14 @@ async def process_meeting(
             "analysis": result["analysis"],
         }
 
-    merged = merge_segments(results)
+    merged = merge_segments(
+        {k: {"segments": v["segments"]} for k, v in results.items()}
+    )
+
     transcript_text = build_transcript_text(merged)
-    analysis = build_intelligent_summary(merged)
+    analysis = build_intelligent_summary(
+        [seg for r in results.values() for seg in r["segments"]]
+    )
 
     if not merged:
         schedule_file_cleanup(created_files, CLEANUP_DELAY_SEC)
