@@ -53,13 +53,13 @@ async def run_processing(
     for file_data in audio_files_data:
         filename = file_data["filename"]
         contents = file_data["contents"]
-        mimetype = file_data["mimetype"]
 
         if not allowed_file(filename, ALLOWED_EXT):
             continue
 
         filename = secure_filename(filename)
         base = os.path.splitext(filename)[0]
+        real_name = clean_speaker(speaker_map_dict.get(base, base))
 
         save_path = os.path.join(UPLOAD_FOLDER, filename)
         with open(save_path, "wb") as out:
@@ -75,10 +75,10 @@ async def run_processing(
         except Exception:
             wav_path = save_path
 
-        result = await asyncio.to_thread(transcribe_and_emotion, wav_path)
+        result = await asyncio.to_thread(transcribe_and_emotion, wav_path, real_name)
 
         results[base] = {
-            "speaker": clean_speaker(speaker_map_dict.get(base, base)),
+            "speaker": real_name,
             "segments": result["segments"],
             "analysis": result["analysis"],
         }
@@ -106,7 +106,7 @@ async def run_processing(
         node_headers["Authorization"] = f"Bearer {user_token}"
 
     try:
-        requests.post(
+        res = requests.post(
             NODE_API,
             json={
                 "meetingCode": meeting_code,
@@ -119,6 +119,7 @@ async def run_processing(
             headers=node_headers,
             timeout=None,
         )
+        print(f"Node API response: {res.status_code} {res.text[:200]}")
     except Exception as e:
         print(f"Node API callback failed: {e}")
 
