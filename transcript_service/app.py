@@ -117,7 +117,7 @@ async def run_processing(
                 },
             },
             headers=node_headers,
-            timeout=30,
+            timeout=None,
         )
     except Exception as e:
         print(f"Node API callback failed: {e}")
