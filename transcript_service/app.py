@@ -4,9 +4,10 @@ load_dotenv()
 
 import os
 import json
+import asyncio
 import requests
 
-from fastapi import FastAPI, File, Form, Header, UploadFile, Request
+from fastapi import FastAPI, File, Form, Header, UploadFile, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from werkzeug.utils import secure_filename
@@ -39,37 +40,28 @@ async def preflight_handler(rest_of_path: str, request: Request):
     return JSONResponse(content={"ok": True})
 
 
-@app.post("/process_meeting")
-async def process_meeting(
-    request: Request,
-    audio_files: list[UploadFile] = File(...),
-    meeting_code: str = Form(default="UNKNOWN"),
-    speaker_map: str = Form(default="{}"),
-    host_secret: str = Header(default="", alias="x-host-secret"),
-    user_token: str = Header(default="", alias="x-user-token"),
+async def run_processing(
+    audio_files_data: list[dict],
+    meeting_code: str,
+    speaker_map_dict: dict,
+    host_secret: str,
+    user_token: str,
 ):
-    form = await request.form()
-    print("FORM KEYS:", list(form.keys()))
-    print("FILES:", request.headers.get("content-type"))
-    meeting_code = meeting_code.upper()
-
-    try:
-        speaker_map_dict = json.loads(speaker_map)
-    except Exception:
-        speaker_map_dict = {}
-
     results = {}
     created_files = []
 
-    for f in audio_files:
-        if not (f and allowed_file(f.filename, ALLOWED_EXT)):
+    for file_data in audio_files_data:
+        filename = file_data["filename"]
+        contents = file_data["contents"]
+        mimetype = file_data["mimetype"]
+
+        if not allowed_file(filename, ALLOWED_EXT):
             continue
 
-        filename = secure_filename(f.filename)
+        filename = secure_filename(filename)
         base = os.path.splitext(filename)[0]
 
         save_path = os.path.join(UPLOAD_FOLDER, filename)
-        contents = await f.read()
         with open(save_path, "wb") as out:
             out.write(contents)
 
@@ -83,7 +75,7 @@ async def process_meeting(
         except Exception:
             wav_path = save_path
 
-        result = transcribe_and_emotion(wav_path)
+        result = await asyncio.to_thread(transcribe_and_emotion, wav_path)
 
         results[base] = {
             "speaker": clean_speaker(speaker_map_dict.get(base, base)),
@@ -100,32 +92,21 @@ async def process_meeting(
         [seg for r in results.values() for seg in r["segments"]]
     )
 
-    if not merged:
-        schedule_file_cleanup(created_files, CLEANUP_DELAY_SEC)
-        return JSONResponse(
-            status_code=400,
-            content={
-                "success": False,
-                "error": "No valid audio files processed",
-                "transcript_text": "",
-                "segments": [],
-                "analysis": {},
-            },
-        )
+    schedule_file_cleanup(created_files, CLEANUP_DELAY_SEC)
 
-    transcript_saved = False
-    node_error = None
+    if not merged:
+        return
+
+    node_headers = {
+        "Content-Type": "application/json",
+        "x-host-secret": host_secret,
+    }
+
+    if user_token:
+        node_headers["Authorization"] = f"Bearer {user_token}"
 
     try:
-        node_headers = {
-            "Content-Type": "application/json",
-            "x-host-secret": host_secret,
-        }
-
-        if user_token:
-            node_headers["Authorization"] = f"Bearer {user_token}"
-
-        res = requests.post(
+        requests.post(
             NODE_API,
             json={
                 "meetingCode": meeting_code,
@@ -136,42 +117,52 @@ async def process_meeting(
                 },
             },
             headers=node_headers,
-            timeout=None,
+            timeout=30,
         )
-
-        if res.status_code in (200, 201):
-            transcript_saved = True
-        else:
-            node_error = f"Node rejected {res.status_code}"
-
-    except requests.exceptions.Timeout:
-        node_error = "Node API timed out"
-    except requests.exceptions.ConnectionError:
-        node_error = "Node API unreachable"
     except Exception as e:
-        node_error = str(e)
+        print(f"Node API callback failed: {e}")
 
-    schedule_file_cleanup(created_files, CLEANUP_DELAY_SEC)
 
-    if not transcript_saved:
-        return JSONResponse(
-            status_code=502,
-            content={
-                "success": False,
-                "error": node_error or "Node API failed",
-                "transcript_text": transcript_text,
-                "segments": merged,
-                "analysis": analysis,
-            },
+@app.post("/process_meeting")
+async def process_meeting(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    audio_files: list[UploadFile] = File(...),
+    meeting_code: str = Form(default="UNKNOWN"),
+    speaker_map: str = Form(default="{}"),
+    host_secret: str = Header(default="", alias="x-host-secret"),
+    user_token: str = Header(default="", alias="x-user-token"),
+):
+    meeting_code = meeting_code.upper()
+
+    try:
+        speaker_map_dict = json.loads(speaker_map)
+    except Exception:
+        speaker_map_dict = {}
+
+    audio_files_data = []
+    for f in audio_files:
+        contents = await f.read()
+        audio_files_data.append(
+            {
+                "filename": f.filename,
+                "contents": contents,
+                "mimetype": f.content_type,
+            }
         )
+
+    background_tasks.add_task(
+        run_processing,
+        audio_files_data,
+        meeting_code,
+        speaker_map_dict,
+        host_secret,
+        user_token,
+    )
 
     return JSONResponse(
-        content={
-            "success": True,
-            "transcript_text": transcript_text,
-            "segments": merged,
-            "analysis": analysis,
-        }
+        status_code=202,
+        content={"success": True, "message": "Processing started"},
     )
 
 
