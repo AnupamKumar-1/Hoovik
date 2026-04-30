@@ -382,7 +382,7 @@ export default function useMeetingLifecycle({
     persistHistorySnapshot().catch(() => { });
 
     await cleanupAll();
-    navigate("/home");
+    navigate("/home", { state: { meetingEnded: true, meetingCode: code } });
 
     if (TRANSCRIPTS_ENABLED && hostData?.hostSecret && TRANSCRIPT_ENDPOINT) {
       setTimeout(() => {
