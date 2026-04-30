@@ -374,7 +374,7 @@ export default function Home() {
   useEffect(() => {
     const state = location.state;
     if (state?.meetingEnded && state?.meetingCode) {
-      startPollingForTranscript(state.meetingCode);
+      startPollingForTranscript(state.meetingCode, 30, 20000 );
       window.history.replaceState({}, "", window.location.pathname);
     }
   }, [location.state, startPollingForTranscript]);
@@ -382,7 +382,7 @@ export default function Home() {
   useEffect(() => {
     const pending = localStorage.getItem(PENDING_TRANSCRIPT_KEY);
     if (pending && TRANSCRIPTS_ENABLED) {
-      startPollingForTranscript(pending);
+      startPollingForTranscript(pending, 30, 20000);
     }
   }, [startPollingForTranscript]);
 
