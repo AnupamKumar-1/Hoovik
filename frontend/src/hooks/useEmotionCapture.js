@@ -1,7 +1,6 @@
 import { useRef } from "react";
 import { EMO_CONFIG, EMOTIONS_ENABLED } from "../pages/meetConfig";
 
-
 const CAPTURE_WIDTH = 720;
 const CAPTURE_HEIGHT = 540;
 const JPEG_QUALITY = 0.82;
@@ -10,11 +9,15 @@ const BURST_COUNT_MANY = 1;
 const MANY_THRESHOLD = 4;
 const BURST_GAP_MS = 200;
 
-
 const INTER_PARTICIPANT_DELAY_MS = 80;
 
 const DEFAULT_INTERVAL_MS = 700;
 const ACTIVE_SPEAKER_DEPRIORITISE_EVERY = 4;
+
+function isMobileBrowser() {
+  if (typeof navigator !== "object") return false;
+  return /android|iphone|ipad|ipod|mobile|tablet/i.test(navigator.userAgent);
+}
 
 export default function useEmotionCapture({
   socketRef,
@@ -31,7 +34,6 @@ export default function useEmotionCapture({
   const canvasCache = useRef(new Map());
   const videoCache = useRef(new Map());
   const passCounterRef = useRef(0);
-
 
   function getCanvas(participantId) {
     if (!canvasCache.current.has(participantId)) {
@@ -55,6 +57,15 @@ export default function useEmotionCapture({
       video.srcObject = stream;
       video.muted = true;
       video.playsInline = true;
+      video.setAttribute("playsinline", "");
+      video.setAttribute("webkit-playsinline", "");
+
+      if (isMobileBrowser()) {
+        video.style.cssText =
+          "position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;";
+        document.body.appendChild(video);
+      }
+
       entry = { video, stream };
       videoCache.current.set(participantId, entry);
     }
@@ -64,22 +75,50 @@ export default function useEmotionCapture({
       try {
         await video.play();
       } catch {
+        if (video.parentNode) video.parentNode.removeChild(video);
+        video.srcObject = null;
         videoCache.current.delete(participantId);
         return null;
       }
     }
 
-    return (video.videoWidth && video.videoHeight) ? video : null;
+    return video.videoWidth && video.videoHeight ? video : null;
   }
 
+  function getVideoRotation(video) {
+    try {
+      const track = video.srcObject?.getVideoTracks?.()?.[0];
+      const settings = track?.getSettings?.() ?? {};
+      return settings.facingMode ? (settings.rotation ?? 0) : 0;
+    } catch {
+      return 0;
+    }
+  }
 
   function drawFullFrame(ctx, video) {
-    ctx.drawImage(video, 0, 0, CAPTURE_WIDTH, CAPTURE_HEIGHT);
+    const rotation = getVideoRotation(video);
+
+    if (rotation === 0) {
+      ctx.drawImage(video, 0, 0, CAPTURE_WIDTH, CAPTURE_HEIGHT);
+      return;
+    }
+
+    ctx.save();
+    ctx.translate(CAPTURE_WIDTH / 2, CAPTURE_HEIGHT / 2);
+    ctx.rotate((rotation * Math.PI) / 180);
+
+    const isPortrait = rotation === 90 || rotation === 270;
+    const drawW = isPortrait ? CAPTURE_HEIGHT : CAPTURE_WIDTH;
+    const drawH = isPortrait ? CAPTURE_WIDTH : CAPTURE_HEIGHT;
+    ctx.drawImage(video, -drawW / 2, -drawH / 2, drawW, drawH);
+    ctx.restore();
   }
 
   async function captureAndSend({ canvas, ctx, video, participantId, socket }) {
     drawFullFrame(ctx, video);
-    const blob = await new Promise((r) => canvas.toBlob(r, "image/jpeg", JPEG_QUALITY));
+    const blob = await new Promise((r) =>
+      canvas.toBlob(r, "image/jpeg", JPEG_QUALITY)
+    );
 
     if (!blob || blob.size < 1000) return;
 
@@ -118,12 +157,10 @@ export default function useEmotionCapture({
     }
   }
 
-
   function resolveParticipantId(streamId) {
     const meta = participantsMetaRef?.current?.find((p) => p.id === streamId);
     return meta?.meta?.userId || streamId;
   }
-
 
   function shuffle(arr) {
     for (let i = arr.length - 1; i > 0; i--) {
@@ -133,7 +170,6 @@ export default function useEmotionCapture({
     return arr;
   }
 
-
   async function doCapturePass() {
     const streamsMap = remoteStreamsRef.current || {};
     let entries = Object.entries(streamsMap).filter(([id]) => id !== myId);
@@ -142,9 +178,8 @@ export default function useEmotionCapture({
     passCounterRef.current += 1;
     const passCount = passCounterRef.current;
     const activeSpeakerId = activeSpeakerIdRef?.current;
-    const burstCount = entries.length > MANY_THRESHOLD
-      ? BURST_COUNT_MANY
-      : BURST_COUNT_DEFAULT;
+    const burstCount =
+      entries.length > MANY_THRESHOLD ? BURST_COUNT_MANY : BURST_COUNT_DEFAULT;
 
     shuffle(entries);
 
@@ -155,7 +190,6 @@ export default function useEmotionCapture({
         entries.push(entry);
       }
     }
-
 
     for (let i = 0; i < entries.length; i++) {
       const [streamId, stream] = entries[i];
@@ -192,7 +226,10 @@ export default function useEmotionCapture({
     }
     recordingState.current.clear();
     canvasCache.current.clear();
-    videoCache.current.forEach(({ video }) => { video.srcObject = null; });
+    videoCache.current.forEach(({ video }) => {
+      if (video.parentNode) video.parentNode.removeChild(video);
+      video.srcObject = null;
+    });
     videoCache.current.clear();
     passCounterRef.current = 0;
   }
