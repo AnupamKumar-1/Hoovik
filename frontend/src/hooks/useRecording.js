@@ -6,6 +6,26 @@ const NOISE_GATE_SMOOTHING = parseFloat(process.env.REACT_APP_NOISE_GATE_SMOOTHI
 const NOISE_GATE_FFT_SIZE = 2048;
 const SPEECH_MIN_ACTIVE_MS = parseInt(process.env.REACT_APP_SPEECH_MIN_ACTIVE_MS || "800", 10);
 
+function makeRecordableAudioStream(originalTrack) {
+  const rawStream = new MediaStream([originalTrack]);
+
+  try {
+    new MediaRecorder(rawStream);
+    return { audioStream: rawStream, reEncodeCtx: null };
+  } catch { }
+
+  try {
+    const reEncodeCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const source = reEncodeCtx.createMediaStreamSource(rawStream);
+    const destination = reEncodeCtx.createMediaStreamDestination();
+    source.connect(destination);
+    return { audioStream: destination.stream, reEncodeCtx };
+  } catch (err) {
+    console.error("[useRecording] makeRecordableAudioStream failed:", err);
+    return { audioStream: rawStream, reEncodeCtx: null };
+  }
+}
+
 export default function useRecording({
   isHost,
   roomId,
@@ -16,6 +36,13 @@ export default function useRecording({
 }) {
   const recordersRef = useRef({});
 
+  function _closeContexts(rec) {
+    const ctxs = new Set([rec?.reEncodeCtx, rec?.audioCtx].filter(Boolean));
+    for (const ctx of ctxs) {
+      try { if (ctx.state !== "closed") ctx.close(); } catch { }
+    }
+  }
+
   function _stopRecorderOnly(id) {
     const existing = recordersRef.current[id];
     if (!existing) return;
@@ -24,11 +51,10 @@ export default function useRecording({
       if (existing.recorder?.state !== "inactive") existing.recorder.stop();
     } catch { }
 
-    try {
-      if (existing.audioCtx?.state !== "closed") existing.audioCtx?.close();
-    } catch { }
+    _closeContexts(existing);
 
     existing.recorder = null;
+    existing.reEncodeCtx = null;
     existing.audioCtx = null;
     existing.analyser = null;
     existing.audioStream = null;
@@ -62,21 +88,26 @@ export default function useRecording({
 
     try {
       const track = audioTracks[0];
-      const audioStream = new MediaStream([track]);
+      const { audioStream, audioCtx: reEncodeCtx } = makeRecordableAudioStream(track);
 
-      let audioCtx = null;
+      const analyserCtx = reEncodeCtx ?? new (window.AudioContext || window.webkitAudioContext)();
+      const analyserCtxIsOwned = !reEncodeCtx;
+
+      let audioCtx = analyserCtx;
       let analyser = null;
       let pcmBuffer = null;
 
       try {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        analyser = audioCtx.createAnalyser();
+        analyser = analyserCtx.createAnalyser();
         analyser.fftSize = NOISE_GATE_FFT_SIZE;
         analyser.smoothingTimeConstant = NOISE_GATE_SMOOTHING;
-        const sourceNode = audioCtx.createMediaStreamSource(audioStream);
+        const sourceNode = analyserCtx.createMediaStreamSource(audioStream);
         sourceNode.connect(analyser);
         pcmBuffer = new Float32Array(analyser.fftSize);
       } catch {
+        if (analyserCtxIsOwned) {
+          try { analyserCtx.close(); } catch { }
+        }
         audioCtx = null;
         analyser = null;
       }
@@ -86,7 +117,15 @@ export default function useRecording({
         mimeType = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "";
       }
 
-      const recorder = new MediaRecorder(audioStream, mimeType ? { mimeType } : undefined);
+      let recorder;
+      try {
+        recorder = new MediaRecorder(audioStream, mimeType ? { mimeType } : undefined);
+      } catch (err) {
+        console.error(`[useRecording] MediaRecorder init failed for id="${id}":`, err);
+        try { if (reEncodeCtx?.state !== "closed") reEncodeCtx?.close(); } catch { }
+        try { if (audioCtx?.state !== "closed") audioCtx?.close(); } catch { }
+        return;
+      }
 
       const gateState = survivingGateState
         ? {
@@ -140,17 +179,25 @@ export default function useRecording({
         survivingChunks.push(ev.data);
       };
 
+      recorder.onerror = (ev) => {
+        console.error(`[useRecording] MediaRecorder error for id="${id}":`, ev.error);
+      };
+
       recorder.start(1000);
+      console.log(`[useRecording] Recording started for id="${id}" | re-encoded:`, !!reEncodeCtx);
 
       recordersRef.current[id] = {
         recorder,
         chunks: survivingChunks,
         audioStream,
+        reEncodeCtx,
         audioCtx,
         analyser,
         gateState,
       };
-    } catch { }
+    } catch (err) {
+      console.error(`[useRecording] startRecordingForStream failed for id="${id}":`, err);
+    }
   }
 
   function stopAllRecorders() {
@@ -158,12 +205,12 @@ export default function useRecording({
       return new Promise((resolve) => {
         try {
           if (!rec?.recorder || rec.recorder.state === "inactive") {
-            try { if (rec?.audioCtx?.state !== "closed") rec.audioCtx?.close(); } catch { }
+            _closeContexts(rec);
             resolve();
             return;
           }
           rec.recorder.addEventListener("stop", () => {
-            try { if (rec?.audioCtx?.state !== "closed") rec.audioCtx?.close(); } catch { }
+            _closeContexts(rec);
             resolve();
           }, { once: true });
           rec.recorder.stop();
