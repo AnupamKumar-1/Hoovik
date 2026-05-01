@@ -1,5 +1,7 @@
 import {
   isSafari,
+  isMobileBrowser,
+  refreshMobilePreview,
   safePlay,
   enforceVideoMirrorBehavior,
   syncPreview,
@@ -69,8 +71,8 @@ function _applyStreamToPreview() {
       localMirrorEnabled,
     });
   } catch { }
-  if (isSafari()) {
-    refreshSafariPreview({
+  if (isMobileBrowser()) {
+    refreshMobilePreview({
       localVideoEl,
       localStream,
       placeholderStream: _placeholderStream,
@@ -90,7 +92,11 @@ async function _getUserMediaWithTimeout(constraints) {
   const timeout = new Promise((_, reject) =>
     setTimeout(() => reject(new Error("getUserMedia timeout")), TOGGLE_TIMEOUT_MS)
   );
-  return Promise.race([navigator.mediaDevices.getUserMedia(constraints), timeout]);
+  const safeConstraints =
+    constraints.audio && !("video" in constraints)
+      ? { ...constraints, video: false }
+      : constraints;
+  return Promise.race([navigator.mediaDevices.getUserMedia(safeConstraints), timeout]);
 }
 
 function _getTrack(kind) {
@@ -171,8 +177,8 @@ export function setVideoElement(videoEl) {
     });
     safePlay(localVideoEl);
   } catch { }
-  if (isSafari()) {
-    refreshSafariPreview({
+  if (isMobileBrowser()) {
+    refreshMobilePreview({
       localVideoEl,
       localStream,
       placeholderStream: _placeholderStream,
@@ -280,7 +286,7 @@ async function _turnAudioOff() {
 
   runExternalCleaners("audio", { externalCleaners, localStream });
 
-  if (isSafari()) _applyStreamToPreview();
+  if (isMobileBrowser()) _applyStreamToPreview();
 
   _safeEmit("update-participant-state", { muted: true });
   return true;
@@ -323,7 +329,7 @@ async function _turnAudioOn(currentMuted) {
     attachTrackEndHandler(newTrack, "audio", _ctx());
     await replaceTrackInPeers(newTrack, "audio", { pcsRef, localStream });
 
-    if (isSafari()) _applyStreamToPreview();
+    if (isMobileBrowser()) _applyStreamToPreview();
 
     _safeEmit("update-participant-state", { muted: false });
     return false;
@@ -382,10 +388,10 @@ async function _turnVideoOff() {
     await stopOutgoingVideoToPeers({ pcsRef });
   }
 
-  if (isSafari()) {
-    await _safariMicSwap();
+  if (isMobileBrowser()) {
+    if (isSafari()) await _safariMicSwap();
     clearPreviewIfNoTracks({ localStream, localVideoEl });
-    refreshSafariPreview({
+    refreshMobilePreview({
       localVideoEl,
       localStream,
       placeholderStream: _placeholderStream,
@@ -450,8 +456,8 @@ async function _turnVideoOn(currentVideoOff) {
       localMirrorEnabled,
     });
 
-    if (isSafari()) {
-      refreshSafariPreview({
+    if (isMobileBrowser()) {
+      refreshMobilePreview({
         localVideoEl,
         localStream,
         placeholderStream: null,

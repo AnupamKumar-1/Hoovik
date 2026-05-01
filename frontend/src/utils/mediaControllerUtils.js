@@ -10,6 +10,29 @@ export function isSafari() {
     );
 }
 
+export function isMobileBrowser() {
+    if (typeof navigator !== "object") return false;
+    return /android|iphone|ipad|ipod|mobile|tablet/i.test(navigator.userAgent);
+}
+
+export function refreshMobilePreview({
+    localVideoEl,
+    localStream,
+    placeholderStream,
+    localMirrorEnabled,
+}) {
+    if (!isMobileBrowser() || !localVideoEl) return;
+    if (isSafari()) {
+        return refreshSafariPreview({ localVideoEl, localStream, placeholderStream, localMirrorEnabled });
+    }
+    try {
+        const src = placeholderStream ?? localStream ?? null;
+        if (localVideoEl.srcObject !== src) localVideoEl.srcObject = src;
+        enforceVideoMirrorBehavior(localVideoEl, { mirror: !!localMirrorEnabled });
+        safePlay(localVideoEl);
+    } catch { }
+}
+
 export function safePlay(el) {
     if (!el) return;
     try {
