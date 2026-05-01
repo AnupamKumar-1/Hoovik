@@ -154,14 +154,25 @@ export default function useRecording({
   }
 
   function stopAllRecorders() {
-    Object.values(recordersRef.current).forEach((rec) => {
-      try {
-        if (rec?.recorder?.state !== "inactive") rec.recorder.stop();
-      } catch { }
-      try {
-        if (rec?.audioCtx?.state !== "closed") rec.audioCtx?.close();
-      } catch { }
+    const promises = Object.values(recordersRef.current).map((rec) => {
+      return new Promise((resolve) => {
+        try {
+          if (!rec?.recorder || rec.recorder.state === "inactive") {
+            try { if (rec?.audioCtx?.state !== "closed") rec.audioCtx?.close(); } catch { }
+            resolve();
+            return;
+          }
+          rec.recorder.addEventListener("stop", () => {
+            try { if (rec?.audioCtx?.state !== "closed") rec.audioCtx?.close(); } catch { }
+            resolve();
+          }, { once: true });
+          rec.recorder.stop();
+        } catch {
+          resolve();
+        }
+      });
     });
+    return Promise.all(promises);
   }
 
   function hasSufficientSpeech(rec) {

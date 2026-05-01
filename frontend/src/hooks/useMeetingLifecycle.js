@@ -371,9 +371,15 @@ export default function useMeetingLifecycle({
     const hostDataRaw = localStorage.getItem(`host:${code}`);
     const hostData = hostDataRaw ? JSON.parse(hostDataRaw) : null;
 
-    try { stopAllRecorders(); } catch { }
+    try { await stopAllRecorders(); } catch { }
 
-    const recordersSnapshot = { ...(recordersRef.current || {}) };
+    const recordersSnapshot = {};
+    for (const [id, rec] of Object.entries(recordersRef.current || {})) {
+      recordersSnapshot[id] = {
+        chunks: Array.isArray(rec?.chunks) ? [...rec.chunks] : [],
+        gateState: rec?.gateState ? { ...rec.gateState } : null,
+      };
+    }
 
     try {
       if (socketRef.current?.connected) socketRef.current.emit("end-meeting", roomId);
