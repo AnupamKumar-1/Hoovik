@@ -238,6 +238,7 @@ export default function VideoMeet() {
     removeAnalyzer,
     startRecordingForStream,
     ICE_CONFIG,
+    isHost,
   });
 
   const emotionSocketRef = useEmotionSocket({ setEmotionsMap });
@@ -326,8 +327,8 @@ export default function VideoMeet() {
       }
       try {
         const rec = recordersRef.current?.[peerId];
-        if (rec?.state === "recording") rec.stop();
-        delete recordersRef.current[peerId];
+        if (rec?.recorder && rec.recorder.state !== "inactive") rec.recorder.stop();
+        if (rec?.audioCtx?.state !== "closed") rec?.audioCtx?.close();
       } catch { }
       removeAnalyzer(peerId);
       notifyPcsChanged();

@@ -23,6 +23,7 @@ export default function useWebRTC({
   removeAnalyzer,
   startRecordingForStream,
   ICE_CONFIG,
+  isHost,
 }) {
   const makingOfferRef = useRef({});
   const ignoreOfferRef = useRef({});
@@ -82,7 +83,7 @@ export default function useWebRTC({
         analyzerAttachedRef.current[peerId] = true;
         createAnalyzerForStream(peerId, stream);
 
-        if (!recordingAttachedRef.current[peerId] && typeof startRecordingForStream === "function") {
+        if (isHost && !recordingAttachedRef.current[peerId] && typeof startRecordingForStream === "function") {
           recordingAttachedRef.current[peerId] = true;
           startRecordingForStream(peerId, stream);
         }
