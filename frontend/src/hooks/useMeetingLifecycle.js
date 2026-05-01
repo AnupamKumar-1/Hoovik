@@ -42,11 +42,15 @@ export default function useMeetingLifecycle({
   onSocketReady,
 }) {
   const participantsMetaRef = useRef(participantsMeta);
+  const lastParticipantsRef = useRef([]);
   const isHostRef = useRef(isHost);
   const instanceKey = useRef(`${roomId}:${Date.now()}:${Math.random()}`);
 
   useEffect(() => {
     participantsMetaRef.current = participantsMeta;
+    if (Array.isArray(participantsMeta)) {
+      lastParticipantsRef.current = JSON.parse(JSON.stringify(participantsMeta));
+    }
   }, [participantsMeta]);
 
   useEffect(() => {
@@ -371,7 +375,7 @@ export default function useMeetingLifecycle({
     const hostDataRaw = localStorage.getItem(`host:${code}`);
     const hostData = hostDataRaw ? JSON.parse(hostDataRaw) : null;
 
-    const participantsSnapshot = [...(participantsMetaRef.current || [])];
+    const participantsSnapshot = lastParticipantsRef.current;
 
     try { await stopAllRecorders(); } catch { }
 
