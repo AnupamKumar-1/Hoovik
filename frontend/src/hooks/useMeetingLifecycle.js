@@ -292,6 +292,8 @@ export default function useMeetingLifecycle({
   }
 
   function runBackgroundTranscript(code, hostSecret, recordersSnapshot, participantsSnapshot) {
+    console.log("[transcript] participantsSnapshot:", JSON.stringify(participantsSnapshot));
+    console.log("[transcript] recorderSnapshot keys:", Object.keys(recordersSnapshot));
     const speakerMap = {};
     const currentMeta = participantsSnapshot || [];
 
