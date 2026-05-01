@@ -1403,7 +1403,7 @@
 
   .videoArea {
     padding: 8px;
-    padding-bottom: calc(var(--m-bar-h) + 8px);
+    padding-bottom: calc(var(--m-bar-h) + 24px);
     align-items: stretch;
   }
 
@@ -1416,6 +1416,8 @@
     flex-direction: column;
     align-items: stretch;
     gap: 6px;
+    height: calc(100% - var(--m-bar-h));
+    max-height: calc(100% - var(--m-bar-h));
   }
 
   .stageLayoutMobile .spotlightWrap {
@@ -1458,7 +1460,7 @@
   }
   .videoArea {
     padding: 6px;
-    padding-bottom: calc(var(--m-bar-h) + 6px);
+    padding-bottom: calc(var(--m-bar-h) + 20px);
     align-items: stretch;
   }
   .ctrlBtn { min-width: 40px; padding: 0 6px; }
