@@ -287,9 +287,9 @@ export default function useMeetingLifecycle({
     navigate("/home");
   }
 
-  function runBackgroundTranscript(code, hostSecret, recordersSnapshot) {
+  function runBackgroundTranscript(code, hostSecret, recordersSnapshot, participantsSnapshot) {
     const speakerMap = {};
-    const currentMeta = participantsMetaRef?.current || [];
+    const currentMeta = participantsSnapshot || [];
 
     currentMeta.forEach((p) => {
       const name =
@@ -371,6 +371,8 @@ export default function useMeetingLifecycle({
     const hostDataRaw = localStorage.getItem(`host:${code}`);
     const hostData = hostDataRaw ? JSON.parse(hostDataRaw) : null;
 
+    const participantsSnapshot = [...(participantsMetaRef.current || [])];
+
     try { await stopAllRecorders(); } catch { }
 
     const recordersSnapshot = {};
@@ -392,7 +394,7 @@ export default function useMeetingLifecycle({
 
     if (TRANSCRIPTS_ENABLED && hostData?.hostSecret && TRANSCRIPT_ENDPOINT) {
       setTimeout(() => {
-        runBackgroundTranscript(code, hostData.hostSecret, recordersSnapshot);
+        runBackgroundTranscript(code, hostData.hostSecret, recordersSnapshot, participantsSnapshot);
       }, 0);
     }
   }

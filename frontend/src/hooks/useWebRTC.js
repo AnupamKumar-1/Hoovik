@@ -107,7 +107,7 @@ export default function useWebRTC({
         { once: true }
       );
     },
-    [pcsRef, createAnalyzerForStream, startRecordingForStream]
+    [pcsRef, createAnalyzerForStream, startRecordingForStream, isHost]
   );
 
   const pushStreamUpdate = useCallback(
@@ -159,7 +159,10 @@ export default function useWebRTC({
         if (!stream) stream = new MediaStream([ev.track]);
 
         pushStreamUpdate(peerId, stream);
-        attachAnalyzerWhenReady(peerId, stream, pcId);
+
+        if (ev.track.kind === "audio") {
+          attachAnalyzerWhenReady(peerId, stream, pcId);
+        }
       };
 
       pc.onicecandidate = (ev) => {
