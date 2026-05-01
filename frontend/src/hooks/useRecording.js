@@ -6,26 +6,6 @@ const NOISE_GATE_SMOOTHING = parseFloat(process.env.REACT_APP_NOISE_GATE_SMOOTHI
 const NOISE_GATE_FFT_SIZE = 2048;
 const SPEECH_MIN_ACTIVE_MS = parseInt(process.env.REACT_APP_SPEECH_MIN_ACTIVE_MS || "800", 10);
 
-function makeRecordableAudioStream(originalTrack) {
-  const rawStream = new MediaStream([originalTrack]);
-
-  try {
-    new MediaRecorder(rawStream);
-    return { audioStream: rawStream, reEncodeCtx: null };
-  } catch { }
-
-  try {
-    const reEncodeCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const source = reEncodeCtx.createMediaStreamSource(rawStream);
-    const destination = reEncodeCtx.createMediaStreamDestination();
-    source.connect(destination);
-    return { audioStream: destination.stream, reEncodeCtx };
-  } catch (err) {
-    console.error("[useRecording] makeRecordableAudioStream failed:", err);
-    return { audioStream: rawStream, reEncodeCtx: null };
-  }
-}
-
 export default function useRecording({
   isHost,
   roomId,
@@ -35,11 +15,19 @@ export default function useRecording({
   API_BASE,
 }) {
   const recordersRef = useRef({});
+  const sharedCtxRef = useRef(null);
+
+  function getSharedCtx() {
+    if (!sharedCtxRef.current || sharedCtxRef.current.state === "closed") {
+      sharedCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    return sharedCtxRef.current;
+  }
 
   function _closeContexts(rec) {
-    const ctxs = new Set([rec?.reEncodeCtx, rec?.audioCtx].filter(Boolean));
-    for (const ctx of ctxs) {
-      try { if (ctx.state !== "closed") ctx.close(); } catch { }
+    if (!rec) return;
+    if (rec.ownsReEncodeCtx) {
+      try { if (rec.reEncodeCtx?.state !== "closed") rec.reEncodeCtx?.close(); } catch { }
     }
   }
 
@@ -88,10 +76,32 @@ export default function useRecording({
 
     try {
       const track = audioTracks[0];
-      const { audioStream, audioCtx: reEncodeCtx } = makeRecordableAudioStream(track);
+      const isRemote = id !== "local";
 
-      const analyserCtx = reEncodeCtx ?? new (window.AudioContext || window.webkitAudioContext)();
-      const analyserCtxIsOwned = !reEncodeCtx;
+      let audioStream;
+      let reEncodeCtx = null;
+      let ownsReEncodeCtx = false;
+
+      if (isRemote) {
+        try {
+          reEncodeCtx = new (window.AudioContext || window.webkitAudioContext)();
+          ownsReEncodeCtx = true;
+          const source = reEncodeCtx.createMediaStreamSource(new MediaStream([track]));
+          const destination = reEncodeCtx.createMediaStreamDestination();
+          source.connect(destination);
+          audioStream = destination.stream;
+        } catch (err) {
+          console.error("[useRecording] re-encode failed:", err);
+          if (reEncodeCtx) { try { reEncodeCtx.close(); } catch { } }
+          reEncodeCtx = null;
+          ownsReEncodeCtx = false;
+          audioStream = new MediaStream([track]);
+        }
+      } else {
+        audioStream = new MediaStream([track]);
+      }
+
+      const analyserCtx = reEncodeCtx ?? getSharedCtx();
 
       let audioCtx = analyserCtx;
       let analyser = null;
@@ -105,9 +115,6 @@ export default function useRecording({
         sourceNode.connect(analyser);
         pcmBuffer = new Float32Array(analyser.fftSize);
       } catch {
-        if (analyserCtxIsOwned) {
-          try { analyserCtx.close(); } catch { }
-        }
         audioCtx = null;
         analyser = null;
       }
@@ -122,8 +129,7 @@ export default function useRecording({
         recorder = new MediaRecorder(audioStream, mimeType ? { mimeType } : undefined);
       } catch (err) {
         console.error(`[useRecording] MediaRecorder init failed for id="${id}":`, err);
-        try { if (reEncodeCtx?.state !== "closed") reEncodeCtx?.close(); } catch { }
-        try { if (audioCtx?.state !== "closed") audioCtx?.close(); } catch { }
+        if (ownsReEncodeCtx) { try { reEncodeCtx?.close(); } catch { } }
         return;
       }
 
@@ -191,6 +197,7 @@ export default function useRecording({
         chunks: survivingChunks,
         audioStream,
         reEncodeCtx,
+        ownsReEncodeCtx,
         audioCtx,
         analyser,
         gateState,
@@ -219,7 +226,13 @@ export default function useRecording({
         }
       });
     });
-    return Promise.all(promises);
+
+    return Promise.all(promises).then(() => {
+      try {
+        if (sharedCtxRef.current?.state !== "closed") sharedCtxRef.current?.close();
+      } catch { }
+      sharedCtxRef.current = null;
+    });
   }
 
   function hasSufficientSpeech(rec) {
