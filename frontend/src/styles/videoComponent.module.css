@@ -1389,7 +1389,7 @@
 
 
 @media (max-width: 900px) {
-  .localPreview { width: 150px; height: 84px; right: 12px; }
+  .localPreview { width: 160px; height: 100px; right: 12px; }
   .timerDisplay { display: none; }
   .emotionSidebar { display: none !important; }
   .chatPanel { display: none !important; }
@@ -1451,8 +1451,8 @@
   .topBar { padding: 0 12px; }
   .roomCode { display: none; }
   .localPreview {
-    width: 108px;
-    height: 60px;
+    width: 140px;
+    height: 90px;
     right: 8px;
     bottom: calc(var(--m-bar-h) + 8px);
   }
@@ -1489,7 +1489,7 @@
 }
 
 @media (max-width: 480px) {
-  .localPreview { width: 90px; height: 50px; }
+  .localPreview { width: 130px; height: 84px; }
   .hostBadge { display: none; }
   .participantCount { display: none; }
   .mobileSheet { height: 85vh; max-height: 85vh; border-radius: 16px 16px 0 0; }
