@@ -190,19 +190,17 @@ export default function useSocket({
     socket.on("user-joined", onUserJoined);
 
     const onUserLeft = (peerId) => {
-      h.current.setParticipantsMeta((prev) =>
-        prev.filter((p) => p.id !== peerId)
-      );
 
       h.current.closePeer(peerId);
       h.current.removeAnalyzer(peerId);
-      delete h.current.recordersRef.current[peerId];
 
       h.current.setEmotionsMap((prev) => {
         const copy = { ...prev };
         delete copy[peerId];
         return copy;
       });
+
+      
     };
 
     socket.on("user-left", onUserLeft);
