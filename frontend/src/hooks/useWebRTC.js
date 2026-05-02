@@ -32,7 +32,6 @@ export default function useWebRTC({
   const isSettingRemoteAnswerPending = useRef({});
   const disconnectTimeoutRef = useRef({});
   const analyzerAttachedRef = useRef({});
-  const recordingAttachedRef = useRef({});
   const pendingSignalsRef = useRef({});
   const pendingPeerQueueRef = useRef([]);
   const handleSignalRef = useRef(null);
@@ -56,7 +55,6 @@ export default function useWebRTC({
       delete pendingCandidatesRef.current[peerId];
       delete isSettingRemoteAnswerPending.current[peerId];
       delete analyzerAttachedRef.current[peerId];
-      delete recordingAttachedRef.current[peerId];
       delete pendingSignalsRef.current[peerId];
       delete peerStreamRef.current[peerId];
 
@@ -83,8 +81,7 @@ export default function useWebRTC({
         analyzerAttachedRef.current[peerId] = true;
         createAnalyzerForStream(peerId, stream);
 
-        if (isHost && !recordingAttachedRef.current[peerId] && typeof startRecordingForStream === "function") {
-          recordingAttachedRef.current[peerId] = true;
+        if (isHost && typeof startRecordingForStream === "function") {
           startRecordingForStream(peerId, stream);
         }
       };
