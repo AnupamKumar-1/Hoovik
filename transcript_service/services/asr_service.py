@@ -3,7 +3,7 @@ from transformers import pipeline
 from utils.emotion import normalize_emotion, get_emoji
 from collections import Counter
 import re
-import os
+
 
 print("Loading Whisper model...")
 asr_model = whisper.load_model("small")
