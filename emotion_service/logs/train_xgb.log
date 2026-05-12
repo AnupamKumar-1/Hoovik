@@ -1,38 +1,120 @@
-2026-04-06 12:19:02,647 | INFO | Loading dataset from: /Users/anupamkumar/Desktop/meet/emotion_service/extracted_dataset/dataset.npz
-2026-04-06 12:19:03,037 | INFO | Building features...
-2026-04-06 12:19:03,497 | INFO | Training XGBoost...
-2026-04-06 12:24:09,076 | INFO |  TEST ACC: 0.7083
-2026-04-06 12:24:09,085 | INFO | 
+2026-05-08 22:25:35,752 | INFO | Loading dataset from /Users/anupamkumar/Desktop/meet/emotion_service/extracted_dataset/dataset.npz
+2026-05-08 22:25:36,143 | INFO | Loaded — train: 9629  val: 2294  test: 2299
+2026-05-08 22:25:36,146 | INFO | Data mix — RAVDESS: 46.5%  CREMA-D: 53.5%
+2026-05-08 22:25:36,146 | INFO | Train-split class counts: angry=1624  fearful=1264  disgust=1624  happy=1624  sad=1624  neutral/calm=1869
+2026-05-08 22:25:36,146 | INFO | Building features...
+2026-05-08 22:25:38,840 | INFO | Raw feature shape: (9629, 8149)
+2026-05-08 22:25:39,174 | WARNING | 12 zero-variance feature(s) zeroed out (cols: [132, 133, 458, 459, 784, 785, 1110, 1111, 5532, 5533]...)
+2026-05-08 22:25:39,205 | INFO | Filling NaNs with train column medians before PCA...
+2026-05-08 22:25:40,878 | INFO | Applying PCA → 512 dims
+2026-05-08 22:25:54,731 | INFO | PCA explained variance: 0.887
+2026-05-08 22:25:54,732 | INFO | Feature shape after preprocessing: (9629, 512)
+2026-05-08 22:25:54,732 | INFO | Training XGBoost | n_estimators=3150 | early_stopping=150 | seed=42
+2026-05-08 22:28:10,603 | INFO | Best iteration: 3145  best val mlogloss: 0.9330
+2026-05-08 22:28:10,681 | INFO |
+==================== TEST RESULTS ====================
+2026-05-08 22:28:10,681 | INFO | OVERALL TEST ACC: 0.6603
+2026-05-08 22:28:10,689 | INFO |
               precision    recall  f1-score   support
 
-       angry       0.86      0.74      0.80       192
-     fearful       0.86      0.53      0.66        96
-     disgust       0.68      0.73      0.70       192
-       happy       0.79      0.77      0.78       192
-         sad       0.51      0.59      0.55       192
-neutral/calm       0.71      0.77      0.74       288
+       angry       0.74      0.81      0.77       388
+     fearful       0.50      0.48      0.49       292
+     disgust       0.70      0.52      0.60       388
+       happy       0.77      0.77      0.77       388
+         sad       0.50      0.59      0.54       388
+neutral/calm       0.73      0.73      0.73       455
 
-    accuracy                           0.71      1152
-   macro avg       0.74      0.69      0.70      1152
-weighted avg       0.72      0.71      0.71      1152
+    accuracy                           0.66      2299
+   macro avg       0.66      0.65      0.65      2299
+weighted avg       0.66      0.66      0.66      2299
 
-2026-04-06 12:24:09,838 | INFO | DONE
-2026-04-24 01:05:09,625 | INFO | Loading dataset from: /Users/anupamkumar/Desktop/meet/emotion_service/extracted_dataset/dataset.npz
-2026-04-24 01:05:10,057 | INFO | Building features...
-2026-04-24 01:05:10,525 | INFO | Training XGBoost...
-2026-04-24 01:10:25,358 | INFO |  TEST ACC: 0.7083
-2026-04-24 01:10:25,367 | INFO | 
+2026-05-08 22:28:10,690 | INFO |
+Confusion Matrix:
+[[316  16   7  15  22  12]
+ [ 44 140  27   8  69   4]
+ [ 26  53 203  33  61  12]
+ [ 19  15  11 298  12  33]
+ [ 10  39  37  12 229  61]
+ [ 13  19   6  22  63 332]]
+2026-05-08 22:28:10,690 | INFO |
+RAVDESS test acc (1152 samples): 0.6293
+2026-05-08 22:28:10,694 | INFO |
               precision    recall  f1-score   support
 
-       angry       0.86      0.74      0.80       192
-     fearful       0.86      0.53      0.66        96
-     disgust       0.68      0.73      0.70       192
-       happy       0.79      0.77      0.78       192
-         sad       0.51      0.59      0.55       192
-neutral/calm       0.71      0.77      0.74       288
+       angry       0.77      0.74      0.76       192
+     fearful       0.38      0.27      0.32        96
+     disgust       0.70      0.51      0.59       192
+       happy       0.69      0.71      0.70       192
+         sad       0.43      0.56      0.48       192
+neutral/calm       0.70      0.74      0.72       288
 
-    accuracy                           0.71      1152
-   macro avg       0.74      0.69      0.70      1152
-weighted avg       0.72      0.71      0.71      1152
+    accuracy                           0.63      1152
+   macro avg       0.61      0.59      0.59      1152
+weighted avg       0.64      0.63      0.63      1152
 
-2026-04-24 01:10:26,096 | INFO | DONE
+2026-05-08 22:28:10,694 | INFO |
+CREMA-D test acc (1147 samples): 0.6914
+2026-05-08 22:28:10,697 | INFO |
+              precision    recall  f1-score   support
+
+       angry       0.71      0.88      0.79       196
+     fearful       0.53      0.58      0.56       196
+     disgust       0.70      0.54      0.61       196
+       happy       0.86      0.82      0.84       196
+         sad       0.60      0.62      0.61       196
+neutral/calm       0.80      0.71      0.75       167
+
+    accuracy                           0.69      1147
+   macro avg       0.70      0.69      0.69      1147
+weighted avg       0.70      0.69      0.69      1147
+
+2026-05-08 22:28:10,697 | INFO |
+==================== PER-MODALITY TEST RESULTS ====================
+2026-05-08 22:28:10,697 | INFO | audio_only (384 samples): acc=0.5365
+2026-05-08 22:28:10,700 | INFO |
+              precision    recall  f1-score   support
+
+       angry       0.73      0.70      0.71        64
+     fearful       0.35      0.34      0.35        32
+     disgust       0.66      0.45      0.54        64
+       happy       0.39      0.47      0.43        64
+         sad       0.38      0.34      0.36        64
+neutral/calm       0.62      0.72      0.66        96
+
+    accuracy                           0.54       384
+   macro avg       0.52      0.51      0.51       384
+weighted avg       0.54      0.54      0.53       384
+
+2026-05-08 22:28:10,700 | INFO | video_only (384 samples): acc=0.6146
+2026-05-08 22:28:10,703 | INFO | 
+              precision    recall  f1-score   support
+
+       angry       0.75      0.66      0.70        64
+     fearful       0.08      0.03      0.05        32
+     disgust       0.58      0.48      0.53        64
+       happy       0.89      0.78      0.83        64
+         sad       0.40      0.69      0.51        64
+neutral/calm       0.70      0.71      0.70        96
+
+    accuracy                           0.61       384
+   macro avg       0.57      0.56      0.55       384
+weighted avg       0.62      0.61      0.61       384
+
+2026-05-08 22:28:10,703 | INFO | both (1531 samples): acc=0.7028
+2026-05-08 22:28:10,708 | INFO |
+              precision    recall  f1-score   support
+
+       angry       0.74      0.88      0.80       260
+     fearful       0.54      0.56      0.55       228
+     disgust       0.74      0.55      0.63       260
+       happy       0.85      0.84      0.85       260
+         sad       0.57      0.63      0.59       260
+neutral/calm       0.80      0.74      0.77       263
+
+    accuracy                           0.70      1531
+   macro avg       0.70      0.70      0.70      1531
+weighted avg       0.71      0.70      0.70      1531
+
+2026-05-08 22:28:10,796 | INFO | Saved model → /Users/anupamkumar/Desktop/meet/emotion_service/models/xgb/xgb_model.joblib
+2026-05-08 22:28:10,814 | INFO | Saved pca.joblib + col_medians.npy (8149 dims) → /Users/anupamkumar/Desktop/meet/emotion_service/models/xgb
+2026-05-08 22:28:11,524 | INFO | DONE — train_xgb complete.

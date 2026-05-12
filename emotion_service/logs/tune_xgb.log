@@ -1,0 +1,20 @@
+2026-05-08 22:04:42,779 | INFO | ============================================================
+2026-05-08 22:04:42,779 | INFO | tune_xgb.py — Optuna hyperparameter search
+2026-05-08 22:04:42,779 | INFO |   trials=20  startup=8  jobs=1
+2026-05-08 22:04:42,779 | INFO |   use_pca=True  pca_dim=512  seed=42
+2026-05-08 22:04:42,779 | INFO |   study_name=xgb_emotion  storage=sqlite:///optuna_xgb.db
+2026-05-08 22:04:42,779 | INFO | ============================================================
+2026-05-08 22:04:42,779 | INFO | Loading dataset from /Users/anupamkumar/Desktop/meet/emotion_service/extracted_dataset/dataset.npz
+2026-05-08 22:04:43,144 | INFO | Loaded — train: 9629  val: 2294  test: 2299
+2026-05-08 22:04:43,145 | INFO | Building features...
+2026-05-08 22:04:45,778 | INFO | Feature build: 2.6s  shape=(9629, 8149)
+2026-05-08 22:04:46,132 | WARNING | 12 zero-variance feature(s) zeroed out (cols: [132, 133, 458, 459, 784, 785, 1110, 1111, 5532, 5533]...)
+2026-05-08 22:04:46,157 | INFO | Filling NaNs with train column medians before PCA...
+2026-05-08 22:04:47,837 | INFO | Applying PCA → 512 dims
+2026-05-08 22:05:02,125 | INFO | PCA explained variance: 0.887
+2026-05-08 22:05:02,126 | INFO | Feature shape after preprocessing: (9629, 512)
+2026-05-08 22:05:02,611 | INFO | Starting Optuna search: 20 trials...
+2026-05-08 22:08:56,205 | INFO | Trial    0 | mlogloss=0.93321 | best_iter=2996 | lr=0.03083 depth=5 sub=0.76 col=0.41
+2026-05-08 22:13:31,895 | INFO | Trial    1 | mlogloss=1.03852 | best_iter=2974 | lr=0.01995 depth=8 sub=0.90 col=0.45
+2026-05-08 22:22:13,711 | INFO | Trial    2 | mlogloss=1.07672 | best_iter=2999 | lr=0.00312 depth=6 sub=0.48 col=0.50
+2026-05-08 22:23:46,352 | INFO | Trial    3 | mlogloss=0.92077 | best_iter= 774 | lr=0.10058 depth=7 sub=0.76 col=0.42

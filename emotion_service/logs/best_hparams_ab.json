@@ -1,0 +1,47 @@
+{
+  "best_composite_score": 0.7734557402675475,
+  "best_val_acc": 0.7794245858761988,
+  "best_macro_f1": 0.7790109810103973,
+  "best_macro_recall": 0.778704208673041,
+  "best_ravdess_acc": 0.7994791666666666,
+  "best_crema_acc": 0.7591943957968477,
+  "best_ece": 0.055171227197909026,
+  "instability": 0.00458524630943493,
+  "used_swa": false,
+  "swa_n_averaged": 4,
+  "epochs_survived_b": 20,
+  "test_acc_logged": -1.0,
+  "training": {
+    "lr_a": 0.000166,
+    "lr_b": 0.00025,
+    "label_smoothing": 0.0777,
+    "swa_tail": 4
+  },
+  "model": {
+    "dropout": 0.15179156757707213
+  },
+  "augmentation": {
+    "mixup_alpha": 0.1668,
+    "mixup_prob": 0.2207
+  },
+  "misc": {
+    "class_boost": [
+      1.054,
+      3.685,
+      1.859,
+      1.376,
+      3.492,
+      0.562
+    ]
+  },
+  "separation_losses": {
+    "sad_margin": 0.307,
+    "disgust_margin": 0.162,
+    "sad_sep_w": 0.0657,
+    "fear_sep_w": 0.0202,
+    "disgust_sep_w": 0.0342
+  },
+  "dataloader": {
+    "ravdess_weight_b": 1.933
+  }
+}

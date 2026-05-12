@@ -1,0 +1,27 @@
+{
+  "paths": {
+    "data_root": "data",
+    "extract_dir": "extracted_dataset",
+    "splits": "extracted_dataset/splits.json"
+  },
+
+  "processing": {
+    "chunk_size": 500,
+    "seq_len": 10,
+    "sample_rate": 16000,
+    "audio_window_sec": 0.6,
+    "audio_dim": 1024,
+    "face_dim": 326,
+    "num_workers": 4,
+    "audio_batch_size": 32
+  },
+
+  "split": {
+    "train_ratio": 0.7,
+    "val_ratio": 0.15,
+    "test_ratio": 0.15,
+    "seed": 42
+  },
+
+  "device": "mps"
+}

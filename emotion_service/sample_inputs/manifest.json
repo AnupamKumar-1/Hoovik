@@ -1,0 +1,104 @@
+[
+  {
+    "index": 3,
+    "tag": "angry_0",
+    "true_label": "angry",
+    "actor": 2001,
+    "source": "CREMA-D",
+    "modality": "both",
+    "face_frames": 10,
+    "audio_frames": 10,
+    "paths": {
+      "face": "/Users/anupamkumar/Desktop/meet/emotion_service/sample_inputs/xf_angry_0.npy",
+      "audio": "/Users/anupamkumar/Desktop/meet/emotion_service/sample_inputs/xa_angry_0.npy",
+      "face_mask": "/Users/anupamkumar/Desktop/meet/emotion_service/sample_inputs/fm_angry_0.npy",
+      "audio_mask": "/Users/anupamkumar/Desktop/meet/emotion_service/sample_inputs/am_angry_0.npy"
+    },
+    "run_cmd": "python inference/predict.py --face /Users/anupamkumar/Desktop/meet/emotion_service/sample_inputs/xf_angry_0.npy --audio /Users/anupamkumar/Desktop/meet/emotion_service/sample_inputs/xa_angry_0.npy --face_mask /Users/anupamkumar/Desktop/meet/emotion_service/sample_inputs/fm_angry_0.npy --audio_mask /Users/anupamkumar/Desktop/meet/emotion_service/sample_inputs/am_angry_0.npy"
+  },
+  {
+    "index": 0,
+    "tag": "fearful_0",
+    "true_label": "fearful",
+    "actor": 2001,
+    "source": "CREMA-D",
+    "modality": "both",
+    "face_frames": 10,
+    "audio_frames": 10,
+    "paths": {
+      "face": "/Users/anupamkumar/Desktop/meet/emotion_service/sample_inputs/xf_fearful_0.npy",
+      "audio": "/Users/anupamkumar/Desktop/meet/emotion_service/sample_inputs/xa_fearful_0.npy",
+      "face_mask": "/Users/anupamkumar/Desktop/meet/emotion_service/sample_inputs/fm_fearful_0.npy",
+      "audio_mask": "/Users/anupamkumar/Desktop/meet/emotion_service/sample_inputs/am_fearful_0.npy"
+    },
+    "run_cmd": "python inference/predict.py --face /Users/anupamkumar/Desktop/meet/emotion_service/sample_inputs/xf_fearful_0.npy --audio /Users/anupamkumar/Desktop/meet/emotion_service/sample_inputs/xa_fearful_0.npy --face_mask /Users/anupamkumar/Desktop/meet/emotion_service/sample_inputs/fm_fearful_0.npy --audio_mask /Users/anupamkumar/Desktop/meet/emotion_service/sample_inputs/am_fearful_0.npy"
+  },
+  {
+    "index": 2,
+    "tag": "disgust_0",
+    "true_label": "disgust",
+    "actor": 2001,
+    "source": "CREMA-D",
+    "modality": "both",
+    "face_frames": 10,
+    "audio_frames": 10,
+    "paths": {
+      "face": "/Users/anupamkumar/Desktop/meet/emotion_service/sample_inputs/xf_disgust_0.npy",
+      "audio": "/Users/anupamkumar/Desktop/meet/emotion_service/sample_inputs/xa_disgust_0.npy",
+      "face_mask": "/Users/anupamkumar/Desktop/meet/emotion_service/sample_inputs/fm_disgust_0.npy",
+      "audio_mask": "/Users/anupamkumar/Desktop/meet/emotion_service/sample_inputs/am_disgust_0.npy"
+    },
+    "run_cmd": "python inference/predict.py --face /Users/anupamkumar/Desktop/meet/emotion_service/sample_inputs/xf_disgust_0.npy --audio /Users/anupamkumar/Desktop/meet/emotion_service/sample_inputs/xa_disgust_0.npy --face_mask /Users/anupamkumar/Desktop/meet/emotion_service/sample_inputs/fm_disgust_0.npy --audio_mask /Users/anupamkumar/Desktop/meet/emotion_service/sample_inputs/am_disgust_0.npy"
+  },
+  {
+    "index": 1,
+    "tag": "happy_0",
+    "true_label": "happy",
+    "actor": 2001,
+    "source": "CREMA-D",
+    "modality": "both",
+    "face_frames": 10,
+    "audio_frames": 10,
+    "paths": {
+      "face": "/Users/anupamkumar/Desktop/meet/emotion_service/sample_inputs/xf_happy_0.npy",
+      "audio": "/Users/anupamkumar/Desktop/meet/emotion_service/sample_inputs/xa_happy_0.npy",
+      "face_mask": "/Users/anupamkumar/Desktop/meet/emotion_service/sample_inputs/fm_happy_0.npy",
+      "audio_mask": "/Users/anupamkumar/Desktop/meet/emotion_service/sample_inputs/am_happy_0.npy"
+    },
+    "run_cmd": "python inference/predict.py --face /Users/anupamkumar/Desktop/meet/emotion_service/sample_inputs/xf_happy_0.npy --audio /Users/anupamkumar/Desktop/meet/emotion_service/sample_inputs/xa_happy_0.npy --face_mask /Users/anupamkumar/Desktop/meet/emotion_service/sample_inputs/fm_happy_0.npy --audio_mask /Users/anupamkumar/Desktop/meet/emotion_service/sample_inputs/am_happy_0.npy"
+  },
+  {
+    "index": 6,
+    "tag": "sad_0",
+    "true_label": "sad",
+    "actor": 2001,
+    "source": "CREMA-D",
+    "modality": "both",
+    "face_frames": 10,
+    "audio_frames": 10,
+    "paths": {
+      "face": "/Users/anupamkumar/Desktop/meet/emotion_service/sample_inputs/xf_sad_0.npy",
+      "audio": "/Users/anupamkumar/Desktop/meet/emotion_service/sample_inputs/xa_sad_0.npy",
+      "face_mask": "/Users/anupamkumar/Desktop/meet/emotion_service/sample_inputs/fm_sad_0.npy",
+      "audio_mask": "/Users/anupamkumar/Desktop/meet/emotion_service/sample_inputs/am_sad_0.npy"
+    },
+    "run_cmd": "python inference/predict.py --face /Users/anupamkumar/Desktop/meet/emotion_service/sample_inputs/xf_sad_0.npy --audio /Users/anupamkumar/Desktop/meet/emotion_service/sample_inputs/xa_sad_0.npy --face_mask /Users/anupamkumar/Desktop/meet/emotion_service/sample_inputs/fm_sad_0.npy --audio_mask /Users/anupamkumar/Desktop/meet/emotion_service/sample_inputs/am_sad_0.npy"
+  },
+  {
+    "index": 4,
+    "tag": "neutral_calm_0",
+    "true_label": "neutral/calm",
+    "actor": 2001,
+    "source": "CREMA-D",
+    "modality": "both",
+    "face_frames": 10,
+    "audio_frames": 10,
+    "paths": {
+      "face": "/Users/anupamkumar/Desktop/meet/emotion_service/sample_inputs/xf_neutral_calm_0.npy",
+      "audio": "/Users/anupamkumar/Desktop/meet/emotion_service/sample_inputs/xa_neutral_calm_0.npy",
+      "face_mask": "/Users/anupamkumar/Desktop/meet/emotion_service/sample_inputs/fm_neutral_calm_0.npy",
+      "audio_mask": "/Users/anupamkumar/Desktop/meet/emotion_service/sample_inputs/am_neutral_calm_0.npy"
+    },
+    "run_cmd": "python inference/predict.py --face /Users/anupamkumar/Desktop/meet/emotion_service/sample_inputs/xf_neutral_calm_0.npy --audio /Users/anupamkumar/Desktop/meet/emotion_service/sample_inputs/xa_neutral_calm_0.npy --face_mask /Users/anupamkumar/Desktop/meet/emotion_service/sample_inputs/fm_neutral_calm_0.npy --audio_mask /Users/anupamkumar/Desktop/meet/emotion_service/sample_inputs/am_neutral_calm_0.npy"
+  }
+]

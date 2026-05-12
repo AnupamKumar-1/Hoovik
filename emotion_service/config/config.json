@@ -1,71 +1,157 @@
 {
+  "version": "1.0.0",
   "paths": {
     "dataset": "extracted_dataset/dataset.npz",
-    "norm_dir": "extracted_dataset/norm_stats",
-
     "checkpoints": {
       "modal": "models/modal",
-      "xgb": "models/xgb"
+      "xgb": "models/xgb",
+      "ensemble": "models/ensemble",
+      "anomaly": "models/anomaly"
     },
-
     "logs": "logs",
-
     "models": {
       "modal": "models/modal/best_modal.pt",
       "xgb": "models/xgb/xgb_model.joblib",
-      "scaler": "models/xgb/scaler.joblib",
       "pca": "models/xgb/pca.joblib"
     }
   },
-
-  "model": {
-    "seq_len": 8,
-    "face_dim": 27,
+  "processing": {
+    "seq_len": 10,
+    "sample_rate": 16000,
+    "audio_window_sec": 0.6,
     "audio_dim": 1024,
-    "d_model": 256,
-    "num_classes": 6,
-
-    "dropout": 0.25,
-    "nhead": 8,
-    "num_encoder_layers": 6,
-    "dim_feedforward": 768
+    "face_dim": 326,
+    "num_workers": 4
   },
-
+  "model": {
+    "num_classes": 6,
+    "d_model": 256,
+    "dropout": 0.15179156757707213,
+    "nhead": 8,
+    "num_encoder_layers": 3,
+    "dim_feedforward": 768,
+    "face_scale": 1.2,
+    "cross_gate_weight": 0.7,
+    "conf_blend_weight": 0.5
+  },
   "training": {
     "batch_size": 64,
-    "epochs": 80,
-    "lr": 0.0003,
+    "lr_a": 0.000166,
+    "lr_b": 0.000197,
+    "lr_c": 7.2e-06,
+    "epochs_a": 15,
+    "epochs_b": 40,
+    "epochs_c": 35,
     "weight_decay": 0.0001,
     "patience": 12,
-    "warmup_epochs": 5,
+    "patience_c": 6,
+    "min_delta_c": 0.0005,
+    "warmup_epochs": 2,
+    "warmup_epochs_b": 5,
     "grad_clip": 1.0,
-    "label_smoothing": 0.1
+    "label_smoothing": 0.077662,
+    "swa_tail": 4,
+    "temp_lr": 0.01,
+    "temp_max_iter": 50,
+    "mixup_alpha": 0.166792,
+    "mixup_prob": 0.220746,
+    "mixup_warmup_epochs": 0,
+    "supcon_temp_start": 0.1,
+    "supcon_temp_floor": 0.07,
+    "supcon_temp_decay": 0.0015,
+    "lambda_sc_max": 0.15,
+    "lambda_sc_ramp_epochs": 15,
+    "triplet_weight": 0.025,
+    "triplet_margin": 0.5,
+    "modality_drop_prob": 0.06822,
+    "augment_noise_face_low": 0.025,
+    "augment_noise_face_high": 0.06,
+    "augment_noise_face_thresh": 0.01,
+    "augment_noise_audio_low": 0.01,
+    "augment_noise_audio_high": 0.02,
+    "augment_noise_audio_thresh": 0.01,
+    "augment_drop_face_prob": 0.02,
+    "augment_drop_audio_prob": 0.02,
+    "augment_roll_prob": 0.3,
+    "augment_roll_max": 3,
+    "augment_mask_prob": 0.3,
+    "augment_mask_max_frac": 0.1667
   },
-
   "xgb": {
-    "n_estimators": 1500,
-    "max_depth": 6,
-    "learning_rate": 0.03,
-    "subsample": 0.8,
-    "colsample_bytree": 0.6,
-    "min_child_weight": 3,
-    "gamma": 0.1,
-    "reg_alpha": 0.1,
-    "reg_lambda": 1.0,
-    "early_stopping_rounds": 30,
-    "tree_method": "hist"
+    "n_estimators": 3150,
+    "max_depth": 5,
+    "learning_rate": 0.030834348179355788,
+    "subsample": 0.759195090518222,
+    "colsample_bytree": 0.40921304830970556,
+    "min_child_weight": 10,
+    "gamma": 1.4639878836228102,
+    "reg_alpha": 0.0001707396743152812,
+    "reg_lambda": 5.3994844097874335,
+    "early_stopping_rounds": 150,
+    "tree_method": "hist",
+    "verbose": 10,
+    "importance_type": "gain",
+    "importance_top_n": 30,
+    "colsample_bylevel": 0.5779972601681014
   },
-
   "features": {
-    "use_pca": false,
-    "pca_dim": 256
+    "use_pca": true,
+    "pca_dim": 512
   },
-
-
-
   "misc": {
     "seed": 42,
-    "class_names": ["angry", "fearful", "disgust", "happy", "sad", "neutral/calm"],
-    "class_counts": [1128, 576, 1128, 1128, 1128, 1692]
+    "class_names": [
+      "angry",
+      "fearful",
+      "disgust",
+      "happy",
+      "sad",
+      "neutral/calm"
+    ],
+    "class_counts": [
+      2399,
+      1847,
+      2399,
+      2399,
+      2399,
+      2779
+    ],
+    "class_boost": [
+      1.053513,
+      3.285075,
+      1.859025,
+      1.376399,
+      3.092464,
+      0.561607
+    ],
+    "actor_id_threshold": 1000,
+    "normalize_confusion": true
+  },
+  "separation_losses": {
+    "sad_margin": 0.290365,
+    "disgust_margin": 0.162435,
+    "fear_margin": 0.15,
+    "sad_sep_w": 0.060703,
+    "fear_sep_w": 0.02024,
+    "disgust_sep_w": 0.034217
+  },
+  "anomaly": {
+    "target_fpr": 0.1,
+    "pca_components": {
+      "global_fallback": 256,
+      "both": 256,
+      "audio_only": 384,
+      "video_only": 64
+    },
+    "n_estimators": 200,
+    "min_train_samples": 50,
+    "min_val_samples": 10
+  },
+  "dataloader": {
+    "num_workers": 2,
+    "persistent_workers": true,
+    "prefetch_factor": 2,
+    "ravdess_weight_a": 1.2,
+    "ravdess_weight_b": 1.432926
   }
 }

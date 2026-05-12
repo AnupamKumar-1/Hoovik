@@ -1,97 +1,145 @@
-2026-04-06 12:24:47,013 | INFO | Loading dataset from: /Users/anupamkumar/Desktop/meet/emotion_service/extracted_dataset/dataset.npz
-2026-04-06 12:24:54,026 | INFO | Epoch 1 | Val Loss 1.3894 | Val Acc 0.3767
-2026-04-06 12:24:59,099 | INFO | Epoch 2 | Val Loss 1.0796 | Val Acc 0.5911
-2026-04-06 12:25:04,169 | INFO | Epoch 3 | Val Loss 1.1865 | Val Acc 0.5616
-2026-04-06 12:25:09,160 | INFO | Epoch 4 | Val Loss 0.9346 | Val Acc 0.6493
-2026-04-06 12:25:14,347 | INFO | Epoch 5 | Val Loss 1.1145 | Val Acc 0.6372
-2026-04-06 12:25:19,371 | INFO | Epoch 6 | Val Loss 1.0096 | Val Acc 0.6415
-2026-04-06 12:25:24,392 | INFO | Epoch 7 | Val Loss 0.9731 | Val Acc 0.6415
-2026-04-06 12:25:29,411 | INFO | Epoch 8 | Val Loss 1.0067 | Val Acc 0.6571
-2026-04-06 12:25:34,422 | INFO | Epoch 9 | Val Loss 1.0453 | Val Acc 0.6536
-2026-04-06 12:25:39,444 | INFO | Epoch 10 | Val Loss 0.9983 | Val Acc 0.6745
-2026-04-06 12:25:44,539 | INFO | Epoch 11 | Val Loss 0.9214 | Val Acc 0.6580
-2026-04-06 12:25:49,850 | INFO | Epoch 12 | Val Loss 1.0285 | Val Acc 0.6571
-2026-04-06 12:25:55,121 | INFO | Epoch 13 | Val Loss 0.9982 | Val Acc 0.6780
-2026-04-06 12:26:00,441 | INFO | Epoch 14 | Val Loss 1.0459 | Val Acc 0.6658
-2026-04-06 12:26:05,757 | INFO | Epoch 15 | Val Loss 1.0048 | Val Acc 0.6701
-2026-04-06 12:26:11,498 | INFO | Epoch 16 | Val Loss 0.9869 | Val Acc 0.7005
-2026-04-06 12:26:16,630 | INFO | Epoch 17 | Val Loss 1.0473 | Val Acc 0.6875
-2026-04-06 12:26:21,683 | INFO | Epoch 18 | Val Loss 1.0327 | Val Acc 0.6823
-2026-04-06 12:26:26,737 | INFO | Epoch 19 | Val Loss 1.0205 | Val Acc 0.6936
-2026-04-06 12:26:31,781 | INFO | Epoch 20 | Val Loss 1.0168 | Val Acc 0.6970
-2026-04-06 12:26:36,923 | INFO | Epoch 21 | Val Loss 1.0630 | Val Acc 0.6250
-2026-04-06 12:26:42,045 | INFO | Epoch 22 | Val Loss 1.0435 | Val Acc 0.6753
-2026-04-06 12:26:47,144 | INFO | Epoch 23 | Val Loss 1.0004 | Val Acc 0.6684
-2026-04-06 12:26:47,443 | INFO | 
- TEST ACC: 0.6970
-2026-04-06 12:26:47,449 | INFO | 
+
+2026-05-08 18:19:30,395 | INFO | device=mps | face_dim=326 | audio_dim=1024 | d_model=256
+2026-05-08 18:19:30,894 | INFO | Loaded — train: 9629  val: 2294  test: 2299
+2026-05-08 18:19:30,894 | INFO | Data mix — RAVDESS: 46.5%  CREMA-D: 53.5%
+2026-05-08 18:19:30,934 | INFO | Phase A (both modalities) — train: 6645  val: 1526
+2026-05-08 18:19:30,934 | INFO | Phase B/C (all modalities) — train: 9629  val: 2294
+2026-05-08 18:19:31,489 | INFO | Trainable parameters: 1,821,334
+2026-05-08 18:19:31,491 | INFO | Running in eager mode (MPS native)
+2026-05-08 18:19:31,595 | INFO | ==================== Phase A | lr=0.000166 | epochs=15 ====================
+2026-05-08 18:19:46,496 | INFO | [A] Epoch 001 | lr=8.30e-05 | train_loss=2.5656 train_acc=0.3228 | val_loss=2.1710 val_acc=0.4803
+2026-05-08 18:20:18,103 | INFO | device=mps | face_dim=326 | audio_dim=1024 | d_model=256
+2026-05-08 18:20:18,523 | INFO | Loaded — train: 9629  val: 2294  test: 2299
+2026-05-08 18:20:18,523 | INFO | Data mix — RAVDESS: 46.5%  CREMA-D: 53.5%
+2026-05-08 18:20:18,561 | INFO | Phase A (both modalities) — train: 6645  val: 1526
+2026-05-08 18:20:18,561 | INFO | Phase B/C (all modalities) — train: 9629  val: 2294
+2026-05-08 18:20:18,777 | INFO | Trainable parameters: 1,821,334
+2026-05-08 18:20:18,777 | INFO | Running in eager mode (MPS native)
+2026-05-08 18:20:18,843 | INFO | ==================== Phase A | lr=0.000166 | epochs=15 ====================
+2026-05-08 18:20:33,600 | INFO | [A] Epoch 001 | lr=8.30e-05 | train_loss=2.5951 train_acc=0.3160 | val_loss=2.1612 val_acc=0.5059
+2026-05-08 18:20:45,597 | INFO | [A] Epoch 002 | lr=1.66e-04 | train_loss=1.8048 train_acc=0.5732 | val_loss=1.6916 val_acc=0.6206
+2026-05-08 18:20:58,191 | INFO | [A] Epoch 003 | lr=1.66e-04 | train_loss=1.4226 train_acc=0.7108 | val_loss=1.6666 val_acc=0.6796
+2026-05-08 18:21:10,626 | INFO | [A] Epoch 004 | lr=1.64e-04 | train_loss=1.2747 train_acc=0.7716 | val_loss=1.5913 val_acc=0.7136
+2026-05-08 18:21:23,771 | INFO | [A] Epoch 005 | lr=1.56e-04 | train_loss=1.1921 train_acc=0.8140 | val_loss=1.6723 val_acc=0.7300 | val_R=0.5712 val_C=0.7285
+2026-05-08 18:21:36,354 | INFO | [A] Epoch 006 | lr=1.45e-04 | train_loss=1.1182 train_acc=0.8414 | val_loss=1.8452 val_acc=0.7392
+2026-05-08 18:21:48,865 | INFO | [A] Epoch 007 | lr=1.30e-04 | train_loss=1.0715 train_acc=0.8686 | val_loss=1.6548 val_acc=0.7864
+2026-05-08 18:22:01,612 | INFO | [A] Epoch 008 | lr=1.12e-04 | train_loss=1.0590 train_acc=0.8734 | val_loss=1.8180 val_acc=0.7739
+2026-05-08 18:22:13,806 | INFO | [A] Epoch 009 | lr=9.30e-05 | train_loss=1.0030 train_acc=0.8971 | val_loss=1.8479 val_acc=0.7700
+2026-05-08 18:22:26,507 | INFO | [A] Epoch 010 | lr=7.30e-05 | train_loss=0.9751 train_acc=0.9138 | val_loss=1.8370 val_acc=0.7634 | val_R=0.6797 val_C=0.7574
+2026-05-08 18:22:38,684 | INFO | [A] Epoch 011 | lr=5.36e-05 | train_loss=0.9636 train_acc=0.9219 | val_loss=1.8812 val_acc=0.7765
+2026-05-08 18:22:50,834 | INFO | [A] Epoch 012 | lr=3.59e-05 | train_loss=0.9592 train_acc=0.9299 | val_loss=1.9011 val_acc=0.7693
+2026-05-08 18:23:02,978 | INFO | [A] Epoch 013 | lr=2.09e-05 | train_loss=0.9683 train_acc=0.9300 | val_loss=1.9308 val_acc=0.7765
+2026-05-08 18:23:15,231 | INFO | [A] Epoch 014 | lr=9.51e-06 | train_loss=0.9863 train_acc=0.9386 | val_loss=1.9949 val_acc=0.7746
+2026-05-08 18:23:28,256 | INFO | [A] Epoch 015 | lr=2.41e-06 | train_loss=1.0040 train_acc=0.9392 | val_loss=2.0295 val_acc=0.7746 | val_R=0.6970 val_C=0.7671
+2026-05-08 18:23:28,306 | INFO | Phase A best restored
+2026-05-08 18:23:28,908 | INFO | Phase A best checkpoint — full val acc: 0.7293 (Phase B must beat this to save a checkpoint)
+2026-05-08 18:23:28,908 | INFO | ==================== Phase B | lr=0.000197 | epochs=40 ====================
+2026-05-08 18:23:47,897 | INFO | [B] Epoch 001 | lr=3.94e-05 | train_loss=1.5373 train_acc=0.8069 | val_loss=2.0658 val_acc=0.7315
+2026-05-08 18:24:06,250 | INFO | [B] Epoch 002 | lr=7.88e-05 | train_loss=1.5130 train_acc=0.8179 | val_loss=2.1529 val_acc=0.7201
+2026-05-08 18:24:24,464 | INFO | [B] Epoch 003 | lr=1.18e-04 | train_loss=1.4687 train_acc=0.8408 | val_loss=2.2820 val_acc=0.6818
+2026-05-08 18:24:42,715 | INFO | [B] Epoch 004 | lr=1.58e-04 | train_loss=1.4235 train_acc=0.8562 | val_loss=2.2289 val_acc=0.7350
+2026-05-08 18:25:01,822 | INFO | [B] Epoch 005 | lr=1.97e-04 | train_loss=1.4183 train_acc=0.8631 | val_loss=2.2333 val_acc=0.7175 | val_R=0.6962 val_C=0.7391
+2026-05-08 18:25:21,464 | INFO | [B] Epoch 006 | lr=1.97e-04 | train_loss=1.3298 train_acc=0.8658 | val_loss=2.3223 val_acc=0.7323
+2026-05-08 18:25:39,669 | INFO | [B] Epoch 007 | lr=1.97e-04 | train_loss=1.2753 train_acc=0.8834 | val_loss=2.1574 val_acc=0.7337
+2026-05-08 18:25:57,561 | INFO | [B] Epoch 008 | lr=1.95e-04 | train_loss=1.2524 train_acc=0.8958 | val_loss=2.3572 val_acc=0.7428
+2026-05-08 18:26:15,425 | INFO | [B] Epoch 009 | lr=1.93e-04 | train_loss=1.1842 train_acc=0.9084 | val_loss=2.2379 val_acc=0.7088
+2026-05-08 18:26:33,794 | INFO | [B] Epoch 010 | lr=1.91e-04 | train_loss=1.2021 train_acc=0.9071 | val_loss=2.2925 val_acc=0.7232 | val_R=0.7118 val_C=0.7347
+2026-05-08 18:26:51,627 | INFO | [B] Epoch 011 | lr=1.87e-04 | train_loss=1.1973 train_acc=0.9103 | val_loss=2.3301 val_acc=0.7550
+2026-05-08 18:27:09,553 | INFO | [B] Epoch 012 | lr=1.83e-04 | train_loss=1.0808 train_acc=0.9413 | val_loss=2.3062 val_acc=0.7446
+2026-05-08 18:27:27,453 | INFO | [B] Epoch 013 | lr=1.78e-04 | train_loss=1.0680 train_acc=0.9427 | val_loss=2.3144 val_acc=0.7345
+2026-05-08 18:27:45,256 | INFO | [B] Epoch 014 | lr=1.73e-04 | train_loss=1.0074 train_acc=0.9458 | val_loss=2.3428 val_acc=0.7554
+2026-05-08 18:28:03,668 | INFO | [B] Epoch 015 | lr=1.67e-04 | train_loss=1.0338 train_acc=0.9494 | val_loss=2.3156 val_acc=0.7415 | val_R=0.7422 val_C=0.7408
+2026-05-08 18:28:21,590 | INFO | [B] Epoch 016 | lr=1.60e-04 | train_loss=1.0488 train_acc=0.9466 | val_loss=2.3420 val_acc=0.7450
+2026-05-08 18:28:39,572 | INFO | [B] Epoch 017 | lr=1.53e-04 | train_loss=1.0386 train_acc=0.9522 | val_loss=2.3721 val_acc=0.7511
+2026-05-08 18:28:57,578 | INFO | [B] Epoch 018 | lr=1.45e-04 | train_loss=1.0183 train_acc=0.9589 | val_loss=2.2755 val_acc=0.7716
+2026-05-08 18:29:15,593 | INFO | [B] Epoch 019 | lr=1.37e-04 | train_loss=1.0245 train_acc=0.9593 | val_loss=2.2799 val_acc=0.7459
+2026-05-08 18:29:34,121 | INFO | [B] Epoch 020 | lr=1.29e-04 | train_loss=0.9933 train_acc=0.9595 | val_loss=2.3440 val_acc=0.7581 | val_R=0.7656 val_C=0.7504
+2026-05-08 18:29:52,103 | INFO | [B] Epoch 021 | lr=1.20e-04 | train_loss=0.9310 train_acc=0.9727 | val_loss=2.3207 val_acc=0.7803
+2026-05-08 18:30:10,131 | INFO | [B] Epoch 022 | lr=1.12e-04 | train_loss=0.9870 train_acc=0.9624 | val_loss=2.3673 val_acc=0.7572
+2026-05-08 18:30:28,158 | INFO | [B] Epoch 023 | lr=1.03e-04 | train_loss=0.8969 train_acc=0.9806 | val_loss=2.4130 val_acc=0.7520
+2026-05-08 18:30:46,185 | INFO | [B] Epoch 024 | lr=9.41e-05 | train_loss=0.9172 train_acc=0.9753 | val_loss=2.5149 val_acc=0.7507
+2026-05-08 18:31:04,864 | INFO | [B] Epoch 025 | lr=8.53e-05 | train_loss=0.9476 train_acc=0.9754 | val_loss=2.3605 val_acc=0.7685 | val_R=0.7639 val_C=0.7732
+2026-05-08 18:31:22,817 | INFO | [B] Epoch 026 | lr=7.66e-05 | train_loss=0.9142 train_acc=0.9758 | val_loss=2.4025 val_acc=0.7620
+2026-05-08 18:31:41,389 | INFO | [B] Epoch 027 | lr=6.81e-05 | train_loss=0.9094 train_acc=0.9782 | val_loss=2.4265 val_acc=0.7554
+2026-05-08 18:31:59,411 | INFO | [B] Epoch 028 | lr=5.98e-05 | train_loss=0.8662 train_acc=0.9821 | val_loss=2.4095 val_acc=0.7733
+2026-05-08 18:32:17,695 | INFO | [B] Epoch 029 | lr=5.18e-05 | train_loss=0.8598 train_acc=0.9795 | val_loss=2.3550 val_acc=0.7755
+2026-05-08 18:32:37,946 | INFO | [B] Epoch 030 | lr=4.42e-05 | train_loss=0.8992 train_acc=0.9779 | val_loss=2.4213 val_acc=0.7685 | val_R=0.7682 val_C=0.7688
+2026-05-08 18:32:56,812 | INFO | [B] Epoch 031 | lr=3.71e-05 | train_loss=0.9191 train_acc=0.9781 | val_loss=2.4272 val_acc=0.7650
+2026-05-08 18:33:14,982 | INFO | [B] Epoch 032 | lr=3.04e-05 | train_loss=0.8846 train_acc=0.9844 | val_loss=2.3816 val_acc=0.7764
+2026-05-08 18:33:32,995 | INFO | [B] Epoch 033 | lr=2.43e-05 | train_loss=0.9176 train_acc=0.9716 | val_loss=2.4102 val_acc=0.7716
+2026-05-08 18:33:32,995 | INFO | [B] Early stopping at epoch 33 | best_acc=0.7803
+2026-05-08 18:33:33,046 | INFO | Phase B best restored
+2026-05-08 18:33:33,054 | INFO | ==================== Phase C | lr=7.2e-06 | epochs=35 ====================
+2026-05-08 18:33:51,576 | INFO | [C] Epoch 001 | lr=3.60e-06 | train_loss=0.9318 train_acc=0.9808 | val_loss=2.3228 val_acc=0.7790
+2026-05-08 18:34:10,113 | INFO | [C] Epoch 002 | lr=7.20e-06 | train_loss=0.9174 train_acc=0.9841 | val_loss=2.3243 val_acc=0.7820
+2026-05-08 18:34:28,896 | INFO | [C] Epoch 003 | lr=7.20e-06 | train_loss=0.9134 train_acc=0.9854 | val_loss=2.3231 val_acc=0.7772
+2026-05-08 18:34:48,815 | INFO | [C] Epoch 004 | lr=7.18e-06 | train_loss=0.9148 train_acc=0.9859 | val_loss=2.3101 val_acc=0.7847
+2026-05-08 18:35:08,217 | INFO | [C] Epoch 005 | lr=7.13e-06 | train_loss=0.9143 train_acc=0.9856 | val_loss=2.3270 val_acc=0.7829 | val_R=0.7786 val_C=0.7872
+2026-05-08 18:35:29,326 | INFO | [C] Epoch 006 | lr=7.05e-06 | train_loss=0.9168 train_acc=0.9850 | val_loss=2.3381 val_acc=0.7799
+2026-05-08 18:35:55,580 | INFO | [C] Epoch 007 | lr=6.94e-06 | train_loss=0.8970 train_acc=0.9885 | val_loss=2.3368 val_acc=0.7816
+2026-05-08 18:36:16,928 | INFO | [C] Epoch 008 | lr=6.80e-06 | train_loss=0.9027 train_acc=0.9876 | val_loss=2.3328 val_acc=0.7833
+2026-05-08 18:36:36,815 | INFO | [C] Epoch 009 | lr=6.63e-06 | train_loss=0.8974 train_acc=0.9880 | val_loss=2.3340 val_acc=0.7790
+2026-05-08 18:36:57,574 | INFO | [C] Epoch 010 | lr=6.43e-06 | train_loss=0.9061 train_acc=0.9854 | val_loss=2.3432 val_acc=0.7790 | val_R=0.7734 val_C=0.7846
+2026-05-08 18:36:57,575 | INFO | [C] Early stopping at epoch 10 | best_acc=0.7847
+2026-05-08 18:36:57,628 | INFO | Phase C best restored (acc=0.7847)
+2026-05-08 18:36:57,628 | INFO | SWA: no epochs collected (Phase C stopped too early)
+2026-05-08 18:36:57,679 | INFO | Final best weights saved → /Users/anupamkumar/Desktop/meet/emotion_service/models/modal/best_modal.pt
+2026-05-08 18:36:58,798 | INFO | Temperature scaling: T=1.1732
+2026-05-08 18:36:59,852 | INFO |
+==================== TEST RESULTS ====================
+2026-05-08 18:36:59,853 | INFO | OVERALL TEST ACC: 0.7425
+2026-05-08 18:36:59,866 | INFO | 
               precision    recall  f1-score   support
 
-           0       0.88      0.75      0.81       192
-           1       0.75      0.68      0.71        96
-           2       0.65      0.72      0.68       192
-           3       0.79      0.73      0.76       192
-           4       0.50      0.68      0.58       192
-           5       0.75      0.64      0.69       288
+       angry       0.88      0.85      0.86       388
+     fearful       0.65      0.65      0.65       292
+     disgust       0.75      0.73      0.74       388
+       happy       0.86      0.81      0.84       388
+         sad       0.57      0.62      0.59       388
+neutral/calm       0.75      0.77      0.76       455
 
-    accuracy                           0.70      1152
-   macro avg       0.72      0.70      0.70      1152
-weighted avg       0.72      0.70      0.70      1152
+    accuracy                           0.74      2299
+   macro avg       0.74      0.74      0.74      2299
+weighted avg       0.75      0.74      0.74      2299
 
-2026-04-06 12:26:47,449 | INFO |  DONE
-2026-04-24 00:59:30,150 | INFO | Loading dataset from: /Users/anupamkumar/Desktop/meet/emotion_service/extracted_dataset/dataset.npz
-2026-04-24 01:01:19,063 | INFO | Loading dataset from: /Users/anupamkumar/Desktop/meet/emotion_service/extracted_dataset/dataset.npz
-2026-04-24 01:01:26,411 | INFO | Epoch 1 | Val Loss 1.4712 | Val Acc 0.4123
-2026-04-24 01:01:31,685 | INFO | Epoch 2 | Val Loss 1.5004 | Val Acc 0.4557
-2026-04-24 01:01:36,636 | INFO | Epoch 3 | Val Loss 1.0833 | Val Acc 0.6085
-2026-04-24 01:01:42,116 | INFO | Epoch 4 | Val Loss 1.0007 | Val Acc 0.6345
-2026-04-24 01:01:47,248 | INFO | Epoch 5 | Val Loss 1.0093 | Val Acc 0.6354
-2026-04-24 01:01:52,243 | INFO | Epoch 6 | Val Loss 0.9388 | Val Acc 0.6389
-2026-04-24 01:01:57,262 | INFO | Epoch 7 | Val Loss 0.9835 | Val Acc 0.6345
-2026-04-24 01:02:02,207 | INFO | Epoch 8 | Val Loss 1.1494 | Val Acc 0.6398
-2026-04-24 01:02:07,146 | INFO | Epoch 9 | Val Loss 0.9781 | Val Acc 0.6606
-2026-04-24 01:02:12,104 | INFO | Epoch 10 | Val Loss 1.0039 | Val Acc 0.6840
-2026-04-24 01:02:17,135 | INFO | Epoch 11 | Val Loss 0.9791 | Val Acc 0.6641
-2026-04-24 01:02:22,079 | INFO | Epoch 12 | Val Loss 1.0135 | Val Acc 0.6832
-2026-04-24 01:02:27,030 | INFO | Epoch 13 | Val Loss 0.9919 | Val Acc 0.6667
-2026-04-24 01:02:31,975 | INFO | Epoch 14 | Val Loss 0.9374 | Val Acc 0.6866
-2026-04-24 01:02:37,000 | INFO | Epoch 15 | Val Loss 0.9854 | Val Acc 0.6762
-2026-04-24 01:02:41,947 | INFO | Epoch 16 | Val Loss 0.9895 | Val Acc 0.6832
-2026-04-24 01:02:46,903 | INFO | Epoch 17 | Val Loss 0.9766 | Val Acc 0.6927
-2026-04-24 01:02:51,845 | INFO | Epoch 18 | Val Loss 1.0033 | Val Acc 0.6936
-2026-04-24 01:02:56,809 | INFO | Epoch 19 | Val Loss 0.9923 | Val Acc 0.6997
-2026-04-24 01:03:01,794 | INFO | Epoch 20 | Val Loss 0.9865 | Val Acc 0.6970
-2026-04-24 01:03:06,967 | INFO | Epoch 21 | Val Loss 0.9882 | Val Acc 0.6745
-2026-04-24 01:03:12,216 | INFO | Epoch 22 | Val Loss 1.0478 | Val Acc 0.6884
-2026-04-24 01:03:17,314 | INFO | Epoch 23 | Val Loss 1.1372 | Val Acc 0.6441
-2026-04-24 01:03:22,435 | INFO | Epoch 24 | Val Loss 1.1053 | Val Acc 0.6693
-2026-04-24 01:03:27,401 | INFO | Epoch 25 | Val Loss 0.8547 | Val Acc 0.7031
-2026-04-24 01:03:32,402 | INFO | Epoch 26 | Val Loss 0.9205 | Val Acc 0.7248
-2026-04-24 01:03:37,387 | INFO | Epoch 27 | Val Loss 1.0025 | Val Acc 0.6849
-2026-04-24 01:03:42,356 | INFO | Epoch 28 | Val Loss 1.0063 | Val Acc 0.6866
-2026-04-24 01:03:47,376 | INFO | Epoch 29 | Val Loss 0.9326 | Val Acc 0.7274
-2026-04-24 01:03:52,302 | INFO | Epoch 30 | Val Loss 0.9876 | Val Acc 0.7049
-2026-04-24 01:03:57,525 | INFO | Epoch 31 | Val Loss 0.9694 | Val Acc 0.7274
-2026-04-24 01:04:02,700 | INFO | Epoch 32 | Val Loss 1.0038 | Val Acc 0.7127
-2026-04-24 01:04:07,787 | INFO | Epoch 33 | Val Loss 1.0680 | Val Acc 0.7092
-2026-04-24 01:04:12,764 | INFO | Epoch 34 | Val Loss 0.9886 | Val Acc 0.7231
-2026-04-24 01:04:17,735 | INFO | Epoch 35 | Val Loss 1.0609 | Val Acc 0.7083
-2026-04-24 01:04:22,711 | INFO | Epoch 36 | Val Loss 1.0808 | Val Acc 0.7283
-2026-04-24 01:04:27,682 | INFO | Epoch 37 | Val Loss 1.1774 | Val Acc 0.7161
-2026-04-24 01:04:27,986 | INFO | 
- TEST ACC: 0.7109
-2026-04-24 01:04:27,994 | INFO | 
+2026-05-08 18:36:59,868 | INFO |
+Confusion Matrix:
+[[328  11  22   8  12   7]
+ [ 12 190  19   3  65   3]
+ [ 17  22 284  11  47   7]
+ [  4  12  11 315  10  36]
+ [  3  40  35   8 239  63]
+ [ 10  17   8  20  49 351]]
+2026-05-08 18:36:59,869 | INFO |
+RAVDESS test acc (1152 samples): 0.7205
+2026-05-08 18:36:59,871 | INFO | 
               precision    recall  f1-score   support
 
-           0       0.86      0.84      0.85       192
-           1       0.89      0.65      0.75        96
-           2       0.89      0.65      0.75       192
-           3       0.72      0.79      0.75       192
-           4       0.47      0.72      0.57       192
-           5       0.72      0.62      0.67       288
+       angry       0.95      0.77      0.85       192
+     fearful       0.65      0.61      0.63        96
+     disgust       0.78      0.68      0.72       192
+       happy       0.83      0.72      0.77       192
+         sad       0.51      0.64      0.57       192
+neutral/calm       0.70      0.81      0.75       288
 
-    accuracy                           0.71      1152
-   macro avg       0.76      0.71      0.72      1152
-weighted avg       0.74      0.71      0.72      1152
+    accuracy                           0.72      1152
+   macro avg       0.74      0.70      0.72      1152
+weighted avg       0.74      0.72      0.73      1152
 
-2026-04-24 01:04:27,994 | INFO |  DONE
+2026-05-08 18:36:59,872 | INFO |
+CREMA-D test acc (1147 samples): 0.7646
+2026-05-08 18:36:59,875 | INFO |
+              precision    recall  f1-score   support
+
+       angry       0.82      0.92      0.87       196
+     fearful       0.65      0.67      0.66       196
+     disgust       0.73      0.79      0.75       196
+       happy       0.89      0.90      0.90       196
+         sad       0.64      0.60      0.62       196
+neutral/calm       0.89      0.71      0.79       167
+
+    accuracy                           0.76      1147
+   macro avg       0.77      0.76      0.76      1147
+weighted avg       0.77      0.76      0.76      1147
+
+2026-05-08 18:36:59,875 | INFO | DONE

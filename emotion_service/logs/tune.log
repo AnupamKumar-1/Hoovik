@@ -1,0 +1,144 @@
+2026-05-07 22:31:30,309 | INFO | Loaded data — train_A: 6645  val_A: 1526  train_B: 9629  val_B: 2294
+2026-05-07 22:31:30,309 | INFO | Running 30 trials  (Phase A: 9 epochs, no mixup, patience=4 | Phase B: 20 epochs, mixup, patience=5)
+2026-05-07 22:31:30,309 | INFO | Objective = best_val_b  (Phase B full-dataset val accuracy)
+2026-05-07 23:34:16,839 | INFO | Loaded data — train_A: 6645  val_A: 1526  train_B: 9629  val_B: 2294
+2026-05-07 23:34:16,839 | INFO | Running 30 trials  (Phase A: 9 epochs, no mixup, patience=4 | Phase B: 20 epochs, mixup, patience=5)
+2026-05-07 23:34:16,839 | INFO | Objective = best_val_b  (Phase B full-dataset val accuracy)
+2026-05-07 23:34:17,168 | INFO | Deleted existing study — starting fresh
+2026-05-08 02:41:06,524 | INFO | 
+==================== BEST TRIAL ====================
+2026-05-08 02:41:06,525 | INFO | Phase B val accuracy: 0.7829  (trial #11)
+2026-05-08 02:41:06,525 | INFO | Best hyperparameters:
+2026-05-08 02:41:06,525 | INFO |   boost_angry: 0.810740
+2026-05-08 02:41:06,525 | INFO |   boost_fearful: 3.986750
+2026-05-08 02:41:06,525 | INFO |   boost_disgust: 1.550280
+2026-05-08 02:41:06,525 | INFO |   boost_happy: 1.487695
+2026-05-08 02:41:06,525 | INFO |   boost_sad: 2.749874
+2026-05-08 02:41:06,525 | INFO |   boost_neutral: 0.974035
+2026-05-08 02:41:06,525 | INFO |   sad_margin: 0.326164
+2026-05-08 02:41:06,525 | INFO |   disgust_margin: 0.153040
+2026-05-08 02:41:06,525 | INFO |   sad_sep_w: 0.078583
+2026-05-08 02:41:06,525 | INFO |   fear_sep_w: 0.049053
+2026-05-08 02:41:06,525 | INFO |   disgust_sep_w: 0.012093
+2026-05-08 02:41:06,525 | INFO |   lr_a: 0.000243
+2026-05-08 02:41:06,525 | INFO |   lr_b: 0.000238
+2026-05-08 02:41:06,525 | INFO |   label_smoothing: 0.081567
+2026-05-08 02:41:06,525 | INFO |   dropout: 0.231182
+2026-05-08 02:41:06,525 | INFO |   ravdess_weight_b: 1.573728
+2026-05-08 02:41:06,527 | INFO | 
+Saved to /Users/anupamkumar/Desktop/meet/emotion_service/logs/best_hparams_ab.json
+2026-05-08 02:41:06,528 | INFO | 
+Top 5 trials (ranked by Phase B val accuracy):
+2026-05-08 02:41:06,528 | INFO |   Trial  11 | phase_b_val_acc=0.7829
+2026-05-08 02:41:06,528 | INFO |   Trial  24 | phase_b_val_acc=0.7790
+2026-05-08 02:41:06,528 | INFO |   Trial  26 | phase_b_val_acc=0.7790
+2026-05-08 02:41:06,528 | INFO |   Trial  21 | phase_b_val_acc=0.7759
+2026-05-08 02:41:06,528 | INFO |   Trial   3 | phase_b_val_acc=0.7742
+2026-05-08 09:56:46,462 | INFO | Loaded data — train_A: 6645  val_A: 1526  train_B: 9629  val_B: 2294  test: 2299
+2026-05-08 09:56:46,463 | INFO | Running 20 trials  (Phase A: 9 epochs, patience=4 | Phase B: 20 epochs, patience=5 | SWA tail: 2–6 epochs)
+2026-05-08 09:56:46,463 | INFO | Objective = 0.35*val_acc + 0.35*macro_f1 + 0.15*ravdess + 0.15*crema - 0.05*min(σ,0.03) - 0.10*ece
+2026-05-08 09:56:46,463 | INFO | Test set evaluated every 5 trials (logged only, never optimised)
+2026-05-08 09:57:30,078 | INFO | Loaded data — train_A: 6645  val_A: 1526  train_B: 9629  val_B: 2294  test: 2299
+2026-05-08 09:57:30,078 | INFO | Running 20 trials  (Phase A: 9 epochs, patience=4 | Phase B: 15 epochs, patience=5 | SWA tail: 2–6 epochs)
+2026-05-08 09:57:30,078 | INFO | Objective = 0.35*val_acc + 0.35*macro_f1 + 0.15*ravdess + 0.15*crema - 0.05*min(σ,0.03) - 0.10*ece
+2026-05-08 09:57:30,078 | INFO | Test set evaluated every 5 trials (logged only, never optimised)
+2026-05-08 09:57:30,356 | INFO | Deleted existing study — starting fresh
+2026-05-08 10:21:25,756 | INFO | Loaded data — train_A: 6645  val_A: 1526  train_B: 9629  val_B: 2294  test: 2299
+2026-05-08 10:21:25,757 | INFO | Running 20 trials  (Phase A: 9 epochs, patience=4 | Phase B: 15 epochs, patience=5 | SWA tail: 2–6 epochs)
+2026-05-08 10:21:25,757 | INFO | Objective = 0.35*val_acc + 0.35*macro_f1 + 0.15*ravdess + 0.15*crema - 0.05*min(σ,0.03) - 0.10*ece
+2026-05-08 10:21:25,757 | INFO | Test set evaluated every 5 trials (logged only, never optimised)
+2026-05-08 10:21:26,057 | INFO | Deleted existing study — starting fresh
+2026-05-08 10:57:39,084 | INFO | Loaded data — train_A: 6645  val_A: 1526  train_B: 9629  val_B: 2294  test: 2299
+2026-05-08 10:57:39,084 | INFO | Running 20 trials  (Phase A: 9 epochs, patience=4 | Phase B: 15 epochs, patience=5 | SWA tail: 2–6 epochs)
+2026-05-08 10:57:39,084 | INFO | Objective = 0.35*val_acc + 0.35*macro_f1 + 0.15*ravdess + 0.15*crema - 0.05*min(σ,0.03) - 0.10*ece
+2026-05-08 10:57:39,084 | INFO | Test set evaluated every 5 trials (logged only, never optimised)
+2026-05-08 10:57:39,374 | INFO | Resuming study — 4 trials already done
+2026-05-08 11:38:14,974 | INFO | 
+==================== BEST TRIAL ====================
+2026-05-08 11:38:14,975 | INFO | Composite score:  0.7722  (trial #1)
+2026-05-08 11:38:14,975 | INFO |   val_acc:        0.7768
+2026-05-08 11:38:14,975 | INFO |   macro_f1:       0.7774
+2026-05-08 11:38:14,975 | INFO |   ravdess_acc:    0.7821
+2026-05-08 11:38:14,975 | INFO |   crema_acc:      0.7715
+2026-05-08 11:38:14,975 | INFO |   ece:            0.0452  (penalty)
+2026-05-08 11:38:14,975 | INFO |   instability:    0.0057  (penalty, raw σ)
+2026-05-08 11:38:14,975 | INFO |   used_swa:       False  (n_averaged=3)
+2026-05-08 11:38:14,975 | INFO |   test_acc:       -1.0000  (logged only — not optimised)
+2026-05-08 11:38:14,975 | INFO | Best hyperparameters:
+2026-05-08 11:38:14,975 | INFO |   boost_angry: 1.339589
+2026-05-08 11:38:14,976 | INFO |   boost_fearful: 3.795351
+2026-05-08 11:38:14,976 | INFO |   boost_disgust: 1.193204
+2026-05-08 11:38:14,976 | INFO |   boost_happy: 1.331651
+2026-05-08 11:38:14,976 | INFO |   boost_sad: 3.425108
+2026-05-08 11:38:14,976 | INFO |   boost_neutral: 0.516430
+2026-05-08 11:38:14,976 | INFO |   sad_margin: 0.195831
+2026-05-08 11:38:14,976 | INFO |   disgust_margin: 0.166095
+2026-05-08 11:38:14,976 | INFO |   sad_sep_w: 0.036580
+2026-05-08 11:38:14,976 | INFO |   fear_sep_w: 0.030705
+2026-05-08 11:38:14,976 | INFO |   disgust_sep_w: 0.012242
+2026-05-08 11:38:14,976 | INFO |   lr_a: 0.000407
+2026-05-08 11:38:14,976 | INFO |   lr_b: 0.000378
+2026-05-08 11:38:14,976 | INFO |   label_smoothing: 0.081445
+2026-05-08 11:38:14,976 | INFO |   dropout: 0.263533
+2026-05-08 11:38:14,976 | INFO |   ravdess_weight_b: 1.064065
+2026-05-08 11:38:14,976 | INFO |   swa_tail: 3
+2026-05-08 11:38:14,979 | INFO | 
+Saved to /Users/anupamkumar/Desktop/meet/emotion_service/logs/best_hparams_ab.json
+2026-05-08 11:38:14,979 | INFO | 
+Top 5 trials (ranked by composite score):
+2026-05-08 11:38:14,979 | INFO |   Trial   1 | composite=0.7722 | val=0.7768  f1=0.7774  rav=0.7821  cre=0.7715  ece=0.0452  test=-1.0000  swa=False
+2026-05-08 11:38:14,979 | INFO |   Trial   4 | composite=0.7718 | val=0.7772  f1=0.7756  rav=0.7821  cre=0.7723  ece=0.0475  test=-1.0000  swa=False
+2026-05-08 11:38:14,979 | INFO |   Trial   5 | composite=0.7707 | val=0.7777  f1=0.7764  rav=0.7943  cre=0.7609  ece=0.0618  test=0.7273  swa=False
+2026-05-08 11:38:14,979 | INFO |   Trial   2 | composite=0.7704 | val=0.7764  f1=0.7760  rav=0.7865  cre=0.7662  ece=0.0558  test=-1.0000  swa=False
+2026-05-08 11:38:14,979 | INFO |   Trial   8 | composite=0.7609 | val=0.7668  f1=0.7661  rav=0.7726  cre=0.7609  ece=0.0557  test=-1.0000  swa=False
+2026-05-08 11:44:10,420 | INFO | Loaded data — train_A: 6645  val_A: 1526  train_B: 9629  val_B: 2294  test: 2299
+2026-05-08 11:44:10,420 | INFO | Running 40 trials  (Phase A: 9 epochs, patience=4 | Phase B: 15 epochs, patience=5 | SWA tail: 2–6 epochs)
+2026-05-08 11:44:10,420 | INFO | Objective = 0.35*val_acc + 0.35*macro_f1 + 0.15*ravdess + 0.15*crema - 0.05*min(σ,0.03) - 0.10*ece
+2026-05-08 11:44:10,420 | INFO | Test set evaluated every 5 trials (logged only, never optimised)
+2026-05-08 11:44:10,763 | INFO | Resuming study — 24 trials already done
+2026-05-08 12:16:40,650 | INFO | Loaded data — train_A: 6645  val_A: 1526  train_B: 9629  val_B: 2294  test: 2299
+2026-05-08 12:16:40,651 | INFO | Running 20 trials  (Phase A: 9 epochs, patience=4 | Phase B: 20 epochs, patience=6 | SWA tail: 2–7 epochs)
+2026-05-08 12:16:40,651 | INFO | Objective = 0.30*val_acc + 0.30*macro_f1 + 0.10*macro_recall + 0.15*ravdess + 0.15*crema - 0.05*min(σ,0.03) - 0.10*ece
+2026-05-08 12:16:40,651 | INFO | Test set evaluated every 5 trials (logged only, never optimised)
+2026-05-08 12:16:41,012 | INFO | Deleted existing study — starting fresh
+2026-05-08 14:37:04,299 | INFO | 
+==================== BEST TRIAL ====================
+2026-05-08 14:37:04,301 | INFO | Composite score:  0.7735  (trial #19)
+2026-05-08 14:37:04,301 | INFO |   val_acc:        0.7794
+2026-05-08 14:37:04,301 | INFO |   macro_f1:       0.7790
+2026-05-08 14:37:04,301 | INFO |   macro_recall:   0.7787
+2026-05-08 14:37:04,301 | INFO |   ravdess_acc:    0.7995
+2026-05-08 14:37:04,301 | INFO |   crema_acc:      0.7592
+2026-05-08 14:37:04,301 | INFO |   ece:            0.0552  (penalty)
+2026-05-08 14:37:04,301 | INFO |   instability:    0.0046  (penalty, raw σ)
+2026-05-08 14:37:04,301 | INFO |   used_swa:       False  (n_averaged=4  epochs_survived_b=20)
+2026-05-08 14:37:04,301 | INFO |   test_acc:       -1.0000  (logged only — not optimised)
+2026-05-08 14:37:04,301 | INFO | Best hyperparameters:
+2026-05-08 14:37:04,301 | INFO |   boost_angry: 1.053513
+2026-05-08 14:37:04,301 | INFO |   boost_fearful: 3.685075
+2026-05-08 14:37:04,302 | INFO |   boost_disgust: 1.859025
+2026-05-08 14:37:04,302 | INFO |   boost_happy: 1.376399
+2026-05-08 14:37:04,302 | INFO |   boost_sad: 3.492464
+2026-05-08 14:37:04,302 | INFO |   boost_neutral: 0.561607
+2026-05-08 14:37:04,302 | INFO |   sad_margin: 0.307365
+2026-05-08 14:37:04,302 | INFO |   disgust_margin: 0.162435
+2026-05-08 14:37:04,302 | INFO |   sad_sep_w: 0.065703
+2026-05-08 14:37:04,302 | INFO |   fear_sep_w: 0.020240
+2026-05-08 14:37:04,302 | INFO |   disgust_sep_w: 0.034217
+2026-05-08 14:37:04,302 | INFO |   lr_a: 0.000166
+2026-05-08 14:37:04,302 | INFO |   lr_b: 0.000250
+2026-05-08 14:37:04,302 | INFO |   label_smoothing: 0.077662
+2026-05-08 14:37:04,302 | INFO |   dropout: 0.151792
+2026-05-08 14:37:04,302 | INFO |   ravdess_weight_b: 1.932926
+2026-05-08 14:37:04,302 | INFO |   swa_tail: 4
+2026-05-08 14:37:04,302 | INFO |   mixup_alpha: 0.166792
+2026-05-08 14:37:04,302 | INFO |   mixup_prob: 0.220746
+2026-05-08 14:37:04,306 | INFO | 
+Saved to /Users/anupamkumar/Desktop/meet/emotion_service/logs/best_hparams_ab.json
+2026-05-08 14:37:04,306 | INFO | 
+Top 5 trials (ranked by composite score):
+2026-05-08 14:37:04,306 | INFO |   Trial  19 | composite=0.7735 | val=0.7794  f1=0.7790  rec=0.7787  rav=0.7995  cre=0.7592  ece=0.0552  test=-1.0000  swa=False  ep_b=20
+2026-05-08 14:37:04,306 | INFO |   Trial  14 | composite=0.7641 | val=0.7746  f1=0.7734  rec=0.7720  rav=0.7882  cre=0.7609  ece=0.0967  test=-1.0000  swa=False  ep_b=20
+2026-05-08 14:37:04,306 | INFO |   Trial   3 | composite=0.7632 | val=0.7681  f1=0.7682  rec=0.7683  rav=0.7778  cre=0.7583  ece=0.0478  test=-1.0000  swa=False  ep_b=20
+2026-05-08 14:37:04,306 | INFO |   Trial   1 | composite=0.7623 | val=0.7703  f1=0.7692  rec=0.7672  rav=0.7804  cre=0.7601  ece=0.0722  test=-1.0000  swa=False  ep_b=20
+2026-05-08 14:37:04,306 | INFO |   Trial   9 | composite=0.7619 | val=0.7668  f1=0.7659  rec=0.7659  rav=0.7847  cre=0.7487  ece=0.0432  test=-1.0000  swa=True  ep_b=17

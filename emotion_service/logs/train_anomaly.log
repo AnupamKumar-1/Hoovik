@@ -1,36 +1,54 @@
-2026-04-06 12:27:50,075 | INFO | Loading dataset from /Users/anupamkumar/Desktop/meet/emotion_service/extracted_dataset/dataset.npz
-2026-04-06 12:27:50,403 | INFO | Building features...
-2026-04-06 12:27:50,604 | INFO | Feature dim: 5255
-2026-04-06 12:27:50,604 | INFO | Fitting anomaly scaler...
-2026-04-06 12:27:50,833 | INFO | Training IsolationForest...
-2026-04-06 12:27:51,071 | INFO | Val score stats → mean=0.0398, std=0.0223
-2026-04-06 12:27:51,073 | INFO | Threshold @ FPR=10% → 0.01478 | overall flagged=10.07%
-2026-04-06 12:27:51,073 | INFO | Val anomaly rates by modality:
-2026-04-06 12:27:51,073 | INFO |   [audio_only  ] n= 384 | flagged=13.28%
-2026-04-06 12:27:51,073 | INFO |   [video_only  ] n= 383 | flagged=0.78%
-2026-04-06 12:27:51,073 | INFO |   [both        ] n= 385 | flagged=16.10%
-2026-04-06 12:27:51,377 | INFO | Anomaly detector ready
-2026-04-25 14:57:10,252 | INFO | Loading dataset from /Users/anupamkumar/Desktop/meet/emotion_service/extracted_dataset/dataset.npz
-2026-04-25 14:57:10,849 | INFO | Building features...
-2026-04-25 14:57:11,122 | INFO | Feature dim: 5255
-2026-04-25 14:57:11,122 | INFO | Fitting anomaly scaler...
-2026-04-25 14:57:11,282 | INFO | Training IsolationForest...
-2026-04-25 14:57:11,555 | INFO | Val score stats → mean=0.0398, std=0.0223
-2026-04-25 14:57:11,556 | INFO | Threshold @ FPR=10% → 0.01478 | overall flagged=10.07%
-2026-04-25 14:57:11,556 | INFO | Val anomaly rates by modality:
-2026-04-25 14:57:11,556 | INFO |   [audio_only  ] n= 384 | flagged=13.28%
-2026-04-25 14:57:11,556 | INFO |   [video_only  ] n= 383 | flagged=0.78%
-2026-04-25 14:57:11,556 | INFO |   [both        ] n= 385 | flagged=16.10%
-2026-04-25 14:57:12,943 | INFO | Anomaly detector ready
-2026-04-26 22:36:05,370 | INFO | Loading dataset from /Users/anupamkumar/Desktop/meet/emotion_service/extracted_dataset/dataset.npz
-2026-04-26 22:36:05,699 | INFO | Building features...
-2026-04-26 22:36:05,926 | INFO | Feature dim: 5255
-2026-04-26 22:36:05,926 | INFO | Fitting anomaly scaler...
-2026-04-26 22:36:06,194 | INFO | Training IsolationForest...
-2026-04-26 22:36:06,425 | INFO | Val score stats → mean=0.0398, std=0.0223
-2026-04-26 22:36:06,427 | INFO | Threshold @ FPR=10% → 0.01478 | overall flagged=10.07%
-2026-04-26 22:36:06,427 | INFO | Val anomaly rates by modality:
-2026-04-26 22:36:06,427 | INFO |   [audio_only  ] n= 384 | flagged=13.28%
-2026-04-26 22:36:06,427 | INFO |   [video_only  ] n= 383 | flagged=0.78%
-2026-04-26 22:36:06,427 | INFO |   [both        ] n= 385 | flagged=16.10%
-2026-04-26 22:36:07,020 | INFO | Anomaly detector ready
+
+2026-05-10 18:19:18,266 | INFO | Loading dataset from /Users/anupamkumar/Desktop/meet/emotion_service/extracted_dataset/dataset.npz
+2026-05-10 18:19:18,545 | INFO | Building anomaly features …
+2026-05-10 18:19:25,134 | INFO | Feature dim: 9452  (face_dim=326 audio_dim=1024)  |  train=9629  val=2294
+2026-05-10 18:19:38,843 | INFO | [global_fallback] PCA 9452→256  explained_var=0.772
+2026-05-10 18:19:39,016 | INFO | [global_fallback] threshold=0.04952 | val flagged=10.03%  (n_tr=9629 n_va=2294)
+2026-05-10 18:19:39,804 | INFO | ──── Modality: both | train=6645 val=1526 ────
+2026-05-10 18:19:51,313 | INFO | [both] PCA 9452→256  explained_var=0.688
+2026-05-10 18:19:51,630 | INFO | [both] threshold=0.05246 | val flagged=10.03%  (n_tr=6645 n_va=1526)
+2026-05-10 18:19:52,251 | INFO | both anomaly rates by class:
+2026-05-10 18:19:52,251 | INFO |   [angry           ] n= 259 | flagged=11.20%
+2026-05-10 18:19:52,251 | INFO |   [fearful         ] n= 227 | flagged=5.73%
+2026-05-10 18:19:52,251 | INFO |   [disgust         ] n= 259 | flagged=11.97%
+2026-05-10 18:19:52,251 | INFO |   [happy           ] n= 259 | flagged=15.06%
+2026-05-10 18:19:52,251 | INFO |   [sad             ] n= 259 | flagged=6.18%
+2026-05-10 18:19:52,251 | INFO |   [neutral/calm    ] n= 263 | flagged=9.51%
+2026-05-10 18:19:52,251 | INFO | both anomaly rates by source dataset:
+2026-05-10 18:19:52,251 | INFO |   [RAVDESS   ] n= 384 | flagged=27.08%
+2026-05-10 18:19:52,251 | INFO |   [CREMA-D   ] n=1142 | flagged=4.29%
+2026-05-10 18:19:52,252 | INFO | ──── Modality: audio_only | train=1492 val=384 ────
+2026-05-10 18:19:58,076 | INFO | [audio_only] PCA 9452→384  explained_var=0.813
+2026-05-10 18:19:58,364 | INFO | [audio_only] threshold=0.08837 | val flagged=10.16%  (n_tr=1492 n_va=384)
+2026-05-10 18:19:58,554 | INFO | audio_only anomaly rates by class:
+2026-05-10 18:19:58,554 | INFO |   [angry           ] n=  64 | flagged=7.81%
+2026-05-10 18:19:58,554 | INFO |   [fearful         ] n=  32 | flagged=12.50%
+2026-05-10 18:19:58,554 | INFO |   [disgust         ] n=  64 | flagged=15.62%
+2026-05-10 18:19:58,554 | INFO |   [happy           ] n=  64 | flagged=9.38%
+2026-05-10 18:19:58,554 | INFO |   [sad             ] n=  64 | flagged=12.50%
+2026-05-10 18:19:58,554 | INFO |   [neutral/calm    ] n=  96 | flagged=6.25%
+2026-05-10 18:19:58,554 | INFO | audio_only anomaly rates by source dataset:
+2026-05-10 18:19:58,554 | INFO |   [RAVDESS   ] n= 384 | flagged=10.16%
+2026-05-10 18:19:58,554 | INFO | ──── Modality: video_only | train=1492 val=384 ────
+2026-05-10 18:20:06,210 | INFO | [video_only] PCA 9452→64  explained_var=0.944
+2026-05-10 18:20:06,504 | WARNING | [video_only] threshold=-0.02637 is NEGATIVE — val scores are tightly clustered near zero; consider increasing PCA components for this modality or inspecting feature variance.
+2026-05-10 18:20:06,504 | WARNING | [video_only] Current pca_components=64. To fix: raise anomaly.pca_components.video_only in config.json (try doubling it).
+2026-05-10 18:20:06,504 | INFO | [video_only] threshold=-0.02637 | val flagged=10.16%  (n_tr=1492 n_va=384)
+2026-05-10 18:20:06,610 | INFO | video_only anomaly rates by class:
+2026-05-10 18:20:06,610 | INFO |   [angry           ] n=  64 | flagged=21.88%
+2026-05-10 18:20:06,610 | INFO |   [fearful         ] n=  32 | flagged=0.00%
+2026-05-10 18:20:06,611 | INFO |   [disgust         ] n=  64 | flagged=14.06%
+2026-05-10 18:20:06,611 | INFO |   [happy           ] n=  64 | flagged=18.75%
+2026-05-10 18:20:06,611 | INFO |   [sad             ] n=  64 | flagged=1.56%
+2026-05-10 18:20:06,611 | INFO |   [neutral/calm    ] n=  96 | flagged=3.12%
+2026-05-10 18:20:06,611 | INFO | video_only anomaly rates by source dataset:
+2026-05-10 18:20:06,611 | INFO |   [RAVDESS   ] n= 384 | flagged=10.16%
+2026-05-10 18:20:07,589 | INFO | Saved both → /Users/anupamkumar/Desktop/meet/emotion_service/models/anomaly/iso_both.joblib
+2026-05-10 18:20:07,652 | INFO | Saved audio_only → /Users/anupamkumar/Desktop/meet/emotion_service/models/anomaly/iso_audio_only.joblib
+2026-05-10 18:20:07,690 | INFO | Saved video_only → /Users/anupamkumar/Desktop/meet/emotion_service/models/anomaly/iso_video_only.joblib
+2026-05-10 18:20:07,745 | INFO | Anomaly detector saved to /Users/anupamkumar/Desktop/meet/emotion_service/models/anomaly
+2026-05-10 18:20:07,745 | INFO |   feature_version : v2.0-iqr-ratio-jitter
+2026-05-10 18:20:07,745 | INFO |   feature_dim     : 9452
+2026-05-10 18:20:07,745 | INFO |   feature_hash    : 5c0fef43
+2026-05-10 18:20:07,745 | INFO |   modality models : [2, 0, 1]
+2026-05-10 18:20:07,745 | INFO | DONE

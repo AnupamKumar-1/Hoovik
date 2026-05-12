@@ -1,6 +1,20 @@
 {
-  "w_modal": 0.45,
-  "w_xgb": 0.55,
-  "val_acc": 0.7682291666666666,
-  "test_acc": 0.7300347222222222
+  "w_modal": 0.455,
+  "w_xgb": 0.5449999999999999,
+  "temperature": 0.3,
+  "cal_acc": 0.7868352223190933,
+  "cal_bal_acc": 0.7849603933276913,
+  "n_samples_cal": 2294,
+  "test_acc": 0.7433666811657242,
+  "test_bal_acc": 0.7384399670376228,
+  "modal_only_acc": 0.7424967377120487,
+  "modal_only_bal_acc": 0.7378780236851131,
+  "xgb_only_acc": 0.6602870813397129,
+  "xgb_only_bal_acc": 0.6508331121874407,
+  "ensemble_delta": 0.0008699434536755257,
+  "n_samples_test": 2299,
+  "timestamp": "2026-05-08T16:59:33.586772+00:00",
+  "device": "mps",
+  "model_version": "1.0.0",
+  "seed": 42
 }
