@@ -1,313 +1,650 @@
 # SkyMeetAI
 
-<div align="center">
+> A distributed, full-stack video meeting platform combining WebRTC peer-to-peer media, real-time multimodal emotion inference, in-meeting chat, and asynchronous transcript analysis — implemented as four independently deployed services.
 
-![Node.js](https://img.shields.io/badge/Node.js-20-339933?style=flat-square&logo=nodedotjs&logoColor=white)
-![React](https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react&logoColor=black)
-![Python](https://img.shields.io/badge/Python-3.11-3776AB?style=flat-square&logo=python&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.135-009688?style=flat-square&logo=fastapi&logoColor=white)
-![PyTorch](https://img.shields.io/badge/PyTorch-2.1-EE4C2C?style=flat-square&logo=pytorch&logoColor=white)
-![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-47A248?style=flat-square&logo=mongodb&logoColor=white)
-![Redis](https://img.shields.io/badge/Redis-7-DC382D?style=flat-square&logo=redis&logoColor=white)
-![Socket.IO](https://img.shields.io/badge/Socket.IO-4-010101?style=flat-square&logo=socketdotio&logoColor=white)
-![AWS](https://img.shields.io/badge/AWS-EC2-FF9900?style=flat-square&logo=amazonaws&logoColor=white)
-![License](https://img.shields.io/badge/License-MIT-blue?style=flat-square)
+![CI](https://github.com/AnupamKumar-1/skymeetAI/actions/workflows/ci.yml/badge.svg)
 
-> Real-time collaboration platform with a custom WebRTC engine, in-browser voice activity detection, and self-hosted multimodal emotion AI — achieving ~1.2–1.7s end-to-end inference latency (compute-bound).
+SkyMeetAI was built from scratch to explore:
+- real-time communication systems,
+- distributed backend coordination,
+- browser media pipelines,
+- and multimodal ML inference.
 
-A distributed, latency-sensitive video conferencing system designed for real-time analytics.
-  - Decentralized P2P media (no SFU) for low-latency communication  
-  - Horizontally scalable signaling (Node.js + Redis + Nginx)  
-  - Self-hosted multimodal ML pipeline (Transformer + XGBoost)
-  
-[Live Demo](https://skymeetai.onrender.com) · [Report Bug](https://github.com/AnupamKumar-1/skymeetai/issues) · [Request Feature](https://github.com/AnupamKumar-1/skymeetai/issues)
+The platform includes:
+- a React/WebRTC frontend,
+- a multi-process Node.js + Socket.IO backend,
+- a Python emotion inference service,
+- and a Whisper-based transcription pipeline.
 
-</div>
+This repository documents the system at an implementation-grounded architectural level, including service boundaries, transport contracts, runtime behaviour, and operational limitations.
 
 ---
 
-## System Overview
+## Table of Contents
 
-> Designed for real-world conditions: unstable networks, packet loss, and cross-browser inconsistencies.
-
-Most video conferencing tools tell you *what* was said. SkyMeetAI reveals *how people felt* while saying it.
-
-SkyMeetAI is a distributed video conferencing system combining WebRTC mesh networking with a custom multimodal emotion recognition pipeline.
-
-Unlike most systems, SkyMeetAI does not rely on external AI APIs — all emotion inference is performed using self-hosted models. This enables meeting hosts to understand participant engagement, sentiment shifts, and emotional dynamics in real time — something traditional conferencing tools lack.
-
-The system consists of four independent services: a React frontend (Render), a Node.js signaling backend, an Emotion Service, and a Transcript Service. All backend services run on AWS EC2.
-
-> Real-time pipelines use WebSocket streaming, while post-processing pipelines use HTTP-based batch workflows.
-
----
-
-## Why SkyMeetAI?
-
-Most video conferencing platforms optimize for communication — not understanding.
-
-SkyMeetAI is built to answer a deeper question:
-
-> "What is the emotional state of a meeting in real-time?"
-
-This unlocks:
-- Better remote collaboration (detect disengagement early)
-- Data-driven meeting insights (emotion trends over time)
-- Applications in hiring, education, and team analytics
-
-### When to Use SkyMeetAI
-
-- Small group meetings (≤6 participants) where low latency matters
-- Scenarios requiring real-time behavioral insights (interviews, classrooms, team syncs)
-- Systems where self-hosted AI and data privacy are required
+1. [Key Technical Highlights](#key-technical-highlights)
+2. [Overview](#overview)
+3. [Repository Structure](#repository-structure)
+4. [System Architecture](#system-architecture)
+5. [Subsystems](#subsystems)
+6. [End-to-End Runtime Flow](#end-to-end-runtime-flow)
+7. [Deployment Topology](#deployment-topology)
+8. [Configuration](#configuration)
+9. [Running the System](#running-the-system)
+10. [Inter-Service Contracts](#inter-service-contracts)
+11. [Engineering Challenges](#engineering-challenges)
+12. [Operational Notes](#operational-notes)
+13. [Known Limitations](#known-limitations)
+14. [Contributing](#contributing)
+15. [License](#license)
+16. [Documentation](#documentation)
 
 ---
 
-## Key Highlights
+## Key Technical Highlights
 
-- P2P WebRTC mesh architecture (serverless media path, TURN relay only when required)
-- Real-time in-meeting chat with optimistic UI, ACK-based delivery, retry mechanism, and persistence
-- Real-time emotion inference (video-first, multimodal, extensible architecture)
-- Custom ML pipeline (Transformer + XGBoost ensemble + IsolationForest) — **73.0% test accuracy**
-- Sliding window temporal modeling (8-frame sequence per inference)
-- Speaker-attributed transcription using Whisper with per-segment emotion tagging
-- Horizontally scalable signaling layer (Node.js + Redis pub/sub, 3 PM2 instances)
-- Latency-first design: inference always runs on freshest frame via overwrite buffer (no queue buildup)
-- Fault-tolerant architecture with automatic reconnection and graceful degradation
-- Idempotent event handling and retry-safe messaging across reconnects
+These are the non-trivial engineering decisions made across the stack, grounded in the implemented code.
 
----
-
-## Core Engineering Highlights
-
-- In-browser Voice Activity Detection (RMS + noise gating + speech qualification)
-- WebRTC Perfect Negotiation (collision-safe multi-peer signaling)
-- Stateful meeting engine with reconnection + lifecycle recovery
-- Idempotent real-time messaging (ACK + retry + deduplication)
-- Bounded-latency streaming via overwrite buffer (O(1) memory)
-- Capability-based host authorization (no session dependency)
-- Distributed Redis lock on room join (Lua CAS script) — prevents race conditions
-- Dual-path emotion ingestion (direct WebSocket + backend proxy fallback)
+| Area | What was built |
+|---|---|
+| **WebRTC signalling** | Full SDP/ICE relay over Socket.IO with Redis-adapter fan-out across three pm2 processes; distributed join lock (Redis `SET NX PX`) prevents race conditions when multiple participants join simultaneously |
+| **Multimodal emotion inference** | Per-participant ensemble pipeline: MediaPipe face landmarks + Wav2Vec2 audio embeddings → custom `EmotionTransformer` (PyTorch) + XGBoost → EMA smoothing + modality-stratified anomaly detection; served over Socket.IO with server-side backpressure signalling; live per-modality latency percentiles exposed at `GET /stats` and `GET /stats/json` |
+| **Browser media pipeline** | `AudioWorklet` + `AnalyserNode` for RMS-gated noise detection; `MediaRecorder` per participant for post-meeting audio; `RTCPeerConnection` lifecycle managed per remote peer in React; JPEG frames captured from `<video>` elements at self-throttled rates |
+| **Asynchronous transcript pipeline** | HTTP 202 accepted immediately; background FastAPI task runs ffmpeg → Whisper (`small`) → DistilRoBERTa per-segment emotion → multi-speaker segment merge → HTTP POST callback to backend |
+| **Multi-process backend** | Three pm2 instances on separate ports, unified by `@socket.io/redis-adapter` pub/sub; all room state externalised to Redis so no instance holds authoritative in-process state |
+| **Rate limiting and account locking** | Per-IP and per-user rate limiting via Redis counters; account lock after `ACCOUNT_LOCK_THRESHOLD` consecutive failed logins with a fixed TTL (`ACCOUNT_LOCK_SEC`, default 900 s) implemented in the auth layer |
+| **Chat with client-side ACK timeout** | Backend appends sanitised messages to MongoDB (capped at 500), broadcasts, and emits `chat-ack`; client marks message failed after 5 000 ms with no acknowledgement |
+| **Load testing** | Locust-based WebSocket stress tests in `load_testing/locustfile.py`; participant face images placed in `load_testing/src/*.jpg`; run against the emotion service at `http://localhost:5002` |
 
 ---
 
-## Product Overview
+## Overview
 
-A real-time meeting where **emotion, speech, and interaction are analyzed live and post-call**.
+SkyMeetAI is composed of four services, each with its own runtime, dependency graph, and configuration:
 
----
+| Service | Runtime | Primary Role |
+|---|---|---|
+| **Frontend** | React SPA (browser) | UI, WebRTC peer management, emotion capture, chat |
+| **Backend** | Node.js / Express + Socket.IO | Signalling, auth, room management, transcript storage |
+| **Emotion Service** | Python / FastAPI + Socket.IO | Real-time multimodal emotion inference |
+| **Transcription Service** | Python / FastAPI | Post-meeting ASR, per-segment emotion, transcript delivery |
 
-## Screenshots
+### Transport map
 
-### Real-time Emotion Analysis
+- **WebRTC** (browser-to-browser, negotiated via backend) — live audio/video media between participants. The backend acts only as a signalling relay; media is never proxied through it.
+- **Socket.IO over WebSocket** (frontend ↔ backend) — signalling (SDP/ICE relay), chat, participant state, room lifecycle events.
+- **Socket.IO over WebSocket** (frontend ↔ emotion service) — continuous `emotion.frame` (JPEG) and `audio_chunk` (Float32 PCM) upload per remote participant; `emotion.result` events returned per inference cycle.
+- **HTTP multipart POST** (frontend → transcription service) — audio blob upload after a meeting ends; results are delivered asynchronously via an HTTP callback to the backend.
+- **HTTP REST** (frontend ↔ backend) — authentication, room creation, transcript retrieval, meeting history.
 
-![Emotion Analysis](docs/screenshots/emotion-panel.jpeg)
-
-> Real-time emotion inference with per-participant tracking and group mood aggregation
-
----
-
-### Meeting Interface
-
-![Meeting Room](docs/screenshots/meeting-room.jpeg)
-
-> Low-latency WebRTC mesh with in-meeting controls, chat, and media orchestration
-
----
-
-### Transcript & Post-Meeting Insights
-
-![Transcripts](docs/screenshots/transcripts.jpeg)
-
-> Speaker-attributed transcripts enriched with segment-level emotion classification
+The backend exposes both a REST API and a Socket.IO namespace on the same HTTP server. The emotion service and transcription service are separate processes with no shared memory or file system with the backend.
 
 ---
 
-## Architecture
+## Repository Structure
 
-```
-+-----------------------------------------------------------------------------------+
-|                              CLIENT (React 18)                                    |
-|-----------------------------------------------------------------------------------|
-|  WebRTC Mesh (P2P)  |  Socket.IO (Signaling + Chat)  |  REST API  |  Emotion WS   |
-+----------+-----------+-----------+-----------+-----------+-----------+------------+
-           |                       |                       |           |
-           v                       v                       v           v
+```mermaid
+graph LR
+    Root["skymeetai/"]
+    FE["frontend/\nReact SPA"]
+    BE["backend/\nNode.js · Express · Socket.IO"]
+    EM["emotion_service/\nPython · FastAPI · PyTorch"]
+    TR["transcription_service/\nPython · FastAPI · Whisper"]
+    LT["load_testing/\nLocust WebSocket tests"]
+    LF["locustfile.py"]
+    SR["src/\nParticipant face images"]
+    DO["docs/"]
+    FD["frontend.md"]
+    BD["backend.md"]
+    ED["emotion-service.md"]
+    TD["transcription-service.md"]
 
-   P2P Media (Direct)     +-------------------------------+    +-------------------------------+
-   (No server in path)    |       Node.js Backend         |    |        Emotion Service        |
-                          |  Express + Socket.IO          |    |      FastAPI + ASGI           |
-                          |                               |    |                               |
-                          |  - Stateless (Redis-backed)   |    |  - WebSocket Ingest           |
-                          |  - 3 PM2 Instances            |    |  - Frame Pump                 |
-                          |    (8000 / 8001 / 8002)       |    |  - Overwrite buffer           |
-                          |  - Nginx Load Balancer        |    |    (latest-frame only)        |
-                          |                               |    |  - Frame skip (7x)            |
-                          |  - Signaling (SDP/ICE relay)  |    |  - Sequence buffer            |
-                          |                               |    |    (8-frame sliding window)   |
-                          |  - Chat (Socket.IO)           |    |                               |
-                          |     • ACK + retry             |    |  - PyFeat (face)              |
-                          |     • Rate limiting (Redis)   |    |  - Transformer                |
-                          |     • Deduplication           |    |  - XGBoost                    |
-                          |     • MongoDB persistence     |    +-------------------------------+
-                          |                               |
-                          |  - Transcript Proxy           |
-                          |  - Redis Pub/Sub              |
-                          |  - WS Proxy (/emotion-socket) |
-                          +---------------+---------------+
-                                          |
-                                          | HTTP (POST /process_meeting)
-                                          v
-                          +-----------------------------------------------+
-                          |            Transcript Service                 |
-                          |            FastAPI (stateless)                |
-                          |                                               |
-                          |  - Whisper ASR                                |
-                          |  - DistilRoBERTa Emotion NLP                  |
-                          |  - Speaker-attributed merging                 |
-                          |  - Segment-level filtering                    |
-                          +----------------------+------------------------+
-                                                 |
-                                                 | POST /api/v1/transcripts
-                                                 v
-                          +-----------------------------------------------+
-                          |                 MongoDB                        |
-                          |   meetings + chat + history + transcripts     |
-                          +-----------------------------------------------+
+    Root --> FE & BE & EM & TR & LT & DO
+    LT --> LF & SR
+    DO --> FD & BD & ED & TD
 ```
 
-Emotion inference supports dual ingestion paths:
-- Direct client → Emotion Service WebSocket (primary, low latency)
-- Client → Node.js → Emotion Service proxy (fallback, controlled routing)
+Each subsystem is self-contained with its own dependency manifest, configuration, and README.
 
 ---
 
-## Performance
+## System Architecture
 
-> Metrics collected using high-resolution timers across AWS EC2 and macOS (M1).
+### Component Interaction
 
-### Core Latency
+```mermaid
+graph TD
+    Browser["Browser\n(React SPA)"]
 
-| Metric | Value |
-|--------|-------|
-| WebRTC signaling latency | ~0.02–4.3 ms |
-| Room join latency (client-perceived) | ~65–420 ms |
-| Capture → inference → emit (steady-state) | ~1.2–1.7 s |
-| Cold start latency | up to ~4–5 s |
+    subgraph Backend ["Backend — Node.js (pm2: ports 8000–8002)"]
+        SIO_B["Socket.IO\nsignalling · chat · room state"]
+        REST["REST API\n/api/v1/..."]
+    end
 
-### Emotion Pipeline Breakdown
+    subgraph EmotionSvc ["Emotion Service — Python (port 5002)"]
+        SIO_E["Socket.IO\nper-participant inference"]
+    end
 
-| Stage | Latency |
-|-------|---------|
-| Frame decode | ~1–5 ms |
-| Face detection + feature extraction | ~1.1–1.7 s |
-| Model inference | ~5–20 ms |
+    subgraph TranscriptSvc ["Transcription Service — Python (port 5001)"]
+        HTTP_T["POST /process_meeting\n→ HTTP 202"]
+    end
 
-> Feature extraction accounts for >95% of pipeline latency. The system is compute-bound — GPU deployment would reduce end-to-end latency significantly.
+    subgraph Persistence
+        Mongo[("MongoDB\npersistent state")]
+        Redis[("Redis\nephemeral + lock + pub/sub")]
+    end
 
-### Key Properties
+    Browser -- "WebRTC (media, peer-to-peer)" --> Browser
+    Browser -- "Socket.IO (signalling · chat)" --> SIO_B
+    Browser -- "REST (auth · rooms · transcripts)" --> REST
+    Browser -- "Socket.IO (frames · audio · emotion.result)" --> SIO_E
+    Browser -- "HTTP multipart (audio blobs)" --> HTTP_T
 
-- **O(1) memory** per participant (overwrite buffer, no queue)
-- Latency **stays stable** under high frame rates — does not grow with input rate
-- **8-frame sliding window** for temporal consistency
+    SIO_B --> Redis
+    REST --> Mongo
+    REST --> Redis
+    SIO_B --> Mongo
+
+    HTTP_T -- "HTTP POST callback" --> REST
+
+    Redis -- "pub/sub adapter" --> SIO_B
+```
+
+### State Classification
+
+| Store | What lives there |
+|---|---|
+| **MongoDB** | Users, rooms, meetings, chat history (capped at 500 messages), transcripts |
+| **Redis** | Per-room participant maps, socket-ID arrays, distributed join locks, rate limit counters, account lock flags, transcript/user/history caches (TTL-bounded) |
+| **In-process (Backend)** | None — room state is externalised to Redis to support multi-process Socket.IO fan-out |
+| **In-process (Emotion Service)** | Per-participant audio/video embedding buffers, EMA state, pump coroutine handles — not shared across instances |
+| **Browser localStorage** | JWT, `host:<code>` secret, meeting history fallback |
 
 ---
 
-## Tradeoffs & Limitations
+## Subsystems
 
-- **WebRTC Mesh (O(N²))** — limits scalability to 4–6 participants; chosen for simplicity and low latency
-- **Video-first real-time inference** — audio excluded at runtime due to latency constraints; full multimodal available in batch only
-- **CPU-based inference** — ~1.2–1.7s per frame; GPU deployment would significantly reduce latency
-- **Emotion accuracy (~73.0% test)** — limited by RAVDESS dataset size; real-world performance may vary under noise
+### Frontend
+
+**Responsibility**: Renders the meeting UI; manages local media via `getUserMedia`; negotiates WebRTC peer connections for all remote participants; streams video frames and audio to the emotion service; handles in-meeting chat; records participant audio for post-meeting transcription; submits recorded blobs to the transcription service after the host ends the meeting.
+
+**Key technologies**: React, React Router, WebRTC (`RTCPeerConnection`), Web Audio API (`AudioWorklet`, `AnalyserNode`), `MediaRecorder`, Socket.IO client.
+
+**Protocols used**: Socket.IO (signalling and emotion service), WebRTC (peer media), HTTP multipart POST (transcript upload), HTTP REST (auth, room/transcript API).
+
+**See**: [`docs/frontend.md`](docs/frontend.md)
 
 ---
 
+### Backend
 
+**Responsibility**: Authenticates users (JWT via `passport-jwt`); manages meeting room lifecycle; relays WebRTC signalling (SDP/ICE) between peers; delivers and persists chat; stores and retrieves transcripts; proxies transcript upload requests to the transcription service.
 
-## Quick Start
+**Key technologies**: Node.js, Express, Socket.IO with `@socket.io/redis-adapter`, Mongoose (MongoDB), `redis` v5, `passport-jwt`, pm2.
 
-**Prerequisites:** Node.js 20, Python 3.11, MongoDB, Redis 7, ffmpeg
+**Protocols used**: Socket.IO (browser signalling, chat, participant state), HTTP REST (auth, rooms, transcripts, meetings), HTTP proxy (transcript service forwarding via `Ts_SERVICE_URL`).
+
+**See**: [`docs/backend.md`](docs/backend.md)
+
+---
+
+### Emotion Service
+
+**Responsibility**: Accepts a per-participant Socket.IO connection from the browser host; decodes incoming JPEG video frames and PCM audio chunks; runs face landmark extraction (MediaPipe) and audio embedding (Wav2Vec2); performs ensemble inference (EmotionTransformer + XGBoost) with EMA smoothing and modality-stratified anomaly detection; emits `emotion.result` events back to the client. Exposes live inference latency telemetry via HTTP.
+
+**Key technologies**: Python, FastAPI, Socket.IO (python-socketio), PyTorch (`EmotionTransformer`), XGBoost, MediaPipe, HuggingFace `wav2vec2-large-robust`, APScheduler, uvicorn.
+
+**Protocols used**: Socket.IO — client sends `emotion.frame`, `audio_chunk`, `participant.media_state`; service returns `emotion.result`, `backpressure`, `server.status`. HTTP GET — `GET /stats` (HTML dashboard), `GET /stats/json` (programmatic snapshot).
+
+**Observed inference latency**: median 300–500 ms at 10 concurrent participants (runtime log, 2026-05-07); hardware-dependent. Live per-modality percentiles (P50/P90/P95) are visible at `/stats` while the server is running.
+
+**See**: [`docs/emotion-service.md`](docs/emotion-service.md)
+
+---
+
+### Transcription Service
+
+**Responsibility**: Accepts a multipart audio upload after a meeting ends; converts audio to mono 16 kHz WAV via ffmpeg; runs OpenAI Whisper (`small`) for speech-to-text; classifies per-segment emotion using `j-hartmann/emotion-english-distilroberta-base`; merges and sorts segments across speakers; delivers the structured transcript JSON to the backend via an HTTP POST callback.
+
+**Key technologies**: Python, FastAPI, OpenAI Whisper, HuggingFace Transformers (DistilRoBERTa), ffmpeg, uvicorn.
+
+**Protocols used**: HTTP multipart POST (`POST /process_meeting`, returns HTTP 202 immediately); HTTP POST callback to `NODE_API` — asynchronous, no retry.
+
+**See**: [`docs/transcription-service.md`](docs/transcription-service.md)
+
+---
+
+## End-to-End Runtime Flow
+
+```mermaid
+sequenceDiagram
+    participant FE as Browser (Frontend)
+    participant BE as Backend (Socket.IO + REST)
+    participant RD as Redis
+    participant MG as MongoDB
+    participant EM as Emotion Service
+    participant TS as Transcription Service
+
+    Note over FE,BE: 1 — Room Creation
+    FE->>BE: POST /api/v1/users/login
+    BE-->>FE: JWT
+    FE->>BE: POST /api/v1/rooms
+    BE-->>FE: meetingCode + hostSecret (raw, once)
+    Note over FE: stores host:<code> in localStorage
+
+    Note over FE,RD: 2 — Join and WebRTC Signalling
+    FE->>BE: emit join-call (meetingCode, meta)
+    BE->>RD: acquire room lock (SET NX PX 10000)
+    BE->>MG: findMeetingByCode / addParticipant
+    BE->>RD: setParticipants / setState
+    BE-->>FE: existing-participants, assigned-role, chat-history
+    BE-->>FE: broadcast user-joined to room
+    RD-->>BE: release lock (Lua CAS)
+    FE->>FE: create RTCPeerConnection per peer
+    FE->>BE: emit signal (SDP offer / ICE candidates)
+    BE-->>FE: emit signal to target peer
+    FE->>FE: WebRTC media (peer-to-peer, no server relay)
+
+    Note over FE,EM: 3 — Emotion Streaming (host only, per remote participant)
+    FE->>EM: connect Socket.IO (auth: participantId)
+    loop per inference cycle (~300–500 ms observed)
+        FE->>EM: emotion.frame (JPEG ≤4 MB)
+        FE->>EM: audio_chunk (Float32 PCM 16 kHz ≤2 MB)
+        EM-->>FE: emotion.result (label, score, probs, anomaly)
+        EM-->>FE: backpressure (if face queue depth ≥ 3)
+    end
+
+    Note over FE,BE: 4 — Chat
+    FE->>BE: emit chat-message (roomId, msg, ackCallback)
+    BE->>MG: addChatMessage (capped at 500)
+    BE-->>FE: broadcast chat-message to room
+    BE-->>FE: emit chat-ack to sender
+    Note over FE: times out message as failed after 5000 ms with no ACK
+
+    Note over FE: 5 — Recording (host, in-memory)
+    FE->>FE: MediaRecorder per participant (RMS noise gate)
+
+    Note over FE,TS: 6 — Transcript Upload (after host ends meeting)
+    FE->>BE: emit end-meeting
+    Note over BE: No server-side relay handler exists; non-host clients receive end-meeting via useSocket.js client-side handling
+    FE->>TS: POST /process_meeting (multipart audio blobs, x-host-secret)
+    TS-->>FE: HTTP 202 (processing started)
+
+    Note over TS,MG: 7 — Transcript Persistence and Display (asynchronous)
+    TS->>TS: ffmpeg convert → Whisper ASR → DistilRoBERTa emotion
+    TS->>BE: POST NODE_API /api/v1/transcripts (no retry)
+    BE->>MG: upsert transcript
+    BE->>RD: cache transcript (TTL 300 s)
+    loop poll every 20 s (max 30 attempts)
+        FE->>BE: GET /api/v1/transcripts
+        BE-->>FE: transcript list
+    end
+    FE->>FE: render via TranscriptViewer
+```
+
+---
+
+## Deployment Topology
+
+The four services are deployed as separate processes with no shared runtime. A reverse proxy or load balancer (not included in this repository) is required to route traffic to the correct service.
+
+```mermaid
+graph TD
+    FE["Frontend SPA\n(static host / CDN)"]
+    LB["Reverse Proxy / Load Balancer\n(not included in repository)\nsticky-session required"]
+
+    subgraph BackendCluster ["Backend — Node.js pm2"]
+        B0["meet-8000 :8000\n512 MiB max RSS"]
+        B1["meet-8001 :8001\n512 MiB max RSS"]
+        B2["meet-8002 :8002\n512 MiB max RSS"]
+    end
+
+    subgraph PythonServices ["Python Services — uvicorn"]
+        ES["Emotion Service\n:5002 — single process"]
+        TS["Transcription Service\n:5001 — single process"]
+    end
+
+    subgraph DataStores ["Data Stores"]
+        Mongo[("MongoDB\npersistent state")]
+        Redis[("Redis\nephemeral · locks · pub/sub")]
+    end
+
+    FE -->|"HTTP / WebSocket"| LB
+    LB --> B0 & B1 & B2
+    FE -->|"Socket.IO direct"| ES
+    FE -->|"HTTP multipart direct"| TS
+
+    B0 & B1 & B2 --> Mongo
+    B0 & B1 & B2 --> Redis
+    Redis -->|"pub/sub adapter"| B0 & B1 & B2
+
+    TS -->|"HTTP POST callback"| LB
+```
+
+- **Frontend**: Static SPA built with `react-scripts build`. Served by any static file host or CDN. Connects to all three backend services via environment-variable-configured URLs.
+- **Backend**: Three pm2 instances (`meet-8000`, `meet-8001`, `meet-8002`) defined in `ecosystem.config.cjs`, each binding a distinct port. Socket.IO events are fanned out across processes via the Redis adapter. Each process is configured with a 512 MiB `max_memory_restart` threshold and exponential-backoff restart delay. An external reverse proxy with sticky-session support is required.
+- **Emotion Service**: Single uvicorn process on port 5002. Participant state (embedding buffers, pump handles, EMA) is held in in-process Python dicts; no horizontal scaling is implemented.
+- **Transcription Service**: Single uvicorn process on port 5001. Whisper and DistilRoBERTa models are loaded as module-level singletons at startup. File uploads are written to a local `uploads/` directory and deleted after 120 seconds.
+- **MongoDB**: Required before any backend process starts; connection failure causes `process.exit(1)`.
+- **Redis**: Required before any backend process starts; connection failure causes `process.exit(1)`. Used for Socket.IO adapter pub/sub, room state, distributed locks, rate limiting, and TTL caches.
+
+Docker, Kubernetes, and cloud-native autoscaling are not currently implemented or configured in any subsystem.
+
+---
+
+## Configuration
+
+Each subsystem is configured independently. Only high-level categories are listed here; refer to subsystem documentation for the full variable tables.
+
+### Frontend environment variables
+
+Configured via `.env` files (standard Create React App convention):
+
+| Variable | Purpose |
+|---|---|
+| `REACT_APP_SIGNALING_URL` | Backend Socket.IO and REST base URL (default: `localhost:8000`) |
+| `REACT_APP_EMOTION_SOCKET_URL` | Emotion service Socket.IO URL |
+| `REACT_APP_TRANSCRIPT_URL` | Transcription service base URL (default: `localhost:5001`) |
+
+TURN credentials are currently hardcoded in `meetConfig.js` (`openrelayproject`). Dynamic provisioning is not implemented.
+
+### Backend environment variables
+
+| Variable | Notes |
+|---|---|
+| `MONGO_URI` | Required; no default |
+| `JWT_SECRET` | Required; warned if shorter than 32 characters |
+| `REDIS_URL` | Defaults to `redis://localhost:6379` |
+| `PORT` | Per-process port; set by pm2 `ecosystem.config.cjs` |
+| `Ts_SERVICE_URL` | Upstream URL for the transcript proxy route |
+
+See [`docs/backend.md`](docs/backend.md) for the full table including cache TTLs, rate limit parameters, and lock configuration.
+
+### Emotion service configuration
+
+Configuration is read from `emotion_service/config/config.json` (model paths, sequence length, EMA alpha, rate-limit interval) and is not driven by environment variables. CORS is currently set to `cors_allowed_origins="*"` and must be restricted before exposing the service externally.
+
+See [`docs/emotion-service.md`](docs/emotion-service.md) for the full config schema.
+
+### Transcription service environment variables
+
+| Variable | Default | Notes |
+|---|---|---|
+| `NODE_API` | `http://localhost:8000/api/v1/transcripts` | Backend callback URL |
+| `ALLOWED_ORIGINS` | `""` (no origins) | Comma-separated CORS allowlist |
+
+See [`docs/transcription-service.md`](docs/transcription-service.md) for runtime path constants.
+
+---
+
+## Running the System
+
+Start services in this order. Later services depend on earlier ones being reachable.
+
+```mermaid
+flowchart LR
+    S1["1. MongoDB\n+ Redis"]
+    S2["2. Backend\npm2 start ecosystem.config.cjs"]
+    S3["3. Emotion Service\nuvicorn app:app --port 5002"]
+    S4["4. Transcription Service\nuvicorn app:app --port 5001"]
+    S5["5. Frontend\nnpm start / npm run build"]
+
+    S1 --> S2 --> S3 --> S4 --> S5
+```
+
+### 1. MongoDB and Redis
+
+Start both before any other service. The backend will `process.exit(1)` if either is unreachable at startup.
 
 ```bash
-git clone https://github.com/AnupamKumar-1/skymeetai.git
-cd skymeetai
+mongod --dbpath /data/db
+redis-server
 ```
 
-**Backend:**
+### 2. Backend
+
 ```bash
 cd backend
-cp .env.example .env
 npm install
-npm run dev
+pm2 start ecosystem.config.cjs
 ```
 
-**Frontend:**
+Single-process development:
+
 ```bash
-cd frontend
-cp .env.example .env
-npm install
-npm start
+PORT=8000 node src/app.js
 ```
 
-**Emotion Service:**
+See [`docs/backend.md`](docs/backend.md) for full pm2 lifecycle commands and configuration.
+
+### 3. Emotion Service
+
 ```bash
 cd emotion_service
-python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-uvicorn app:app --host 0.0.0.0 --port 5002 --reload
+uvicorn app:app --host 0.0.0.0 --port 5002
 ```
 
-**Transcript Service:**
+Trained model files (`best_modal.pt`, `xgb_model.joblib`, `weights.json`, anomaly detectors) must be present under `models/` before starting. If any model fails to load, the server refuses to start. See [`docs/emotion-service.md`](docs/emotion-service.md) for the training pipeline.
+
+### 4. Transcription Service
+
 ```bash
-cd transcript_service
-python -m venv venv && source venv/bin/activate
+cd transcription_service
 pip install -r requirements.txt
-uvicorn app:app --host 0.0.0.0 --port 5001 --reload
+uvicorn app:app --host 0.0.0.0 --port 5001
+```
+
+Note: the `uvicorn.run` call inside `app.py` references `"main:app"`; invoke via `uvicorn app:app` directly rather than `python app.py`. Whisper and DistilRoBERTa models are downloaded from HuggingFace on first run if not cached. `ffmpeg` must be available in `PATH`.
+
+### 5. Frontend
+
+```bash
+cd frontend
+npm install
+npm start          # development
+npm run build      # production build
+```
+
+Ensure `.env` variables point to the correct backend, emotion service, and transcription service URLs before building.
+
+---
+
+## Inter-Service Contracts
+
+### Signalling — Frontend ↔ Backend (Socket.IO)
+
+```mermaid
+flowchart LR
+    subgraph ClientEmits ["Client → Backend"]
+        CE1["join-call"]
+        CE2["leave-call"]
+        CE3["end-meeting"]
+        CE4["signal (SDP/ICE relay)"]
+        CE5["chat-message"]
+        CE6["update-participant-state"]
+        CE7["declare-host"]
+    end
+
+    subgraph ServerEmits ["Backend → Client"]
+        SE1["existing-participants"]
+        SE2["user-joined / user-left"]
+        SE3["participants-updated (debounced 150 ms)"]
+        SE4["signal (forwarded)"]
+        SE5["chat-message / chat-ack / chat-history"]
+        SE6["end-meeting"]
+        SE7["error"]
+    end
+```
+
+See [`docs/frontend.md`](docs/frontend.md) and [`docs/backend.md`](docs/backend.md) for full event payload schemas.
+
+### Emotion Inference — Frontend ↔ Emotion Service (Socket.IO)
+
+```mermaid
+flowchart LR
+    subgraph ClientEmits ["Client → Emotion Service (per participant)"]
+        EF["emotion.frame\nJPEG ≤4 MB"]
+        AC["audio_chunk\nFloat32 PCM 16 kHz ≤2 MB"]
+        MS["participant.media_state\nmic/camera toggle"]
+    end
+
+    subgraph ServiceEmits ["Emotion Service → Client"]
+        ER["emotion.result\n{participantId, label, score, probs, anomaly}"]
+        BP["backpressure\nface queue depth ≥ 3"]
+        SS["server.status\ntarget FPS hint"]
+        EE["emotion.error"]
+    end
+```
+
+### Transcript Upload — Frontend → Transcription Service (HTTP)
+
+```mermaid
+flowchart LR
+    FE["Frontend (host)"]
+    TS["POST /process_meeting\nmultipart/form-data"]
+    R202["HTTP 202\nProcessing started"]
+    BG["Background task\nffmpeg → Whisper → DistilRoBERTa"]
+
+    FE -->|"audio blobs · meeting_code\nspeaker_map · x-host-secret\nx-user-token"| TS
+    TS --> R202
+    TS --> BG
+```
+
+### Transcript Persistence — Transcription Service → Backend (HTTP)
+
+```mermaid
+flowchart LR
+    TS["Transcription Service\n(background task)"]
+    BE["POST /api/v1/transcripts\n(NODE_API)"]
+    MG[("MongoDB")]
+    RD[("Redis cache\nTTL 300 s")]
+
+    TS -->|"meetingCode · transcriptText · metadata"| BE
+    BE --> MG
+    BE --> RD
 ```
 
 ---
 
-## Documentation
+## Engineering Challenges
 
-### 1. System Overview
-| Doc | Description |
-|-----|-------------|
-| [Architecture](docs/architecture.md) | High-level system design, services, infrastructure, deployment |
-| [Data Flow](docs/data-flow.md) | End-to-end flow: room join, signaling, chat, emotion, transcripts |
+This section documents the concrete technical problems encountered during development and how they were addressed. These decisions are reflected in the current implementation.
+
+### 1. Multi-process Socket.IO without sticky routing
+
+Running three pm2 processes on separate ports means a Socket.IO client connecting to one process cannot receive events emitted by another. The solution is `@socket.io/redis-adapter`, which uses Redis pub/sub to fan events across all instances. Room state (participant maps, socket-ID arrays) is stored entirely in Redis so any process can read and write authoritative state. No instance holds room state in process memory.
+
+The remaining constraint: a reverse proxy must provide sticky sessions so that the Socket.IO handshake and subsequent requests from the same client land on the same process. This is not enforced by the application; it is a deployment requirement.
+
+### 2. Concurrent join race conditions
+
+When multiple participants join a room at the same time, each backend process reads, modifies, and writes the participant list to Redis. Without coordination this produces lost updates. The implementation uses a Redis distributed lock: `SET NX PX 10000` acquires the lock; a Lua compare-and-swap script releases it. The join handler holds the lock for the duration of participant state mutation, serialising concurrent joins within a 10-second window.
+
+### 3. Multimodal inference without blocking the event loop
+
+The emotion service runs CPU-bound PyTorch and MediaPipe operations inside a per-participant async pump coroutine. Each pump reads from bounded queues (frame queue, audio queue) and submits work to a thread-pool executor, yielding control between inference cycles. A server-side `backpressure` event is emitted to the client when the face executor queue depth reaches 3, signalling the client to reduce its frame submission rate. This prevents memory growth under sustained load without dropping the Socket.IO connection.
+
+### 4. Asynchronous transcript delivery with no shared state
+
+The transcription service and backend share no database, file system, or message queue. After processing, the transcription service delivers results via a single HTTP POST to a backend endpoint (`NODE_API`). The backend then persists to MongoDB and caches in Redis. The frontend polls the backend on a 20-second interval (up to 30 attempts) rather than waiting for a push event, because the transcription service has no channel back to the browser. This design keeps the services fully decoupled but means transcript delivery is eventually consistent with no guarantee of delivery if the callback fails.
+
+### 5. Browser media capture for parallel audio tracks
+
+The host must simultaneously: play remote participant audio/video via WebRTC, capture frames from each remote participant's `<video>` element for emotion analysis, and record each participant's audio track independently for transcription. These three uses of the same remote media stream are managed with separate tap points: `captureStream()` for frame extraction, a cloned `MediaStream` with an `AudioWorklet` node for noise-gated recording, and the standard `<video>` element for playback. Naive approaches that share a single stream reference caused interference between the recorder and the analyser.
+
+### 6. Distributed state reconciliation on reconnect
+
+When a participant disconnects and reconnects, the backend reconstructs their participant record from Redis. However, the emotion service holds per-participant state (embedding buffers, EMA, pump coroutine) in its own process memory. These two stores are not coordinated. A reconnecting participant gets a fresh record in the backend while the emotion service may retain stale buffers from the previous session, or may have already flushed them depending on timing. This is a known consistency gap documented in [Known Limitations](#known-limitations); the current implementation does not attempt reconciliation.
 
 ---
 
-### 2. Client & Interaction Layer
-| Doc | Description |
-|-----|-------------|
-| [Frontend](docs/frontend.md) | React architecture, hooks, media handling, UI state orchestration |
-| [Chat System](docs/chat-system.md) | Real-time messaging, ACK, retry, deduplication |
+## Operational Notes
+
+The following constraints are grounded in the current implementation and are relevant to anyone operating or extending the platform.
+
+- **Backend requires Redis**: Room state, Socket.IO fan-out, distributed join locks, and all rate-limiting depend on Redis. Partial Redis unavailability may propagate `null` values into socket event handlers; see [`docs/backend.md`](docs/backend.md) for known null-guard gaps.
+
+- **Backend requires an external load balancer**: The three pm2 processes bind separate ports (8000–8001–8002). Distributing Socket.IO connections across them requires sticky-session routing at the load balancer to avoid session mismatch with the Redis adapter.
+
+- **Host role is partially client-enforced**: The frontend determines the host role by checking `localStorage` for `host:<code>`. The backend validates the `x-host-secret` header only on the transcript proxy route, not on socket events like `end-meeting`. A client with the key set gains the host UI without additional server verification.
+
+- **Emotion service state is in-process only**: Per-participant embedding buffers, EMA state, and pump coroutines are stored in Python process memory. The service cannot be horizontally scaled without externalising this state.
+
+- **Transcript pipeline is asynchronous with no retry**: The transcription service returns HTTP 202 and processes in a background task. If the `NODE_API` callback fails, the transcript is lost. The frontend polls for up to 10 minutes (30 × 20 s) with no backoff.
+
+- **Cleanup timer runs in all backend processes**: `cleanupOldMeetings` uses a `setInterval` registered at module import time. In a three-process pm2 deployment, all three processes execute it every hour independently.
+
+- **Transcript upload has no retry**: `runBackgroundTranscript` in the frontend makes a single fetch call with a silent `.catch(() => {})`. Failures produce no user-visible notification.
+
+- **TURN credentials are hardcoded**: `meetConfig.js` contains plaintext `openrelayproject` credentials. Time-limited dynamic TURN provisioning is not implemented.
+
+- **Emotion service has no health endpoint**: There is no `/health` or `/ready` HTTP route. Load balancer health checks must use a TCP probe or an alternative mechanism. A live latency dashboard is available at `GET /stats` (browser) and `GET /stats/json` (JSON) — these are observability endpoints, not health probes.
+
+- **Backend CORS allowlist is hardcoded**: Origins outside `localhost:3000` and `skymeetai.onrender.com` are rejected. Adding origins requires a code change and redeployment.
+
+- **Latency log is truncated on backend restart**: `latency.service.js` truncates `logs/latency-<PORT>.log` at process start. No log rotation or archival is implemented.
 
 ---
 
-### 3. Intelligence Layer
-| Doc | Description |
-|-----|-------------|
-| [ML Pipeline](docs/ml-pipeline.md) | Dataset, feature extraction, model architecture, ensemble, results |
+## Known Limitations
+
+The following are platform-level limitations that emerge from the combined architecture.
+
+**Distributed state is split across two uncoordinated stores**: Redis holds ephemeral room state and the emotion service holds per-participant inference state in process memory. A participant reconnect may leave the emotion service with stale buffers while the backend has reconstructed participant records.
+
+**No horizontal scaling for inference services**: The emotion service's in-process state design and single inference thread mean it cannot be scaled by adding instances without externalising state (e.g., Redis-backed participant buffers). The transcription service similarly holds model singletons without inter-instance coordination.
+
+**Transcript delivery is eventually consistent with no guarantee**: The transcript is written to MongoDB only after the transcription service's background task completes and its HTTP callback to the backend succeeds. A crashed transcription process, network failure to `NODE_API`, or empty merged-segment result each cause silent data loss with no notification to the user.
+
+**Host-role enforcement is not fully server-authoritative**: The backend does not validate the host identity on socket events (`end-meeting`, recording data emission). Enforcement relies on the client holding `host:<code>` in `localStorage`.
+
+**Signal relay is unscoped**: The backend's `signal` event forwards SDP/ICE messages to any target socket ID without verifying that both sockets are members of the same room.
+
+**English-only transcription**: The Whisper model is configured with `language="en"` hardcoded. Multilingual meetings will produce degraded or incorrect transcripts.
+
+**Multiple services must be independently operated**: There is no unified health check, orchestration layer, or supervisor across the four services. Operators must monitor each process separately.
 
 ---
 
-### 4. Interfaces & Contracts
-| Doc | Description |
-|-----|-------------|
-| [API Reference](docs/api.md) | REST APIs, Socket.IO events, service contracts |
+## Contributing
 
----
+Contributions are welcome. The codebase spans four independent services across two language ecosystems (Node.js and Python), so please read the relevant subsystem README before opening a pull request.
 
-### 5. System Qualities
-| Doc | Description |
-|-----|-------------|
-| [Performance](docs/performance.md) | Latency, throughput, streaming design, scalability limits |
-| [Reliability](docs/reliability.md) | Fault tolerance, reconnection, idempotency, backpressure handling |
-| [Security](docs/security.md) | Auth, authorization, validation, rate limiting, threat model |
+### Getting started
+
+1. Fork the repository and create a branch from `main`.
+2. Read the subsystem README for the area you are changing before writing any code.
+3. Keep changes scoped to a single subsystem where possible. Cross-service changes require updating both the implementation and the relevant subsystem README.
+4. If you are changing a Socket.IO event name, payload shape, or HTTP contract, update [`docs/`](docs/) to match.
+
+### What to consider before contributing
+
+- The [Known Limitations](#known-limitations) section lists areas the current architecture does not address well. Contributions that improve these are particularly useful — but please open an issue first to discuss the approach, as some limitations (e.g., emotion service state externalisation) require coordinated changes across services.
+- The [Engineering Challenges](#engineering-challenges) section documents why certain decisions were made. Understanding this context helps avoid re-introducing problems that were already solved.
+- A CI pipeline runs lint and build checks on every push and pull request (`.github/workflows/ci.yml`). Tests, if added, should be documented in the relevant subsystem README.
+
+### Coding conventions
+
+Follow the existing style within each subsystem. The Node.js backend uses ES Modules (`"type": "module"` in `package.json`); the Python services use standard PEP 8 formatting. No linter configuration is currently enforced at the repository level.
+
+### Reporting issues
+
+Open a GitHub issue with a description of the observed behaviour, the service involved, the steps to reproduce, and any relevant log output. Tag the issue with the subsystem label (`frontend`, `backend`, `emotion-service`, or `transcription-service`) if applicable.
 
 ---
 
 ## License
 
-MIT — see [LICENSE](LICENSE) for details.
+Licensed under the MIT License. See [LICENSE](LICENSE).
+
+---
+
+## Documentation
+
+Detailed implementation references for each subsystem:
+
+- [`docs/frontend.md`](docs/frontend.md) — React component/hook architecture, WebRTC lifecycle, emotion capture pipeline, Socket.IO event contracts, error handling, known limitations.
+- [`docs/backend.md`](docs/backend.md) — Express routes, Socket.IO event handlers, Redis lock and adapter design, pm2 configuration, API contracts, security considerations.
+- [`docs/emotion-service.md`](docs/emotion-service.md) — Inference pipeline, model training, embedding extraction, performance characteristics, configuration schema.
+- [`docs/transcription-service.md`](docs/transcription-service.md) — ASR pipeline, segment merging logic, API contract, callback payload schema, error handling.
