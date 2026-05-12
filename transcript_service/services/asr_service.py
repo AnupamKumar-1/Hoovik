@@ -63,7 +63,19 @@ STOP_WORDS = {
 }
 
 
-def _extract_label(raw):
+def _extract_label(raw) -> str:
+    """Extract a flat emotion label string from a HuggingFace pipeline response.
+
+    Handles the dict, list-of-dict, and list-of-list-of-dict shapes that
+    ``text-classification`` pipelines may return depending on version and
+    ``top_k`` setting.
+
+    Args:
+        raw: Raw output from the HuggingFace pipeline call.
+
+    Returns:
+        Emotion label string, or ``"neutral"`` if extraction fails.
+    """
     try:
         if isinstance(raw, dict):
             return raw.get("label", "neutral")
@@ -78,6 +90,18 @@ def _extract_label(raw):
 
 
 def _clean_text(text: str) -> str:
+    """Normalise a raw Whisper segment string for downstream processing.
+
+    Strips leading/trailing whitespace, capitalises the first character,
+    collapses internal whitespace runs to single spaces, and appends a
+    period if the text does not already end with ``.``, ``!``, or ``?``.
+
+    Args:
+        text: Raw segment text from Whisper.
+
+    Returns:
+        Cleaned text string, or empty string if input is falsy.
+    """
     if not text:
         return ""
     text = text.strip()
@@ -88,7 +112,23 @@ def _clean_text(text: str) -> str:
     return text
 
 
-def _merge_raw_segments(raw_segs):
+def _merge_raw_segments(raw_segs: list[dict]) -> list[dict]:
+    """Merge consecutive same-speaker Whisper segments into longer utterances.
+
+    Two segments are merged when they share the same speaker, the silence
+    gap between them is ≤ ``MERGE_GAP_SEC``, the combined word count is ≤
+    ``MERGE_MAX_WORDS``, and the current buffer does not end with sentence-
+    terminal punctuation (``.``, ``!``, ``?``). A speaker change always
+    flushes the buffer.
+
+    Args:
+        raw_segs: List of Whisper segment dicts, each containing at minimum
+            ``start``, ``end``, ``text``, and ``speaker`` keys.
+
+    Returns:
+        List of merged segment dicts with keys ``start``, ``end``, ``text``,
+        and ``speaker``.
+    """
     if not raw_segs:
         return []
 
@@ -145,6 +185,19 @@ def _merge_raw_segments(raw_segs):
 
 
 def _get_emotion(text: str) -> str:
+    """Classify the emotion of a text segment, with in-process caching.
+
+    Segments shorter than 4 words are assigned ``"neutral"`` without
+    model inference. Results are stored in the module-level
+    ``emotion_cache`` dict keyed by the exact text string.
+
+    Args:
+        text: Cleaned segment text to classify.
+
+    Returns:
+        Normalised emotion label string (e.g. ``"joy"``, ``"anger"``,
+        ``"neutral"``).
+    """
     if text in emotion_cache:
         return emotion_cache[text]
 
@@ -163,7 +216,28 @@ def _get_emotion(text: str) -> str:
     return emo
 
 
-def _score_segment(seg):
+def _score_segment(seg: dict) -> int:
+    """Compute a heuristic relevance score for a transcript segment.
+
+    Points are awarded for:
+
+    - Word count in the 10–35 range (+3) or 5–9 / 36–50 range (+1).
+    - Non-neutral emotion (+3).
+    - Presence of decision/summary keywords such as ``"important"``,
+      ``"action"``, or ``"plan"`` (+2).
+    - Ends with a question mark (+1).
+    - Duration longer than 5 seconds (+1).
+
+    Used by ``_build_narrative_summary`` and ``build_intelligent_summary``
+    to rank segments for key-point and summary selection.
+
+    Args:
+        seg: Segment dict with at minimum ``text``, ``emotion``, ``start``,
+            and ``end`` keys.
+
+    Returns:
+        Integer relevance score (higher is more relevant).
+    """
     score = 0
     words = seg["text"].split()
     word_count = len(words)
@@ -206,7 +280,27 @@ def _score_segment(seg):
     return score
 
 
-def _build_narrative_summary(segments, full_text):
+def _build_narrative_summary(segments: list[dict], full_text: str) -> str:
+    """Construct a short narrative summary by selecting the best segment from each third.
+
+    The conversation is divided into opening, middle, and closing thirds.
+    The highest-scoring segment (via ``_score_segment``) from each third is
+    selected and joined into a sentence. The result is truncated to 80 words
+    if necessary.
+
+    Short inputs are handled as special cases: empty text returns ``""``,
+    text ≤ 40 words is returned as-is, and transcripts with ≤ 3 segments
+    return the full text (capped at 80 words).
+
+    Args:
+        segments: List of scored segment dicts (must contain ``text``,
+            ``emotion``, ``start``, ``end``).
+        full_text: Pre-joined text of all segments; used for word-count
+            short-circuit checks.
+
+    Returns:
+        Summary string of up to 80 words.
+    """
     words = full_text.split()
     total_words = len(words)
 
@@ -249,7 +343,25 @@ def _build_narrative_summary(segments, full_text):
     return summary
 
 
-def build_intelligent_summary(segments):
+def build_intelligent_summary(segments: list[dict]) -> dict:
+    """Generate a structured analysis dict from a list of transcript segments.
+
+    Computes a narrative summary, up to 5 key points (ranked by
+    ``_score_segment``), emotion distribution, dominant emotion, up to 3
+    notable emotional moments, up to 8 top topics (word frequency after
+    stop-word filtering on words ≥ 5 characters), per-speaker turn and
+    word-count stats, total word count, speaking pace in WPM, and total
+    duration.
+
+    Args:
+        segments: List of segment dicts, each with ``text``, ``emotion``,
+            ``emoji``, ``start``, ``end``, and ``speaker`` keys.
+
+    Returns:
+        Dict with keys ``summary`` (str), ``key_points`` (list[str]), and
+        ``insights`` (dict). Returns empty values for all fields when
+        ``segments`` is empty.
+    """
     if not segments:
         return {"summary": "", "key_points": [], "insights": {}}
 
@@ -325,7 +437,29 @@ def build_intelligent_summary(segments):
     }
 
 
-def transcribe_and_emotion(wav_path, speaker_name="Unknown"):
+def transcribe_and_emotion(wav_path: str, speaker_name: str = "Unknown") -> dict:
+    """Transcribe a WAV file and classify per-segment emotion.
+
+    Runs Whisper ASR (``small``, English, ``fp16=False``), assigns
+    ``speaker_name`` to every raw segment, merges consecutive segments via
+    ``_merge_raw_segments``, cleans text, truncates segments exceeding 80
+    words, classifies emotion, and builds a per-file ``build_intelligent_summary``.
+
+    Note: The per-file summary returned here is stored by the caller but is
+    not forwarded to NODE_API; only the aggregate summary across all speakers
+    is sent in the callback payload.
+
+    Args:
+        wav_path: Absolute or relative path to a mono 16 kHz WAV file.
+        speaker_name: Display name assigned to all segments from this file.
+            Defaults to ``"Unknown"``.
+
+    Returns:
+        Dict with keys ``segments`` (list of dicts with ``start``, ``end``,
+        ``text``, ``emotion``, ``emoji``, ``speaker``) and ``analysis``
+        (output of ``build_intelligent_summary``). Returns empty segments
+        and analysis on transcription failure.
+    """
     try:
         asr = asr_model.transcribe(wav_path, language="en", fp16=False)
     except Exception as e:

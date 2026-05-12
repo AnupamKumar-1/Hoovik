@@ -37,6 +37,7 @@ app.add_middleware(
 
 @app.options("/{rest_of_path:path}")
 async def preflight_handler(rest_of_path: str, request: Request):
+    """Return HTTP 200 for all CORS preflight OPTIONS requests."""
     return JSONResponse(content={"ok": True})
 
 
@@ -47,6 +48,24 @@ async def run_processing(
     host_secret: str,
     user_token: str,
 ):
+    """Orchestrate per-file transcription and deliver results to NODE_API.
+
+    For each audio file: validates extension, writes to disk, converts to
+    mono 16 kHz WAV, transcribes with Whisper, and classifies per-segment
+    emotion. Merges all speaker segments, builds a formatted transcript and
+    aggregate analysis, then POSTs to NODE_API. Skips the callback if the
+    merged segment list is empty. Schedules uploaded files for deletion
+    regardless of outcome.
+
+    Args:
+        audio_files_data: List of dicts with keys ``filename``, ``contents``
+            (raw bytes), and ``mimetype``.
+        meeting_code: Uppercased meeting identifier forwarded to NODE_API.
+        speaker_map_dict: Maps filename base (no extension) to display name.
+        host_secret: Forwarded verbatim as ``x-host-secret`` to NODE_API.
+        user_token: If non-empty, forwarded as ``Authorization: Bearer`` to
+            NODE_API.
+    """
     results = {}
     created_files = []
 
@@ -134,6 +153,28 @@ async def process_meeting(
     host_secret: str = Header(default="", alias="x-host-secret"),
     user_token: str = Header(default="", alias="x-user-token"),
 ):
+    """Accept a multi-speaker audio upload and dispatch processing asynchronously.
+
+    Reads all uploaded files into memory, parses the speaker map, and enqueues
+    ``run_processing`` as a background task. Returns HTTP 202 immediately; the
+    NODE_API callback is made after background processing completes.
+
+    Args:
+        request: Raw FastAPI request (unused directly; required by FastAPI).
+        background_tasks: FastAPI background task queue.
+        audio_files: One or more audio files to transcribe.
+        meeting_code: Meeting identifier; uppercased before use. Defaults to
+            ``"UNKNOWN"``.
+        speaker_map: JSON string mapping filename base to display name.
+            Defaults to ``"{}"``.
+        host_secret: Forwarded to NODE_API as ``x-host-secret``.
+        user_token: Forwarded to NODE_API as ``Authorization: Bearer`` if
+            non-empty.
+
+    Returns:
+        JSONResponse with HTTP 202 and ``{"success": true, "message":
+        "Processing started"}``.
+    """
     meeting_code = meeting_code.upper()
 
     try:
@@ -170,4 +211,4 @@ async def process_meeting(
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("main:app", host="0.0.0.0", port=5001)
+    uvicorn.run("app:app", host="0.0.0.0", port=5001)
