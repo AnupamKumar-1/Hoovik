@@ -68,32 +68,23 @@ flowchart TD
 
     subgraph BG["run_processing() — BackgroundTasks"]
         FileLoop["for each audio_file"]
-
-        subgraph PerFile["Per-file pipeline"]
-            A1["allowed_file() check"]
-            A2["secure_filename() sanitisation"]
-            A3["write to UPLOAD_FOLDER"]
-            A4["convert_to_wav()\nffmpeg → mono 16 kHz WAV"]
-            A5["transcribe_and_emotion()\nasyncio.to_thread"]
-
-            subgraph ASR["asr_service.py — in thread"]
-                B1["whisper.transcribe()"]
-                B2["_merge_raw_segments()"]
-                B3["_get_emotion() per segment"]
-                B4["build_intelligent_summary()\nonce per file (all segments)"]
-            end
-
-            A1 --> A2 --> A3 --> A4 --> A5
-            A5 --> B1 --> B2 --> B3 --> B4
-        end
-
+        A1["allowed_file() check"]
+        A2["secure_filename() sanitisation"]
+        A3["write to UPLOAD_FOLDER"]
+        A4["convert_to_wav()\nffmpeg → mono 16 kHz WAV"]
+        A5["transcribe_and_emotion()\nasyncio.to_thread"]
+        B1["whisper.transcribe()\nasr_service.py — in thread"]
+        B2["_merge_raw_segments()"]
+        B3["_get_emotion() per segment"]
+        B4["build_intelligent_summary()\nonce per file"]
         Merge["merge_segments()\ncross-speaker sort by start, end"]
         Transcript["build_transcript_text()\nformatted plain-text string"]
         Summary["build_intelligent_summary()\naggregate analysis"]
         Cleanup["schedule_file_cleanup()\ndaemon timer — 120 s"]
 
-        FileLoop --> PerFile
-        PerFile --> Merge --> Transcript --> Summary --> Cleanup
+        FileLoop --> A1 --> A2 --> A3 --> A4 --> A5
+        A5 --> B1 --> B2 --> B3 --> B4
+        B4 --> Merge --> Transcript --> Summary --> Cleanup
     end
 
     NodeAPI(["NODE_API\nPOST — requests, timeout=None"])
