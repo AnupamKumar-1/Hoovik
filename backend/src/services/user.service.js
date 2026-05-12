@@ -257,50 +257,6 @@ export async function registerService(req) {
     }
 }
 
-// export async function getUserHistoryService(req) {
-//     try {
-//         const userId = getUserId(req.user);
-//         if (!userId) return { status: httpStatus.UNAUTHORIZED, body: { success: false, message: "Unauthorized. Missing user id." } };
-
-//         const objectUserId = new mongoose.Types.ObjectId(userId);
-//         const cacheKey = RKEYS.history(userId);
-//         const cached = await safeRedisGet(cacheKey);
-//         if (cached !== null) {
-//             log.info("getUserHistory cache hit", { userId });
-//             return { status: httpStatus.OK, body: { success: true, meetings: JSON.parse(cached) } };
-//         }
-
-//         const meetings = await findMeetingsByUser(objectUserId, userId);
-//         const clientOrigin = process.env.CLIENT_ORIGIN || `http://localhost:${process.env.CLIENT_PORT || 3000}`;
-
-//         const withLinks = meetings.map((m) => {
-//             if (m.meetingCode) m.meetingCode = String(m.meetingCode).toUpperCase();
-//             if (!m.link && m.meetingCode) m.link = `${clientOrigin}/room/${m.meetingCode}`;
-
-//             let hostName = "Unknown";
-//             if (m.host && typeof m.host === "object" && (m.host.name || m.host.username)) {
-//                 hostName = m.host.name || m.host.username;
-//             }
-//             m.hostName = hostName;
-
-//             m.participants = (m.participants || []).map((p) => ({
-//                 socketId: p?.socketId || null,
-//                 userId: p?.meta?.userId || p?.userId || null,
-//                 name: p?.name || p?.meta?.name || p?.meta?.display || "Guest",
-//                 joinedAt: p?.joinedAt || p?.createdAt || null,
-//                 leftAt: p?.leftAt || null,
-//             }));
-
-//             return m;
-//         });
-
-//         await safeRedisSet(cacheKey, JSON.stringify(withLinks), { EX: HISTORY_CACHE_TTL_SEC });
-//         return { status: httpStatus.OK, body: { success: true, meetings: withLinks } };
-//     } catch (error) {
-//         log.error("getUserHistory error", { err: error.message });
-//         return { status: httpStatus.INTERNAL_SERVER_ERROR, body: { success: false, message: "Something went wrong." } };
-//     }
-// }
 
 export async function getUserHistoryService(req) {
     try {

@@ -13,7 +13,6 @@ import userRoutes from "./routes/users.routes.js";
 import roomsRoutes from "./routes/rooms.js";
 import meetingsRoutes from "./routes/meetings.routes.js";
 import transcriptRoutes from "./routes/transcripts.js";
-import emotionRoutes from "./routes/emotion.routes.js";
 import { connectToSocket } from "./controllers/socket.controller.js";
 import { logout } from "./controllers/user.controller.js";
 import { connectRedis, redisPub, redisSub } from "./infra/redis.js";
@@ -25,34 +24,10 @@ app.set("trust proxy", 1);
 const server = createServer(app);
 
 const allowedOrigins = [
-  "https://skymeetai.onrender.com",
   "http://localhost:3000",
+  "https://skymeetai.onrender.com",
+
 ];
-
-const EMOTION_SERVICE_URL = process.env.EMOTION_SERVICE_URL;
-
-if (!EMOTION_SERVICE_URL) {
-  console.error("EMOTION_SERVICE_URL not set");
-  process.exit(1);
-}
-
-const emotionProxy = createProxyMiddleware({
-  target: EMOTION_SERVICE_URL,
-  changeOrigin: true,
-  ws: true,
-  secure: false,
-  pathRewrite: {
-    "^/emotion-socket": "",
-  },
-});
-
-app.use("/emotion-socket", emotionProxy);
-
-server.on("upgrade", (req, socket, head) => {
-  if (req.url.startsWith("/emotion-socket")) {
-    emotionProxy.upgrade(req, socket, head);
-  }
-});
 
 app.use(cors({
 
@@ -80,7 +55,6 @@ app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/rooms", roomsRoutes);
 app.use("/api/v1/transcripts/proxy", transcriptProxyRoutes);
 app.use("/api/v1/transcripts", transcriptRoutes);
-app.use("/api/v1/emotion", emotionRoutes);
 app.use("/api/v1/meetings", meetingsRoutes);
 
 app.post("/api/v1/auth/logout", logout);
@@ -127,7 +101,13 @@ const start = async () => {
       connectToSocket(
         server,
         {
-          origin: "https://skymeetai.onrender.com",
+          origin: [
+
+            "http://localhost:3000",
+
+            "https://skymeetai.onrender.com",
+
+          ],
           credentials: true,
         },
         redisPub,

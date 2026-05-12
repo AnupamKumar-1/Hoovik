@@ -2,7 +2,7 @@ import { Server } from "socket.io";
 import { createAdapter } from "@socket.io/redis-adapter";
 import { io as Client } from "socket.io-client";
 import { makeLogger } from "../utils/redis.utils.js";
-import { sendToEmotionService } from "./emotion.controller.js";
+
 import { getState, mkdirp, UPLOAD_BASE } from "../services/socket.service.js";
 
 import {
@@ -11,10 +11,6 @@ import {
   handleUpdateMeta,
   handleChatMessage,
   handleTranscriptionUpdate,
-  handleEmotionChunk,
-  handleEmotionChunkAbort,
-  handleEmotionChunkComplete,
-  handleEmotionUpdate,
   handleKeywordsUpdate,
   handleLeave,
   validateCode,
@@ -30,13 +26,11 @@ const cfg = JSON.parse(
   fs.readFileSync(new URL("../config/config.json", import.meta.url))
 );
 
-const EMOTION_SOCKET_URL = process.env.EMOTION_SOCKET_URL || "http://localhost:5002";
+
 const SOCKET_MAX_HTTP_BUFFER = parseInt(process.env.SOCKET_MAX_HTTP_BUFFER || `${100 * 1024 * 1024}`, 10);
-const EMOTION_RECONNECT_ATTEMPTS = cfg.emotionClients?.reconnectionAttempts ?? 5;
-const EMOTION_RECONNECT_DELAY = cfg.emotionClients?.reconnectionDelay ?? 1000;
 
 const log = makeLogger("socket");
-const EMOTION_CLIENTS = new Map();
+
 let broadcastDebounceTimers = new Map();
 
 function toNodeBuffer(raw) {
@@ -84,88 +78,7 @@ function broadcastParticipants(code, io) {
   }, 150));
 }
 
-function cleanupEmotionClient(clientKey) {
 
-  const client = EMOTION_CLIENTS.get(clientKey);
-  if (!client) return;
-
-  try {
-    client.disconnect();
-  } catch { }
-
-  EMOTION_CLIENTS.delete(clientKey);
-}
-
-function createEmotionClient(clientKey, meetingCode, participantId, io) {
-
-  const tempSocket = Client(EMOTION_SOCKET_URL, {
-    transports: ["websocket"],
-    reconnection: true,
-    reconnectionAttempts: EMOTION_RECONNECT_ATTEMPTS,
-    reconnectionDelay: EMOTION_RECONNECT_DELAY,
-
-    auth: {
-      meeting_id: meetingCode,
-      participant_id: participantId
-
-    },
-  });
-
-  tempSocket.on("emotion.result", async (res) => {
-
-    log.info("emotion result from Python", { participantId, meetingCode, res });
-
-    try {
-      const emotion = res?.result?.emotion;
-      const confidence = res?.result?.confidence;
-
-      await updateMeetingAnalytics(meetingCode, { emotionScores: res });
-
-      const hostSocketId = await getHostSocketId(io, meetingCode);
-
-      if (hostSocketId) {
-
-        // log.info("emitting emotion.result to host", { hostSocketId, participantId, emotion });
-
-        io.to(hostSocketId).emit("emotion.result", {
-          participantId,
-          result: { emotion, confidence },
-          ts: Date.now(),
-        });
-
-      } else {
-
-        log.warn("no host socket found, broadcasting to room", { meetingCode });
-
-        io.in(`meeting:${meetingCode}`)
-          .emit("emotion.result", {
-            participantId,
-            result: { emotion, confidence },
-            ts: Date.now(),
-          });
-      }
-    } catch (e) {
-
-      log.error("emotion.result handler error", { err: e.message });
-
-    }
-  });
-
-  tempSocket.on("connect_error", (err) => {
-
-    log.error("emotion socket connect_error", { clientKey, err: err.message });
-  });
-
-  tempSocket.on("disconnect", (reason) => {
-
-    log.warn("emotion socket disconnected", { clientKey, reason });
-    EMOTION_CLIENTS.delete(clientKey);
-
-  });
-
-  EMOTION_CLIENTS.set(clientKey, tempSocket);
-  return tempSocket;
-}
 
 async function getHostSocketId(io, meetingCode) {
   try {
@@ -280,53 +193,6 @@ export function connectToSocket(
       }
     });
 
-    socket.on("emotion.chunk", async (payload = {}, ack) => {
-      try {
-        const result = await handleEmotionChunk(socket, payload);
-
-        if (typeof ack === "function") ack(result);
-
-      } catch (err) {
-
-        log.error("emotion.chunk error", { err: err.message });
-        if (typeof ack === "function") ack({ ok: false, reason: "internal" });
-
-      }
-    });
-
-    socket.on("emotion.chunk.abort", async (metaReq = {}, ack) => {
-      try {
-        const result = await handleEmotionChunkAbort(socket, metaReq);
-        if (typeof ack === "function") ack(result);
-
-      } catch (err) {
-
-        log.error("emotion.chunk.abort error", { err: err.message });
-        if (typeof ack === "function") ack({
-          ok: false,
-          reason: "internal"
-        });
-      }
-    });
-
-    socket.on("emotion.chunk.complete", async (metaReq = {}, ack) => {
-      try {
-        const result = await handleEmotionChunkComplete(socket, io, metaReq, sendToEmotionService);
-        if (typeof ack === "function") ack(result);
-      } catch (err) {
-        log.error("emotion.chunk.complete error", { err: err.message });
-        if (typeof ack === "function") ack({ ok: false, reason: "internal" });
-      }
-    });
-
-    socket.on("emotion-update", async (data) => {
-      try {
-        await handleEmotionUpdate(socket, io, data);
-      } catch (err) {
-        log.error("emotion-update error", { err: err.message });
-      }
-    });
-
     socket.on("keywords-update", async (keywords) => {
       try {
         await handleKeywordsUpdate(socket, io, keywords);
@@ -346,61 +212,7 @@ export function connectToSocket(
       }
     });
 
-    socket.on("emotion.frame", async (payload, ack) => {
-      try {
-        if (!payload || typeof payload !== "object") {
-          if (typeof ack === "function") ack({ ok: false });
-          return;
-        }
 
-        const meetingCode = String(payload.meetingId || "").trim().toUpperCase();
-        const participantId = payload.participantId || socket.data?.userId;
-        const buffer = payload.buffer || payload.data;
-
-        if (!meetingCode || !participantId || !buffer || !validateCode(meetingCode)) {
-          if (typeof ack === "function") ack({ ok: false });
-          return;
-        }
-
-        let buf;
-        try {
-          buf = toNodeBuffer(buffer);
-        } catch (e) {
-          log.warn("emotion.frame toNodeBuffer failed", { err: e.message });
-          if (typeof ack === "function") ack({ ok: false });
-          return;
-        }
-
-        if (buf.length === 0) {
-          if (typeof ack === "function") ack({ ok: false });
-          return;
-        }
-
-        if (typeof ack === "function") ack({ ok: true });
-
-        const clientKey = `${meetingCode}__${participantId}`;
-        let tempSocket = EMOTION_CLIENTS.get(clientKey);
-
-        if (tempSocket && !tempSocket.connected && !tempSocket.active) {
-          cleanupEmotionClient(clientKey);
-          tempSocket = null;
-        }
-
-        if (!tempSocket) {
-          tempSocket = createEmotionClient(clientKey, meetingCode, participantId, io);
-        }
-
-        if (tempSocket.connected) {
-          tempSocket.emit("frame", buf);
-        } else {
-          tempSocket.once("connect", () => tempSocket.emit("frame", buf));
-        }
-
-      } catch (err) {
-        log.error("emotion.frame error", { err: err.message });
-        if (typeof ack === "function") ack({ ok: false });
-      }
-    });
 
     socket.on("disconnect", async () => {
       try {
@@ -408,7 +220,6 @@ export function connectToSocket(
         const code = socket.data?.meetingCode;
         const { userId } = socket.data || {};
         if (!code || !userId) return;
-        cleanupEmotionClient(`${code}__${userId}`);
         await handleLeave(socket, code, io, userId);
         broadcastParticipants(code, io);
       } catch (err) {
