@@ -102,6 +102,8 @@ export default function VideoMeet() {
   const spotlightPeerRef = useRef(null);
   const ignoreOfferRef = useRef({});
   const isSettingRemoteAnswerPending = useRef({});
+  const updateParticipantMediaStateRef = useRef(null);
+  const prevParticipantMuteStateRef = useRef({}); // pid → muted boolean
 
   const [endingMeeting, setEndingMeeting] = useState(false);
   const [remoteStreams, setRemoteStreams] = useState({});
@@ -133,8 +135,8 @@ export default function VideoMeet() {
     [roomId]
   );
   const myUserId = useMemo(
-    () => localStorage.getItem("userId") || myId || "",
-    [myId]
+    () => localStorage.getItem("userId") || "",
+    []
   );
 
   const setMyIdSynced = useCallback((id) => {
@@ -241,19 +243,62 @@ export default function VideoMeet() {
     isHost,
   });
 
-  const emotionSocketRef = useEmotionSocket({ setEmotionsMap });
+  const {
+    ensureSocket,
+    getSocketForParticipant,
+    releaseSocket: releaseEmotionSocket,
+    serverCapsRef,
+    notifyMediaState,
+  } = useEmotionSocket({
+    setEmotionsMap,
+    updateParticipantMediaStateRef,
+  });
 
-  const { startPeriodicEmotionCapture, stopPeriodicEmotionCapture } =
-    useEmotionCapture({
-      socketRef: emotionSocketRef,
-      remoteStreamsRef,
-      participantsMetaRef,
-      myId,
-      roomId,
-      isHost,
-      DEBUG_SHOW_EMOTION_FOR_EVERYONE: false,
-      activeSpeakerIdRef,
-    });
+  const {
+    startPeriodicEmotionCapture,
+    stopPeriodicEmotionCapture,
+    updateParticipantMediaState,
+  } = useEmotionCapture({
+    ensureSocket,
+    getSocketForParticipant,
+    remoteStreamsRef,
+    participantsMetaRef,
+    myId,
+    roomId,
+    isHost,
+    DEBUG_SHOW_EMOTION_FOR_EVERYONE: false,
+    activeSpeakerIdRef,
+    localStreamRef,
+    serverCapsRef,
+  });
+
+  updateParticipantMediaStateRef.current = updateParticipantMediaState;
+
+
+  useEffect(() => {
+    if (!isHost) return;
+    const prev = prevParticipantMuteStateRef.current;
+    const next = {};
+
+    for (const p of participantsMeta) {
+      const userId = p.meta?.userId || p.id;
+      if (!userId || userId === myUserId) continue;
+
+      const nowMuted = p.meta?.muted === true;
+      next[userId] = nowMuted;
+
+      if (prev[userId] === nowMuted) continue;
+
+      // Mute state changed — notify immediately
+      const micEnabled = !nowMuted;
+
+      try {
+        notifyMediaState(userId, { micEnabled, cameraEnabled: true });
+      } catch {  }
+    }
+
+    prevParticipantMuteStateRef.current = next;
+  }, [participantsMeta, isHost, myUserId, notifyMediaState]);
 
   const { toggleMute, toggleVideo, startScreenShare } = useMediaControls({
     localStreamRef,
@@ -266,6 +311,7 @@ export default function VideoMeet() {
     startRecordingForStream,
     stopPeriodicEmotionCapture,
     startPeriodicEmotionCapture,
+    notifyMediaState,
   });
 
   const {
@@ -316,6 +362,8 @@ export default function VideoMeet() {
     recordersRef,
     startPeriodicEmotionCapture,
     stopPeriodicEmotionCapture,
+    notifyMediaState,
+    updateParticipantMediaState,
   });
 
   const closePeer = useCallback(
@@ -332,6 +380,8 @@ export default function VideoMeet() {
       } catch { }
       removeAnalyzer(peerId);
       notifyPcsChanged();
+
+      try { releaseEmotionSocket(peerId); } catch { }
       setRemoteStreams((prev) => {
         if (!prev[peerId]) return prev;
         const next = { ...prev };
@@ -349,7 +399,8 @@ export default function VideoMeet() {
       pcsRef,
       recordersRef,
       removeAnalyzer,
-      notifyPcsChanged]
+      notifyPcsChanged,
+      releaseEmotionSocket]
   );
 
   const stableSpeakerTimerRef = useRef(null);

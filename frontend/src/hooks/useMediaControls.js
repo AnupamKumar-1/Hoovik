@@ -19,6 +19,7 @@ export default function useMediaControls({
   startRecordingForStream,
   stopPeriodicEmotionCapture,
   startPeriodicEmotionCapture,
+  notifyMediaState,
 }) {
   const screenTrackRef = useRef(null);
 
@@ -45,6 +46,10 @@ export default function useMediaControls({
       setMuted(newMuted);
       if (mutedRef) mutedRef.current = newMuted;
 
+      try {
+        notifyMediaState?.(myUserId, { micEnabled: !newMuted, cameraEnabled: true });
+      } catch { }
+
       if (newMuted) {
         removeAnalyzer("local");
       } else {
@@ -65,11 +70,19 @@ export default function useMediaControls({
     }
   }
 
-  async function toggleVideo(videoOff, setVideoOff) {
+  async function toggleVideo(videoOff, setVideoOff, mutedRef) {
     try {
       const newVideoOff = await mediaToggleVideo(videoOff);
 
       setVideoOff(newVideoOff);
+
+      const micCurrentlyEnabled = mutedRef ? !mutedRef.current : true;
+      try {
+        notifyMediaState?.(myUserId, {
+          micEnabled: micCurrentlyEnabled,
+          cameraEnabled: !newVideoOff,
+        });
+      } catch { }
 
       if (newVideoOff) {
         stopPeriodicEmotionCapture();

@@ -1,4 +1,4 @@
-export const EMOTION_DISPLAY_MIN_SCORE = 0.12;
+export const EMOTION_DISPLAY_MIN_SCORE = 0.42;
 
 const VALID_EMOTIONS = [
   "angry", "fearful", "disgust",
@@ -114,6 +114,12 @@ export function getTopEmotionLabel(emotion) {
   if (!top) return null;
 
   const score = typeof top.score === "number" ? top.score : 0;
+
+  // weak sadness into neutral/calm
+  if ( normalizeLabel(top.label) === "sad" && score < 0.65 ) {
+    top.label = "neutral/calm";
+  }
+
   if (score > 0 && score < EMOTION_DISPLAY_MIN_SCORE) return null;
 
   return String(top.label).toLowerCase();
@@ -143,6 +149,11 @@ export function renderEmojiLabelForEmotion(emotion) {
   if (!top || !top.label) return null;
 
   const score = typeof top.score === "number" ? top.score : 0;
+
+  if (
+    normalizeLabel(top.label) === "sad" && score < 0.65) {
+    top.label = "neutral/calm";
+  }
   if (score > 0 && score < EMOTION_DISPLAY_MIN_SCORE) return null;
 
   const label = normalizeLabel(top.label);

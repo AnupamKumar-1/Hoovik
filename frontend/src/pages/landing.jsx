@@ -104,7 +104,7 @@ export default function LandingPage() {
 
             <div className="lp-stat">
               <span className="lp-stat-val">Live AI</span>
-              <span className="lp-stat-label">Emotion insights updated every second</span>
+              <span className="lp-stat-label"> Multimodal emotion inference with sub-second latency</span>
             </div>
 
             <div className="lp-stat">
