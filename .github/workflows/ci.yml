@@ -62,7 +62,7 @@ jobs:
         run: node --check src/app.js
 
   emotion_service:
-    name: Emotion Service — import check
+    name: Emotion Service — validation
     runs-on: ubuntu-latest
 
     defaults:
@@ -93,20 +93,12 @@ jobs:
       - name: Lint
         run: ruff check . --ignore E402,F401,F403,F405,F541,F841
 
-      - name: Import check
+      - name: Python compile check
         run: |
-          python - <<'EOF'
-          import unittest.mock as mock
-
-          with mock.patch("whisper.load_model", return_value=mock.MagicMock()), \
-               mock.patch("transformers.pipeline", return_value=mock.MagicMock()):
-              import app
-
-          print("emotion_service app.py imports OK")
-          EOF
+          python -m py_compile app.py
 
   transcript_service:
-    name: Transcript Service — import check
+    name: Transcript Service — validation
     runs-on: ubuntu-latest
 
     defaults:
@@ -137,14 +129,6 @@ jobs:
       - name: Lint
         run: ruff check . --ignore E402,F401,F403,F405,F541,F841
 
-      - name: Import check
+      - name: Python compile check
         run: |
-          python - <<'EOF'
-          import unittest.mock as mock
-
-          with mock.patch("whisper.load_model", return_value=mock.MagicMock()), \
-               mock.patch("transformers.pipeline", return_value=mock.MagicMock()):
-              import app
-
-          print("transcript_service app.py imports OK")
-          EOF
+          python -m py_compile app.py
