@@ -1,4 +1,4 @@
-2026-05-08 22:25:35,752 | INFO | Loading dataset from /Users/anupamkumar/Desktop/meet/emotion_service/extracted_dataset/dataset.npz
+2026-05-08 22:25:35,752 | INFO | Loading dataset from /Users/anupamkumar/Desktop/skymeetai/emotion_service/extracted_dataset/dataset.npz
 2026-05-08 22:25:36,143 | INFO | Loaded — train: 9629  val: 2294  test: 2299
 2026-05-08 22:25:36,146 | INFO | Data mix — RAVDESS: 46.5%  CREMA-D: 53.5%
 2026-05-08 22:25:36,146 | INFO | Train-split class counts: angry=1624  fearful=1264  disgust=1624  happy=1624  sad=1624  neutral/calm=1869
@@ -115,6 +115,6 @@ neutral/calm       0.80      0.74      0.77       263
    macro avg       0.70      0.70      0.70      1531
 weighted avg       0.71      0.70      0.70      1531
 
-2026-05-08 22:28:10,796 | INFO | Saved model → /Users/anupamkumar/Desktop/meet/emotion_service/models/xgb/xgb_model.joblib
-2026-05-08 22:28:10,814 | INFO | Saved pca.joblib + col_medians.npy (8149 dims) → /Users/anupamkumar/Desktop/meet/emotion_service/models/xgb
+2026-05-08 22:28:10,796 | INFO | Saved model → /Users/anupamkumar/Desktop/skymeetai/emotion_service/models/xgb/xgb_model.joblib
+2026-05-08 22:28:10,814 | INFO | Saved pca.joblib + col_medians.npy (8149 dims) → /Users/anupamkumar/Desktop/skymeetai/emotion_service/models/xgb
 2026-05-08 22:28:11,524 | INFO | DONE — train_xgb complete.

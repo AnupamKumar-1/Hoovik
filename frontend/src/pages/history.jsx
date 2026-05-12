@@ -143,17 +143,17 @@ export default function History() {
       return out;
     };
 
-    const isUserInMeeting = (meet, user) => {
+    const isUserInMeeting = (skymeetai, user) => {
       if (!user) return false;
-      if (meet.hostId && user?._id && String(user._id) === String(meet.hostId)) return true;
-      const raw = meet.raw || {};
+      if (skymeetai.hostId && user?._id && String(user._id) === String(skymeetai.hostId)) return true;
+      const raw = skymeetai.raw || {};
       const rawHost = raw.host || raw.host_info || null;
       if (rawHost && typeof rawHost === 'object') {
         if (user._id && String(rawHost._id || rawHost.id) === String(user._id)) return true;
         if (user.username && rawHost.username && String(user.username).toLowerCase() === String(rawHost.username).toLowerCase()) return true;
         if (user.email && rawHost.email && String(user.email).toLowerCase() === String(rawHost.email).toLowerCase()) return true;
       }
-      return (meet.participants || []).some((p) => userMatchesParticipant(user, p));
+      return (skymeetai.participants || []).some((p) => userMatchesParticipant(user, p));
     };
 
     const fetchHistory = async () => {

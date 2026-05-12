@@ -26,7 +26,7 @@
 2026-05-08 02:41:06,525 | INFO |   dropout: 0.231182
 2026-05-08 02:41:06,525 | INFO |   ravdess_weight_b: 1.573728
 2026-05-08 02:41:06,527 | INFO | 
-Saved to /Users/anupamkumar/Desktop/meet/emotion_service/logs/best_hparams_ab.json
+Saved to /Users/anupamkumar/Desktop/skymeetai/emotion_service/logs/best_hparams_ab.json
 2026-05-08 02:41:06,528 | INFO | 
 Top 5 trials (ranked by Phase B val accuracy):
 2026-05-08 02:41:06,528 | INFO |   Trial  11 | phase_b_val_acc=0.7829
@@ -83,7 +83,7 @@ Top 5 trials (ranked by Phase B val accuracy):
 2026-05-08 11:38:14,976 | INFO |   ravdess_weight_b: 1.064065
 2026-05-08 11:38:14,976 | INFO |   swa_tail: 3
 2026-05-08 11:38:14,979 | INFO | 
-Saved to /Users/anupamkumar/Desktop/meet/emotion_service/logs/best_hparams_ab.json
+Saved to /Users/anupamkumar/Desktop/skymeetai/emotion_service/logs/best_hparams_ab.json
 2026-05-08 11:38:14,979 | INFO | 
 Top 5 trials (ranked by composite score):
 2026-05-08 11:38:14,979 | INFO |   Trial   1 | composite=0.7722 | val=0.7768  f1=0.7774  rav=0.7821  cre=0.7715  ece=0.0452  test=-1.0000  swa=False
@@ -134,7 +134,7 @@ Top 5 trials (ranked by composite score):
 2026-05-08 14:37:04,302 | INFO |   mixup_alpha: 0.166792
 2026-05-08 14:37:04,302 | INFO |   mixup_prob: 0.220746
 2026-05-08 14:37:04,306 | INFO | 
-Saved to /Users/anupamkumar/Desktop/meet/emotion_service/logs/best_hparams_ab.json
+Saved to /Users/anupamkumar/Desktop/skymeetai/emotion_service/logs/best_hparams_ab.json
 2026-05-08 14:37:04,306 | INFO | 
 Top 5 trials (ranked by composite score):
 2026-05-08 14:37:04,306 | INFO |   Trial  19 | composite=0.7735 | val=0.7794  f1=0.7790  rec=0.7787  rav=0.7995  cre=0.7592  ece=0.0552  test=-1.0000  swa=False  ep_b=20

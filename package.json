@@ -1,0 +1,18 @@
+{
+  "name": "skymeetai",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -n FRONTEND,BACKEND,EMOTION,TRANSCRIPT -c blue,green,magenta,yellow \"npm run dev:frontend\" \"npm run dev:backend\" \"npm run dev:emotion\" \"npm run dev:transcript\"",
+
+    "dev:frontend": "cd frontend && npm start",
+
+    "dev:backend": "cd backend && npm run dev",
+
+    "dev:emotion": "./emotion_service/venv/bin/python -m uvicorn app:app --app-dir emotion_service --host 0.0.0.0 --port 5002 --reload",
+
+    "dev:transcript": "./transcript_service/venv/bin/python -m uvicorn app:app --app-dir transcript_service --host 0.0.0.0 --port 5001 --reload"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.1"
+  }
+}

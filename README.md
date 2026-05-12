@@ -266,7 +266,7 @@ sequenceDiagram
 
     Note over FE,TS: 6 — Transcript Upload (after host ends meeting)
     FE->>BE: emit end-meeting
-    Note over BE: No server-side relay handler exists; non-host clients receive end-meeting via useSocket.js client-side handling
+    Note over BE: Non-host clients receive end-meeting via client-side handler in useSocket.js
     FE->>TS: POST /process_meeting (multipart audio blobs, x-host-secret)
     TS-->>FE: HTTP 202 (processing started)
 
@@ -294,9 +294,9 @@ graph TD
     LB["Reverse Proxy / Load Balancer\n(not included in repository)\nsticky-session required"]
 
     subgraph BackendCluster ["Backend — Node.js pm2"]
-        B0["meet-8000 :8000\n512 MiB max RSS"]
-        B1["meet-8001 :8001\n512 MiB max RSS"]
-        B2["meet-8002 :8002\n512 MiB max RSS"]
+        B0["skymeetai-8000 :8000\n512 MiB max RSS"]
+        B1["skymeetai-8001 :8001\n512 MiB max RSS"]
+        B2["skymeetai-8002 :8002\n512 MiB max RSS"]
     end
 
     subgraph PythonServices ["Python Services — uvicorn"]
@@ -322,7 +322,7 @@ graph TD
 ```
 
 - **Frontend**: Static SPA built with `react-scripts build`. Served by any static file host or CDN. Connects to all three backend services via environment-variable-configured URLs.
-- **Backend**: Three pm2 instances (`meet-8000`, `meet-8001`, `meet-8002`) defined in `ecosystem.config.cjs`, each binding a distinct port. Socket.IO events are fanned out across processes via the Redis adapter. Each process is configured with a 512 MiB `max_memory_restart` threshold and exponential-backoff restart delay. An external reverse proxy with sticky-session support is required.
+- **Backend**: Three pm2 instances (`skymeetai-8000`, `skymeetai-8001`, `skymeetai-8002`) defined in `ecosystem.config.cjs`, each binding a distinct port. Socket.IO events are fanned out across processes via the Redis adapter. Each process is configured with a 512 MiB `max_memory_restart` threshold and exponential-backoff restart delay. An external reverse proxy with sticky-session support is required.
 - **Emotion Service**: Single uvicorn process on port 5002. Participant state (embedding buffers, pump handles, EMA) is held in in-process Python dicts; no horizontal scaling is implemented.
 - **Transcription Service**: Single uvicorn process on port 5001. Whisper and DistilRoBERTa models are loaded as module-level singletons at startup. File uploads are written to a local `uploads/` directory and deleted after 120 seconds.
 - **MongoDB**: Required before any backend process starts; connection failure causes `process.exit(1)`.
@@ -646,5 +646,5 @@ Detailed implementation references for each subsystem:
 
 - [`docs/frontend.md`](docs/frontend.md) — React component/hook architecture, WebRTC lifecycle, emotion capture pipeline, Socket.IO event contracts, error handling, known limitations.
 - [`docs/backend.md`](docs/backend.md) — Express routes, Socket.IO event handlers, Redis lock and adapter design, pm2 configuration, API contracts, security considerations.
-- [`docs/emotion-service.md`](docs/emotion-service.md) — Inference pipeline, model training, embedding extraction, performance characteristics, configuration schema.
+- [`docs/realTimeEmotionService.md`](docs/realTimeEmotionService.md) — Inference pipeline, model training, embedding extraction, performance characteristics, configuration schema.
 - [`docs/transcription-service.md`](docs/transcription-service.md) — ASR pipeline, segment merging logic, API contract, callback payload schema, error handling.

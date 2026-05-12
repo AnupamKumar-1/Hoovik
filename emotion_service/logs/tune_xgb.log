@@ -4,7 +4,7 @@
 2026-05-08 22:04:42,779 | INFO |   use_pca=True  pca_dim=512  seed=42
 2026-05-08 22:04:42,779 | INFO |   study_name=xgb_emotion  storage=sqlite:///optuna_xgb.db
 2026-05-08 22:04:42,779 | INFO | ============================================================
-2026-05-08 22:04:42,779 | INFO | Loading dataset from /Users/anupamkumar/Desktop/meet/emotion_service/extracted_dataset/dataset.npz
+2026-05-08 22:04:42,779 | INFO | Loading dataset from /Users/anupamkumar/Desktop/skymeetai/emotion_service/extracted_dataset/dataset.npz
 2026-05-08 22:04:43,144 | INFO | Loaded — train: 9629  val: 2294  test: 2299
 2026-05-08 22:04:43,145 | INFO | Building features...
 2026-05-08 22:04:45,778 | INFO | Feature build: 2.6s  shape=(9629, 8149)

@@ -132,9 +132,9 @@ The codebase is designed for `pm2` multi-process deployment (`ecosystem.config.c
 
 | pm2 name | `PORT` | `NODE_ENV` |
 |---|---|---|
-| `meet-8000` | `8000` | `production` |
-| `meet-8001` | `8001` | `production` |
-| `meet-8002` | `8002` | `production` |
+| `skymeetai-8000` | `8000` | `production` |
+| `skymeetai-8001` | `8001` | `production` |
+| `skymeetai-8002` | `8002` | `production` |
 
 Shared `base` settings (all three processes):
 
@@ -365,9 +365,9 @@ flowchart TD
     LB["Load Balancer / Reverse Proxy\n(not in this repository)"]
 
     subgraph PM2 ["pm2 — ecosystem.config.cjs"]
-        P0["meet-8000\nPORT=8000"]
-        P1["meet-8001\nPORT=8001"]
-        P2["meet-8002\nPORT=8002"]
+        P0["skymeetai-8000\nPORT=8000"]
+        P1["skymeetai-8001\nPORT=8001"]
+        P2["skymeetai-8002\nPORT=8002"]
     end
 
     subgraph Shared Infra

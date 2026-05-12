@@ -83,7 +83,7 @@
 2026-05-08 18:36:57,575 | INFO | [C] Early stopping at epoch 10 | best_acc=0.7847
 2026-05-08 18:36:57,628 | INFO | Phase C best restored (acc=0.7847)
 2026-05-08 18:36:57,628 | INFO | SWA: no epochs collected (Phase C stopped too early)
-2026-05-08 18:36:57,679 | INFO | Final best weights saved → /Users/anupamkumar/Desktop/meet/emotion_service/models/modal/best_modal.pt
+2026-05-08 18:36:57,679 | INFO | Final best weights saved → /Users/anupamkumar/Desktop/skymeetai/emotion_service/models/modal/best_modal.pt
 2026-05-08 18:36:58,798 | INFO | Temperature scaling: T=1.1732
 2026-05-08 18:36:59,852 | INFO |
 ==================== TEST RESULTS ====================

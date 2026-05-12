@@ -17,8 +17,8 @@ const base = {
 
 module.exports = {
     apps: [
-        { ...base, name: "meet-8000", env: { ...base.env, PORT: 8000 } },
-        { ...base, name: "meet-8001", env: { ...base.env, PORT: 8001 } },
-        { ...base, name: "meet-8002", env: { ...base.env, PORT: 8002 } },
+        { ...base, name: "skymeetai-8000", env: { ...base.env, PORT: 8000 } },
+        { ...base, name: "skymeetai-8001", env: { ...base.env, PORT: 8001 } },
+        { ...base, name: "skymeetai-8002", env: { ...base.env, PORT: 8002 } },
     ],
 };
