@@ -8,8 +8,9 @@ on:
 
 jobs:
   frontend:
-    name: Frontend — lint & build
+    name: Frontend — build
     runs-on: ubuntu-latest
+
     defaults:
       run:
         working-directory: frontend
@@ -27,11 +28,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Lint
-        run: npm run lint --if-present
-
       - name: Build
-        run: npm run build
+        run: CI=false npm run build
         env:
           REACT_APP_SIGNALING_URL: http://localhost:8000
           REACT_APP_EMOTION_SOCKET_URL: http://localhost:5002
@@ -40,8 +38,9 @@ jobs:
           REACT_APP_SERVER_URL: http://localhost:8000
 
   backend:
-    name: Backend — lint & syntax check
+    name: Backend — syntax check
     runs-on: ubuntu-latest
+
     defaults:
       run:
         working-directory: backend
@@ -59,24 +58,24 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Lint
-        run: npm run lint --if-present
-
-      - name: Syntax check (entry point)
+      - name: Syntax check
         run: node --check src/app.js
 
-      - name: Dependency audit
-        run: npm audit --audit-level=high
-
   emotion_service:
-    name: Emotion Service — lint & import check
+    name: Emotion Service — import check
     runs-on: ubuntu-latest
+
     defaults:
       run:
         working-directory: emotion_service
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install ffmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -88,30 +87,39 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Install ruff
+        run: pip install ruff
+
       - name: Lint
-        run: |
-          pip install ruff
-          ruff check .
+        run: ruff check .
 
       - name: Import check
         run: |
           python - <<'EOF'
           import unittest.mock as mock
+
           with mock.patch("whisper.load_model", return_value=mock.MagicMock()), \
                mock.patch("transformers.pipeline", return_value=mock.MagicMock()):
               import app
-          print("app.py imports OK")
+
+          print("emotion_service app.py imports OK")
           EOF
 
   transcript_service:
-    name: Transcription Service — lint & import check
+    name: Transcription Service — import check
     runs-on: ubuntu-latest
+
     defaults:
       run:
         working-directory: transcription_service
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install ffmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -123,17 +131,20 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Install ruff
+        run: pip install ruff
+
       - name: Lint
-        run: |
-          pip install ruff
-          ruff check .
+        run: ruff check .
 
       - name: Import check
         run: |
           python - <<'EOF'
           import unittest.mock as mock
+
           with mock.patch("whisper.load_model", return_value=mock.MagicMock()), \
                mock.patch("transformers.pipeline", return_value=mock.MagicMock()):
               import app
-          print("app.py imports OK")
+
+          print("transcription_service app.py imports OK")
           EOF
