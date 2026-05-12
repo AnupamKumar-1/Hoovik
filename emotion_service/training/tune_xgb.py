@@ -49,6 +49,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import joblib
+from sklearn.metrics import classification_report
 
 from train_xgb import (  # noqa: E402
     BASE_DIR,
@@ -205,7 +206,7 @@ def retrain_best(
     Returns:
         xgb.XGBClassifier: Trained model fitted on the combined train+val set.
     """
-    
+
     logger.info("\n" + "=" * 60)
     logger.info("FINAL RETRAIN WITH BEST PARAMS")
     logger.info("=" * 60)
