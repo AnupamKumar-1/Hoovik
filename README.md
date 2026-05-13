@@ -4,6 +4,8 @@
 
 ![CI](https://github.com/AnupamKumar-1/skymeetAI/actions/workflows/ci.yml/badge.svg)
 
+![SkyMeetAI demo](docs/src/skymeetai_hd.gif)
+
 SkyMeetAI was built from scratch to explore:
 - real-time communication systems,
 - distributed backend coordination,
