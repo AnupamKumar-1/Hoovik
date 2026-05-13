@@ -58,7 +58,7 @@ import soundfile as sf
 import socketio
 import torch
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from fastapi import FastAPI
+from fastapi import FastAPI , HTTPException
 
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
@@ -220,7 +220,7 @@ _face_pending_lock = threading.Lock()
 
 predictor: Optional[EmotionPredictor] = None
 
-
+service_ready: bool = False
 _norm_stats: Optional[dict] = None
 
 
@@ -1177,7 +1177,7 @@ async def lifespan(_app: FastAPI):
     Uses try/finally so executors are always released even if model loading
     raises after partial initialisation.
     """
-    global _norm_stats, predictor
+    global _norm_stats, predictor , service_ready
 
     logger.info("═══ Emotion WS server starting (device=%s) ═══", DEVICE)
     loop = asyncio.get_running_loop()
@@ -1193,11 +1193,16 @@ async def lifespan(_app: FastAPI):
         logger.info("Loading inference predictor (ensemble + anomaly) …")
         predictor = await loop.run_in_executor(None, EmotionPredictor)
         logger.info("Inference predictor ready")
+        
+        service_ready = True
+        logger.info("═══ Server ready ═══")
+        yield
 
         logger.info("═══ Server ready ═══")
         yield
 
     finally:
+        service_ready = False
         logger.info("Shutting down …")
         _latency_tracker.report_now()
         if _scheduler_started and scheduler.running:
@@ -1214,5 +1219,21 @@ from observability.stats import stats_router, set_tracker
 
 set_tracker(_latency_tracker)
 app.include_router(stats_router)
+
+@app.get("/health")
+async def health() -> dict[str, str]:
+    """Liveness probe — no model or I/O checks."""
+    return {"status": "ok"}
+
+
+@app.get("/ready")
+async def ready() -> dict[str, str]:
+    """Readiness probe — true only after extractor + predictor init completed."""
+    if not service_ready:
+        raise HTTPException(
+            status_code=503,
+            detail={"status": "not_ready"},
+        )
+    return {"status": "ready"}
 
 app.mount("/", socketio.ASGIApp(sio, socketio_path="socket.io"))
