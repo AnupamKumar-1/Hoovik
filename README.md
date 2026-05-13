@@ -32,14 +32,15 @@ This repository documents the system at an implementation-grounded architectural
 6. [End-to-End Runtime Flow](#end-to-end-runtime-flow)
 7. [Deployment Topology](#deployment-topology)
 8. [Configuration](#configuration)
-9. [Running the System](#running-the-system)
-10. [Inter-Service Contracts](#inter-service-contracts)
-11. [Engineering Challenges](#engineering-challenges)
-12. [Operational Notes](#operational-notes)
-13. [Known Limitations](#known-limitations)
-14. [Contributing](#contributing)
-15. [License](#license)
-16. [Documentation](#documentation)
+9. [Dataset](#dataset)
+10. [Running the System](#running-the-system)
+11. [Inter-Service Contracts](#inter-service-contracts)
+12. [Engineering Challenges](#engineering-challenges)
+13. [Operational Notes](#operational-notes)
+14. [Known Limitations](#known-limitations)
+15. [Contributing](#contributing)
+16. [License](#license)
+17. [Documentation](#documentation)
 
 ---
 
@@ -379,6 +380,16 @@ See [`docs/transcription-service.md`](docs/transcription-service.md) for runtime
 
 ---
 
+## Dataset
+
+The training dataset used for the `EmotionTransformer` and XGBoost ensemble is provided as a compressed NumPy archive (`dataset.npz`). It contains the paired audio/video embedding sequences and ground-truth emotion labels used to train and evaluate the multimodal inference pipeline.
+
+**Download**: [dataset.npz — Google Drive](https://drive.google.com/file/d/135wYH7DB8_10Jc8g08MfC6Poews_Lkgp/view?usp=sharing)
+
+After downloading, place the file under `emotion_service/` before running the training pipeline. See [`docs/emotion-service.md`](docs/emotion-service.md) for the full training procedure.
+
+---
+
 ## Running the System
 
 Start services in this order. Later services depend on earlier ones being reachable.
@@ -393,6 +404,28 @@ flowchart LR
 
     S1 --> S2 --> S3 --> S4 --> S5
 ```
+
+### Single-command development start
+
+After MongoDB and Redis are running, all four services (frontend, backend, emotion service, transcription service) can be started together from the repository root:
+
+```bash
+npm install        # install concurrently (one-time)
+npm run dev
+```
+
+This runs the following processes in parallel, each with a colour-coded prefix in the terminal output:
+
+| Prefix | Service | Command |
+|---|---|---|
+| `FRONTEND` | React SPA | `cd frontend && npm start` |
+| `BACKEND` | Node.js / Express + Socket.IO | `cd backend && npm run dev` |
+| `EMOTION` | FastAPI emotion inference | `uvicorn app:app --app-dir emotion_service --port 5002` |
+| `TRANSCRIPT` | FastAPI transcription pipeline | `uvicorn app:app --app-dir transcript_service --port 5001` |
+
+> **Note**: Python virtual environments must already be set up under `emotion_service/venv` and `transcript_service/venv`. Start MongoDB and Redis before running this command.
+
+---
 
 ### 1. MongoDB and Redis
 
