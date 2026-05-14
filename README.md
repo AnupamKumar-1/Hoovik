@@ -197,7 +197,7 @@ graph TD
 
 **Key technologies**: Python, FastAPI, Socket.IO (python-socketio), PyTorch (`EmotionTransformer`), XGBoost, MediaPipe, HuggingFace `wav2vec2-large-robust`, APScheduler, uvicorn.
 
-**Protocols used**: Socket.IO — client sends `emotion.frame`, `audio_chunk`, `participant.media_state`; service returns `emotion.result`, `backpressure`, `server.status`. HTTP GET — `GET /stats` (HTML dashboard), `GET /stats/json` (programmatic snapshot).
+**Protocols used**: Socket.IO — client sends `emotion.frame`, `audio_chunk`, `participant.media_state`; service returns `emotion.result`, `backpressure`, `server.status`. HTTP GET — `GET /health` (liveness probe), `GET /ready` (readiness probe), `GET /stats` (HTML dashboard), `GET /stats/json` (programmatic snapshot).
 
 **Observed inference latency**: median 300–500 ms at 10 concurrent participants (runtime log, 2026-05-07); hardware-dependent. Live per-modality percentiles (P50/P90/P95) are visible at `/stats` while the server is running.
 
@@ -614,7 +614,7 @@ The following constraints are grounded in the current implementation and are rel
 
 - **TURN credentials are hardcoded**: `meetConfig.js` contains plaintext `openrelayproject` credentials. Time-limited dynamic TURN provisioning is not implemented.
 
-- **Emotion service has no health endpoint**: There is no `/health` or `/ready` HTTP route. Load balancer health checks must use a TCP probe or an alternative mechanism. A live latency dashboard is available at `GET /stats` (browser) and `GET /stats/json` (JSON) — these are observability endpoints, not health probes.
+- **Emotion service health and readiness endpoints**: `GET /health` returns `{"status": "ok"}` (HTTP 200) as a lightweight liveness probe. `GET /ready` returns `{"status": "ready"}` (HTTP 200) only after successful model loading; returns HTTP 503 if the service is not yet initialised. These replace the previous TCP-probe requirement for load balancer health checks. The observability dashboard remains available at `GET /stats` (browser) and `GET /stats/json` (JSON).
 
 - **Backend CORS allowlist is hardcoded**: Origins outside `localhost:3000` and `skymeetai.onrender.com` are rejected. Adding origins requires a code change and redeployment.
 
@@ -638,7 +638,7 @@ The following are platform-level limitations that emerge from the combined archi
 
 **English-only transcription**: The Whisper model is configured with `language="en"` hardcoded. Multilingual meetings will produce degraded or incorrect transcripts.
 
-**Multiple services must be independently operated**: There is no unified health check, orchestration layer, or supervisor across the four services. Operators must monitor each process separately.
+**Multiple services must be independently operated**: There is no unified orchestration layer or supervisor across the four services. Operators must monitor each process separately. The emotion service exposes `GET /health` and `GET /ready` for liveness and readiness probing; the other services do not yet expose dedicated health endpoints.
 
 ---
 

@@ -17,6 +17,7 @@ Real-time multimodal emotion recognition for video meetings. The service ingests
 - **Actor-disjoint train/val/test splits** — strict speaker-independent evaluation across RAVDESS and CREMA-D
 - **Optuna hyperparameter tuning** — separate search for the Transformer (`tune.py`) and XGBoost (`tune_xgb.py`)
 - **Locust load testing** — WebSocket stress testing via `locustfile.py`
+- **Health and readiness endpoints** — `GET /health` returns `{"status": "ok"}` (HTTP 200) as a lightweight liveness probe with no model dependency; `GET /ready` returns `{"status": "ready"}` (HTTP 200) only after successful model loading, or HTTP 503 if initialisation is incomplete — suitable for load balancer health checks
 - **Live latency dashboard** — `GET /stats` renders a browser-friendly auto-refreshing dashboard; `GET /stats/json` exposes the same P50/P90/P95/min/max snapshot for programmatic access
 
 ---
@@ -595,6 +596,8 @@ While the server is running, inference latency statistics are available without 
 
 | Endpoint | Access | Description |
 |---|---|---|
+| `GET /health` | HTTP | Liveness probe — returns `{"status": "ok"}` (HTTP 200); lightweight, no model dependency |
+| `GET /ready` | HTTP | Readiness probe — returns `{"status": "ready"}` (HTTP 200) after successful model loading; returns HTTP 503 if not yet initialised |
 | `GET /stats` | Browser | Auto-refreshing HTML dashboard showing P50/P90/P95/min/mean/max per modality and overall; updates every 5 s |
 | `GET /stats/json` | HTTP | JSON snapshot of the same data; suitable for monitoring scripts or dashboards |
 
@@ -717,7 +720,6 @@ Feature version `v2.0-iqr-ratio-jitter` — 9,452 dims per sample. Anomaly detec
 - **MP3/AAC unsupported**: clients must send WAV, FLAC, OGG, or raw float32 PCM
 - **Single inference thread**: hard scalability ceiling for large participant counts
 - **No horizontal scaling**: pump state is in-process Python dicts; multi-host deployment requires an external state store (Redis, etc.)
-- **No HTTP health endpoint**: no `/health` or `/ready` route for load balancer probes. The `/stats` and `/stats/json` endpoints provide observability but are not health probes
 
 ---
 
