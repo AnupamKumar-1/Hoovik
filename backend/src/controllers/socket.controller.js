@@ -60,6 +60,10 @@ function broadcastParticipants(code, io) {
     try {
 
       const participants_map = await getParticipants(code);
+      if (!participants_map) {
+        log.warn("participants broadcast skipped after redis read failure", { code });
+        return;
+      }
       if (!participants_map.size) return;
 
       const participants = Array.from(participants_map.values())
