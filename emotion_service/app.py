@@ -1198,9 +1198,6 @@ async def lifespan(_app: FastAPI):
         logger.info("═══ Server ready ═══")
         yield
 
-        logger.info("═══ Server ready ═══")
-        yield
-
     finally:
         service_ready = False
         logger.info("Shutting down …")
