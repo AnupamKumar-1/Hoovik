@@ -6,6 +6,13 @@
 
 **Live Demo:** https://skymeetai.onrender.com
 
+| Service | Platform |
+|---------|----------|
+| Frontend | Render |
+| Backend (Node.js) | Render |
+| Emotion Service | Azure |
+| Transcription Service | Azure |
+
 ![SkyMeetAI demo](docs/src/skymeetai_hd.gif)
 
 SkyMeetAI was built from scratch to explore:
