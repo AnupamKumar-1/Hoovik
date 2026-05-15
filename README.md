@@ -100,7 +100,7 @@ graph LR
     FD["frontend.md"]
     BD["backend.md"]
     ED["emotion-service.md"]
-    TD["transcription-service.md"]
+    TD["transcript_service.md"]
 
     Root --> FE & BE & EM & TR & LT & DO
     LT --> LF & SR
@@ -213,7 +213,7 @@ graph TD
 
 **Protocols used**: HTTP multipart POST (`POST /process_meeting`, returns HTTP 202 immediately); HTTP POST callback to `NODE_API` — asynchronous, no retry.
 
-**See**: [`docs/transcription-service.md`](docs/transcription-service.md)
+**See**: [`docs/transcript_service.md`](docs/transcript_service.md)
 
 ---
 
@@ -376,7 +376,7 @@ See [`docs/emotion-service.md`](docs/emotion-service.md) for the full config sch
 | `NODE_API` | `http://localhost:8000/api/v1/transcripts` | Backend callback URL |
 | `ALLOWED_ORIGINS` | `""` (no origins) | Comma-separated CORS allowlist |
 
-See [`docs/transcription-service.md`](docs/transcription-service.md) for runtime path constants.
+See [`docs/transcript_service.md`](docs/transcript_service.md) for runtime path constants.
 
 ---
 
@@ -665,7 +665,7 @@ Follow the existing style within each subsystem. The Node.js backend uses ES Mod
 
 ### Reporting issues
 
-Open a GitHub issue with a description of the observed behaviour, the service involved, the steps to reproduce, and any relevant log output. Tag the issue with the subsystem label (`frontend`, `backend`, `emotion-service`, or `transcription-service`) if applicable.
+Open a GitHub issue with a description of the observed behaviour, the service involved, the steps to reproduce, and any relevant log output. Tag the issue with the subsystem label (`frontend`, `backend`, `emotion-service`, or `transcript_service`) if applicable.
 
 ---
 
@@ -682,4 +682,4 @@ Detailed implementation references for each subsystem:
 - [`docs/frontend.md`](docs/frontend.md) — React component/hook architecture, WebRTC lifecycle, emotion capture pipeline, Socket.IO event contracts, error handling, known limitations.
 - [`docs/backend.md`](docs/backend.md) — Express routes, Socket.IO event handlers, Redis lock and adapter design, pm2 configuration, API contracts, security considerations.
 - [`docs/realTimeEmotionService.md`](docs/realTimeEmotionService.md) — Inference pipeline, model training, embedding extraction, performance characteristics, configuration schema.
-- [`docs/transcription-service.md`](docs/transcription-service.md) — ASR pipeline, segment merging logic, API contract, callback payload schema, error handling.
+- [`docs/transcript_service.md`](docs/transcript_service.md) — ASR pipeline, segment merging logic, API contract, callback payload schema, error handling.
