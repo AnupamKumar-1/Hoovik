@@ -4,6 +4,8 @@
 
 ![CI](https://github.com/AnupamKumar-1/skymeetAI/actions/workflows/ci.yml/badge.svg)
 
+**Live Demo:** https://skymeetai.onrender.com
+
 ![SkyMeetAI demo](docs/src/skymeetai_hd.gif)
 
 SkyMeetAI was built from scratch to explore:
