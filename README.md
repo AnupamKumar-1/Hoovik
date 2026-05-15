@@ -92,7 +92,7 @@ graph LR
     FE["frontend/\nReact SPA"]
     BE["backend/\nNode.js · Express · Socket.IO"]
     EM["emotion_service/\nPython · FastAPI · PyTorch"]
-    TR["transcription_service/\nPython · FastAPI · Whisper"]
+    TR["transcript_service/\nPython · FastAPI · Whisper"]
     LT["load_testing/\nLocust WebSocket tests"]
     LF["locustfile.py"]
     SR["src/\nParticipant face images"]
