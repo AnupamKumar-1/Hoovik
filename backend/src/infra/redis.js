@@ -7,6 +7,7 @@ function makeClient(name) {
     const c = createClient({
         url: REDIS_URL,
         socket: {
+            tls: true,
             reconnectStrategy: (r) =>
                 Math.min(r * 100 + Math.random() * 100, 3000), },
     });
