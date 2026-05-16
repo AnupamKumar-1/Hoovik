@@ -6,12 +6,9 @@
 
 **Live Demo:** https://skymeetai.onrender.com
 
-| Service | Platform |
-|---------|----------|
-| Frontend | Render |
-| Backend (Node.js) | Render |
-| Emotion Service | Azure |
-| Transcription Service | Azure |
+| Frontend | Backend (Node.js) | Emotion Service | Transcript Service |
+|----------|------------------|-----------------|-------------------|
+| Render | Render | Azure | Azure |
 
 ![SkyMeetAI demo](docs/src/skymeetai_hd.gif)
 
@@ -79,7 +76,7 @@ SkyMeetAI is composed of four services, each with its own runtime, dependency gr
 | **Frontend** | React SPA (browser) | UI, WebRTC peer management, emotion capture, chat |
 | **Backend** | Node.js / Express + Socket.IO | Signalling, auth, room management, transcript storage |
 | **Emotion Service** | Python / FastAPI + Socket.IO | Real-time multimodal emotion inference |
-| **Transcription Service** | Python / FastAPI | Post-meeting ASR, per-segment emotion, transcript delivery |
+| **Transcript Service** | Python / FastAPI | Post-meeting ASR, per-segment emotion, transcript delivery |
 
 ### Transport map
 
@@ -137,7 +134,7 @@ graph TD
         SIO_E["Socket.IO\nper-participant inference"]
     end
 
-    subgraph TranscriptSvc ["Transcription Service — Python (port 5001)"]
+    subgraph TranscriptSvc ["Transcript Service — Python (port 5001)"]
         HTTP_T["POST /process_meeting\n→ HTTP 202"]
     end
 
@@ -214,7 +211,7 @@ graph TD
 
 ---
 
-### Transcription Service
+### Transcript Service
 
 **Responsibility**: Accepts a multipart audio upload after a meeting ends; converts audio to mono 16 kHz WAV via ffmpeg; runs OpenAI Whisper (`small`) for speech-to-text; classifies per-segment emotion using `j-hartmann/emotion-english-distilroberta-base`; merges and sorts segments across speakers; delivers the structured transcript JSON to the backend via an HTTP POST callback.
 
@@ -235,7 +232,7 @@ sequenceDiagram
     participant RD as Redis
     participant MG as MongoDB
     participant EM as Emotion Service
-    participant TS as Transcription Service
+    participant TS as Transcript Service
 
     Note over FE,BE: 1 — Room Creation
     FE->>BE: POST /api/v1/users/login
@@ -313,7 +310,7 @@ graph TD
 
     subgraph PythonServices ["Python Services — uvicorn"]
         ES["Emotion Service\n:5002 — single process"]
-        TS["Transcription Service\n:5001 — single process"]
+        TS["Transcript Service\n:5001 — single process"]
     end
 
     subgraph DataStores ["Data Stores"]
@@ -336,7 +333,7 @@ graph TD
 - **Frontend**: Static SPA built with `react-scripts build`. Served by any static file host or CDN. Connects to all three backend services via environment-variable-configured URLs.
 - **Backend**: Three pm2 instances (`skymeetai-8000`, `skymeetai-8001`, `skymeetai-8002`) defined in `ecosystem.config.cjs`, each binding a distinct port. Socket.IO events are fanned out across processes via the Redis adapter. Each process is configured with a 512 MiB `max_memory_restart` threshold and exponential-backoff restart delay. An external reverse proxy with sticky-session support is required.
 - **Emotion Service**: Single uvicorn process on port 5002. Participant state (embedding buffers, pump handles, EMA) is held in in-process Python dicts; no horizontal scaling is implemented.
-- **Transcription Service**: Single uvicorn process on port 5001. Whisper and DistilRoBERTa models are loaded as module-level singletons at startup. File uploads are written to a local `uploads/` directory and deleted after 120 seconds.
+- **Transcript Service**: Single uvicorn process on port 5001. Whisper and DistilRoBERTa models are loaded as module-level singletons at startup. File uploads are written to a local `uploads/` directory and deleted after 120 seconds.
 - **MongoDB**: Required before any backend process starts; connection failure causes `process.exit(1)`.
 - **Redis**: Required before any backend process starts; connection failure causes `process.exit(1)`. Used for Socket.IO adapter pub/sub, room state, distributed locks, rate limiting, and TTL caches.
 
@@ -408,7 +405,7 @@ flowchart LR
     S1["1. MongoDB\n+ Redis"]
     S2["2. Backend\npm2 start ecosystem.config.cjs"]
     S3["3. Emotion Service\nuvicorn app:app --port 5002"]
-    S4["4. Transcription Service\nuvicorn app:app --port 5001"]
+    S4["4. Transcript Service\nuvicorn app:app --port 5001"]
     S5["5. Frontend\nnpm start / npm run build"]
 
     S1 --> S2 --> S3 --> S4 --> S5
@@ -471,15 +468,15 @@ uvicorn app:app --host 0.0.0.0 --port 5002
 
 Trained model files (`best_modal.pt`, `xgb_model.joblib`, `weights.json`, anomaly detectors) must be present under `models/` before starting. If any model fails to load, the server refuses to start. See [`docs/emotion-service.md`](docs/emotion-service.md) for the training pipeline.
 
-### 4. Transcription Service
+### 4. Transcript Service
 
 ```bash
-cd transcription_service
+cd transcript_service
 pip install -r requirements.txt
 uvicorn app:app --host 0.0.0.0 --port 5001
 ```
 
-Note: the `uvicorn.run` call inside `app.py` references `"main:app"`; invoke via `uvicorn app:app` directly rather than `python app.py`. Whisper and DistilRoBERTa models are downloaded from HuggingFace on first run if not cached. `ffmpeg` must be available in `PATH`.
+Note: the `uvicorn.run` call inside `app.py` references `"main:app"`; invoke via `uvicorn app:app` directly rather than `python app.py`. Whisper and DistilRoBERTa models are downloaded from HuggingFace on first run if not cached. ~~`ffmpeg` must be available in `PATH`.~~ *(fixed: ffmpeg is now checked on startup — [#8](https://github.com/AnupamKumar-1/skymeetAI/pull/8))*
 
 ### 5. Frontend
 
@@ -541,7 +538,7 @@ flowchart LR
     end
 ```
 
-### Transcript Upload — Frontend → Transcription Service (HTTP)
+### Transcript Upload — Frontend → Transcript Service (HTTP)
 
 ```mermaid
 flowchart LR
@@ -555,11 +552,11 @@ flowchart LR
     TS --> BG
 ```
 
-### Transcript Persistence — Transcription Service → Backend (HTTP)
+### Transcript Persistence — Transcript Service → Backend (HTTP)
 
 ```mermaid
 flowchart LR
-    TS["Transcription Service\n(background task)"]
+    TS["Transcript Service\n(background task)"]
     BE["POST /api/v1/transcripts\n(NODE_API)"]
     MG[("MongoDB")]
     RD[("Redis cache\nTTL 300 s")]
@@ -623,7 +620,7 @@ The following constraints are grounded in the current implementation and are rel
 
 - **TURN credentials are hardcoded**: `meetConfig.js` contains plaintext `openrelayproject` credentials. Time-limited dynamic TURN provisioning is not implemented.
 
-- **Emotion service health and readiness endpoints**: `GET /health` returns `{"status": "ok"}` (HTTP 200) as a lightweight liveness probe. `GET /ready` returns `{"status": "ready"}` (HTTP 200) only after successful model loading; returns HTTP 503 if the service is not yet initialised. These replace the previous TCP-probe requirement for load balancer health checks. The observability dashboard remains available at `GET /stats` (browser) and `GET /stats/json` (JSON).
+- ~~**Emotion service health and readiness endpoints**: `GET /health` returns `{"status": "ok"}` (HTTP 200) as a lightweight liveness probe. `GET /ready` returns `{"status": "ready"}` (HTTP 200) only after successful model loading; returns HTTP 503 if the service is not yet initialised. These replace the previous TCP-probe requirement for load balancer health checks. The observability dashboard remains available at `GET /stats` (browser) and `GET /stats/json` (JSON).~~ *(merged: health and readiness endpoints added — [#3](https://github.com/AnupamKumar-1/skymeetAI/pull/3))*
 
 - **Backend CORS allowlist is hardcoded**: Origins outside `localhost:3000` and `skymeetai.onrender.com` are rejected. Adding origins requires a code change and redeployment.
 
@@ -647,7 +644,7 @@ The following are platform-level limitations that emerge from the combined archi
 
 **English-only transcription**: The Whisper model is configured with `language="en"` hardcoded. Multilingual meetings will produce degraded or incorrect transcripts.
 
-**Multiple services must be independently operated**: There is no unified orchestration layer or supervisor across the four services. Operators must monitor each process separately. The emotion service exposes `GET /health` and `GET /ready` for liveness and readiness probing; the other services do not yet expose dedicated health endpoints.
+**Multiple services must be independently operated**: There is no unified orchestration layer or supervisor across the four services. Operators must monitor each process separately. ~~The emotion service exposes `GET /health` and `GET /ready` for liveness and readiness probing; the other services do not yet expose dedicated health endpoints.~~ *(merged: health and readiness endpoints added — [#3](https://github.com/AnupamKumar-1/skymeetAI/pull/3))*
 
 ---
 
