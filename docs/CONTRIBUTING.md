@@ -1,6 +1,6 @@
 # Contributing to SkyMeetAI
 
-Thanks for your interest in contributing. SkyMeetAI spans four independent services across two language ecosystems — please read the relevant section before opening a PR.
+SkyMeetAI is a distributed real-time communication platform composed of four independent services across Node.js and Python ecosystems. Before contributing, please read the setup and documentation for the subsystem you plan to modify, and keep changes scoped where possible.
 
 ---
 
@@ -30,13 +30,13 @@ Thanks for your interest in contributing. SkyMeetAI spans four independent servi
 | Tool | Minimum version | Notes |
 |---|---|---|
 | Node.js | 20.x | Backend and frontend |
-| npm | 9.x | Comes with Node |
+| npm | 9+ | Comes with Node |
 | Python | 3.12.x (emotion service), 3.13.x (transcript service) | Version mismatch may cause dependency issues |
 | pip | 23+ | |
 | MongoDB | 6.x | Local or Atlas |
-| Redis | 7.x | Local instance |
+| Redis | 7+ | Local instance |
 | ffmpeg | any recent | Required by transcript service; must be in `PATH`. Install: `brew install ffmpeg` (macOS) / `sudo apt install ffmpeg` (Ubuntu) |
-| pm2 | 5.x | `npm install -g pm2` — for multi-process backend |
+| pm2 | 5+ | `npm install -g pm2` — for multi-process backend |
 
 ---
 
@@ -67,20 +67,35 @@ Ubuntu:
 sudo apt install redis-server
 ```
 
-Windows — Redis doesn't have an official native build. Use WSL2 (recommended) or download from [tporadowski/redis](https://github.com/tporadowski/redis/releases):
-```powershell
-# inside WSL2
-sudo apt install redis-server
+Windows — Redis doesn't have an official native build. Use [Upstash](https://upstash.com) (recommended) — free tier, no install required:
+
+1. Create a free account at [upstash.com](https://upstash.com)
+2. Create a new Redis database
+3. In the database dashboard, select **TCP** (not REST) and copy the connection URL
+4. Add it to `backend/.env`:
+
+```dotenv
+REDIS_URL=rediss://<your-upstash-url>
 ```
 
-**Start both services:**
+If the backend throws a Redis connection error, add `tls: true` to `backend/src/infra/redis.js`:
+
+```javascript
+function makeClient(name) {
+    const c = createClient({
+        url: REDIS_URL,
+        socket: {
+            tls: true,  // add this
+```
+
+**Start both services (macOS / Linux):**
 
 ```bash
 mongod --dbpath /data/db   # local MongoDB
 redis-server               # local Redis (default port 6379)
 ```
 
-**Verify Redis is running** (should return `PONG`):
+**Verify Redis is running** (macOS / Linux, should return `PONG`):
 
 ```bash
 redis-cli ping
@@ -226,10 +241,6 @@ The following files must be present before the server will start. The server ref
 
 ```
 emotion_service/
-├── extracted_dataset/
-│   ├── dataset.npz
-│   ├── norm_stats.npz
-│   └── splits.json
 └── models/
     ├── face_landmarker.task
     ├── anomaly/
@@ -251,7 +262,7 @@ emotion_service/
         └── xgb_model.joblib
 ```
 
-If you are not modifying the model, you only need the files under `models/` — not `extracted_dataset/`. See [Dataset](#dataset-emotion-service-only) and [docs/realTimeEmotionService.md](docs/realTimeEmotionService.md) for the full training pipeline.
+`extracted_dataset/` is only required if you are retraining the model. It is not needed to run the inference server.
 
 **Run:**
 
@@ -370,14 +381,18 @@ This starts all four services in parallel with colour-coded output:
 Once all services are running:
 
 ```bash
-# Emotion service
 curl http://localhost:5002/health     # → {"status": "ok"}
 curl http://localhost:5002/ready      # → {"status": "ready"} (only after models load)
 curl http://localhost:5002/stats/json # → latency snapshot
-# Observability dashboard — open http://localhost:5002/stats directly in your browser
-
-# Frontend — open http://localhost:3000 in your browser
 ```
+
+Open the observability dashboard in your browser:
+
+http://localhost:5002/stats
+
+Open the frontend in your browser:
+
+http://localhost:3000
 
 ---
 
