@@ -650,28 +650,7 @@ The following are platform-level limitations that emerge from the combined archi
 
 ## Contributing
 
-Contributions are welcome. The codebase spans four independent services across two language ecosystems (Node.js and Python), so please read the relevant subsystem README before opening a pull request.
-
-### Getting started
-
-1. Fork the repository and create a branch from `main`.
-2. Read the subsystem README for the area you are changing before writing any code.
-3. Keep changes scoped to a single subsystem where possible. Cross-service changes require updating both the implementation and the relevant subsystem README.
-4. If you are changing a Socket.IO event name, payload shape, or HTTP contract, update [`docs/`](docs/) to match.
-
-### What to consider before contributing
-
-- The [Known Limitations](#known-limitations) section lists areas the current architecture does not address well. Contributions that improve these are particularly useful — but please open an issue first to discuss the approach, as some limitations (e.g., emotion service state externalisation) require coordinated changes across services.
-- The [Engineering Challenges](#engineering-challenges) section documents why certain decisions were made. Understanding this context helps avoid re-introducing problems that were already solved.
-- A CI pipeline runs lint and build checks on every push and pull request (`.github/workflows/ci.yml`). Tests, if added, should be documented in the relevant subsystem README.
-
-### Coding conventions
-
-Follow the existing style within each subsystem. The Node.js backend uses ES Modules (`"type": "module"` in `package.json`); the Python services use standard PEP 8 formatting. No linter configuration is currently enforced at the repository level.
-
-### Reporting issues
-
-Open a GitHub issue with a description of the observed behaviour, the service involved, the steps to reproduce, and any relevant log output. Tag the issue with the subsystem label (`frontend`, `backend`, `emotion-service`, or `transcript_service`) if applicable.
+Contributions are welcome. See [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) for the full local setup guide, environment configuration, and contribution guidelines.
 
 ---
 
@@ -685,6 +664,7 @@ Licensed under the MIT License. See [LICENSE](LICENSE).
 
 Detailed implementation references for each subsystem:
 
+- [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) — Local setup, environment configuration, prerequisites, and contribution guidelines.
 - [`docs/frontend.md`](docs/frontend.md) — React component/hook architecture, WebRTC lifecycle, emotion capture pipeline, Socket.IO event contracts, error handling, known limitations.
 - [`docs/backend.md`](docs/backend.md) — Express routes, Socket.IO event handlers, Redis lock and adapter design, pm2 configuration, API contracts, security considerations.
 - [`docs/realTimeEmotionService.md`](docs/realTimeEmotionService.md) — Inference pipeline, model training, embedding extraction, performance characteristics, configuration schema.
