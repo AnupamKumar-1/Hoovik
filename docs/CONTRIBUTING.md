@@ -228,21 +228,15 @@ EMOTION_SERVER_URL=http://localhost:5002
 
 > The emotion service is primarily configured via `config/config.json` (model paths, EMA alpha, sequence length). Environment variables are supplementary.
 
-**Download the MediaPipe face landmarker model:**
-
-```bash
-curl -L -o emotion_service/models/face_landmarker.task \
-  https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task
-```
-
 **Model files required before starting:**
 
 The following files must be present before the server will start. The server refuses to start if any model fails to load.
 
 ```
 emotion_service/
+├── embeddings/
+│   └── face_landmarker.task
 └── models/
-    ├── face_landmarker.task
     ├── anomaly/
     │   ├── iso_audio_only.joblib
     │   ├── iso_both.joblib
