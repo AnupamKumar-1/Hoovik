@@ -1,4 +1,29 @@
+import logging
+import shutil
 import subprocess
+
+
+logger = logging.getLogger(__name__)
+
+
+def ensure_ffmpeg_available() -> None:
+    """Verify that the ``ffmpeg`` executable is installed and on ``PATH``.
+
+    Intended to be called during service startup so a missing dependency
+    fails fast with a clear message instead of surfacing later during the
+    first audio conversion request.
+
+    Raises:
+        RuntimeError: If ``ffmpeg`` cannot be located on ``PATH``.
+    """
+    if shutil.which("ffmpeg") is None:
+        message = (
+            "ffmpeg executable not found on PATH. "
+            "transcript_service requires ffmpeg for audio conversion; "
+            "install it (e.g. `apt-get install -y ffmpeg`) and restart the service."
+        )
+        logger.error(message)
+        raise RuntimeError(message)
 
 
 def convert_to_wav(src_path: str, dst_path: str) -> None:

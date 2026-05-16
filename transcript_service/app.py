@@ -13,7 +13,10 @@ from fastapi.responses import JSONResponse
 from werkzeug.utils import secure_filename
 
 from config import *
-from utils.audio import convert_to_wav
+from utils.audio import convert_to_wav, ensure_ffmpeg_available
+
+ensure_ffmpeg_available()
+
 from utils.helpers import allowed_file, clean_speaker, schedule_file_cleanup
 from services.asr_service import transcribe_and_emotion, build_intelligent_summary
 from services.processing_service import merge_segments, build_transcript_text
