@@ -15,6 +15,7 @@ import {
   handleLeave,
   validateCode,
   getParticipants,
+  REDIS_READ_FAILED,
 } from "../services/socket.service.js";
 import { startTimer, endTimer } from "../observability/latency/latency.service.js";
 
@@ -60,6 +61,10 @@ function broadcastParticipants(code, io) {
     try {
 
       const participants_map = await getParticipants(code);
+      if (participants_map === REDIS_READ_FAILED) {
+        log.warn("broadcastParticipants skipped: redis unavailable", { code });
+        return;
+      }
       if (!participants_map.size) return;
 
       const participants = Array.from(participants_map.values())
@@ -89,12 +94,14 @@ async function getHostSocketId(io, meetingCode) {
 
     if (hostSocket) return hostSocket.id;
     const stateArr = await getState(meetingCode);
+    if (stateArr === REDIS_READ_FAILED) return null;
 
     return stateArr?.[0] ?? null;
 
 
   } catch {
     const stateArr = await getState(meetingCode);
+    if (stateArr === REDIS_READ_FAILED) return null;
     return stateArr?.[0] ?? null;
   }
 }

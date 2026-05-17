@@ -4,7 +4,7 @@ import path from "path";
 import os from "os";
 import crypto from "crypto";
 import { withRoomLock } from "../infra/redisLock.js";
-import { makeLogger, safeRedisGet, safeRedisSet, safeRedisDel, safeRedisIncr, safeRedisExpire } from "../utils/redis.utils.js";
+import { makeLogger, safeRedisGetResult, safeRedisSet, safeRedisDel, safeRedisIncr, safeRedisExpire } from "../utils/redis.utils.js";
 import { toBuffer } from "../utils/helpers.utils.js";
 
 import {
@@ -62,6 +62,8 @@ export const KEYS = {
 
 const log = makeLogger("socket");
 
+export const REDIS_READ_FAILED = Symbol("REDIS_READ_FAILED");
+
 export const mkdirp = (p) => fs.promises.mkdir(p, { recursive: true });
 export const unlink = (p) => fs.promises.rm(p,
     {
@@ -73,8 +75,10 @@ export const stat = (p) => fs.promises.stat(p).catch(() => null);
 export const writeFile = (p, buf) => fs.promises.writeFile(p, buf);
 
 export async function getState(code) {
-    const raw = await safeRedisGet(KEYS.state(code));
-    return raw ? JSON.parse(raw) : null;
+    const result = await safeRedisGetResult(KEYS.state(code));
+    if (!result.ok) return REDIS_READ_FAILED;
+    if (result.value === null) return null;
+    return JSON.parse(result.value);
 }
 export async function setState(code, arr) {
     await safeRedisSet(
@@ -87,10 +91,10 @@ export async function deleteState(code) {
 }
 
 export async function getParticipants(code) {
-    const raw = await safeRedisGet(KEYS.participants(code));
-    return raw ? new Map(
-        Object.entries(
-            JSON.parse(raw))) : new Map();
+    const result = await safeRedisGetResult(KEYS.participants(code));
+    if (!result.ok) return REDIS_READ_FAILED;
+    if (result.value === null) return new Map();
+    return new Map(Object.entries(JSON.parse(result.value)));
 }
 
 export async function setParticipants(code, map) {
@@ -106,8 +110,10 @@ export async function deleteParticipants(code) {
 }
 
 export async function getPartialMeta(key) {
-    const raw = await safeRedisGet(KEYS.partialMeta(key));
-    return raw ? JSON.parse(raw) : null;
+    const result = await safeRedisGetResult(KEYS.partialMeta(key));
+    if (!result.ok) return REDIS_READ_FAILED;
+    if (result.value === null) return null;
+    return JSON.parse(result.value);
 }
 export async function setPartialMeta(key, meta) {
     await safeRedisSet(
@@ -166,7 +172,9 @@ export async function handleLeave(socket, code, io, userId) {
     await meeting.markParticipantLeft(socket.id);
 
     let stateArr = await getState(code);
-    if (stateArr) {
+    if (stateArr === REDIS_READ_FAILED) {
+        log.warn("leave skipped state update: redis unavailable", { code, userId });
+    } else if (stateArr) {
         stateArr = stateArr.filter((id) => id !== socket.id);
         if (stateArr.length === 0) {
             await deleteState(code);
@@ -177,7 +185,9 @@ export async function handleLeave(socket, code, io, userId) {
     }
 
     const participants_map = await getParticipants(code);
-    if (participants_map.size) {
+    if (participants_map === REDIS_READ_FAILED) {
+        log.warn("leave skipped participants update: redis unavailable", { code, userId });
+    } else if (participants_map.size) {
         participants_map.delete(userId);
         if (participants_map.size === 0) {
             await deleteParticipants(code);
@@ -214,7 +224,19 @@ export async function handleJoinCall(socket, io, meetingCodeRaw, meta = {}) {
 
     await withRoomLock(code, async () => {
         let participants_map = await getParticipants(code);
-        let stateArr = await getState(code) || [];
+        if (participants_map === REDIS_READ_FAILED) {
+            log.warn("join aborted: redis unavailable (participants)", { code, userId });
+            socket.emit("error", "Meeting service temporarily unavailable. Please try again.");
+            return;
+        }
+
+        let stateArr = await getState(code);
+        if (stateArr === REDIS_READ_FAILED) {
+            log.warn("join aborted: redis unavailable (state)", { code, userId });
+            socket.emit("error", "Meeting service temporarily unavailable. Please try again.");
+            return;
+        }
+        stateArr = stateArr || [];
 
         if (!participants_map.has(userId) && participants_map.size >= MAX_PARTICIPANTS_PER_ROOM) {
             socket.emit("error", "Room is full");
@@ -321,6 +343,10 @@ export async function handleUpdateParticipantState(socket, io, data = {}) {
     await updateMeetingParticipantMeta(code, socket.id, socket.data.meta);
 
     const participants_map = await getParticipants(code);
+    if (participants_map === REDIS_READ_FAILED) {
+        log.warn("update-participant-state skipped: redis unavailable", { code });
+        return;
+    }
     if (participants_map.has(socket.data.userId)) {
         participants_map.get(socket.data.userId).meta = socket.data.meta;
         await setParticipants(code, participants_map);
@@ -353,6 +379,10 @@ export async function handleUpdateMeta(socket, io, metaUpdate = {}) {
     await meeting.updateParticipantMeta(socket.id, socket.data.meta);
 
     const participants_map = await getParticipants(code);
+    if (participants_map === REDIS_READ_FAILED) {
+        log.warn("update-meta skipped: redis unavailable", { code });
+        return;
+    }
     if (participants_map.has(socket.data.userId)) {
         participants_map.get(socket.data.userId).meta = socket.data.meta;
         await setParticipants(code, participants_map);

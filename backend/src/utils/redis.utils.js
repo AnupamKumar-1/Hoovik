@@ -37,6 +37,16 @@ export async function safeRedisGet(key) {
         return null;
     }
 }
+
+/** @returns {{ ok: true, value: string|null } | { ok: false, value: null }} */
+export async function safeRedisGetResult(key) {
+    try {
+        return { ok: true, value: await redisClient.get(key) };
+    } catch (e) {
+        log.warn("redis get failed", { key, err: e.message });
+        return { ok: false, value: null };
+    }
+}
 export async function safeRedisSet(key, value, opts = {}) {
     try { return await redisClient.set(key, value, opts);
 
