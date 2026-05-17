@@ -1,5 +1,7 @@
 # Contributing to SkyMeetAI
 
+If SkyMeetAI has been useful to you, consider giving it a ⭐ on [GitHub](https://github.com/AnupamKumar-1/skymeetAI) — it helps the project grow!
+
 SkyMeetAI is a distributed real-time communication platform composed of four independent services across Node.js and Python ecosystems. Before contributing, please read the setup and documentation for the subsystem you plan to modify, and keep changes scoped where possible.
 
 ---

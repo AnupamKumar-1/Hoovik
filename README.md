@@ -3,6 +3,9 @@
 > A distributed, full-stack video meeting platform combining WebRTC peer-to-peer media, real-time multimodal emotion inference, in-meeting chat, and asynchronous transcript analysis — implemented as four independently deployed services.
 
 ![CI](https://github.com/AnupamKumar-1/skymeetAI/actions/workflows/ci.yml/badge.svg)
+[![GitHub Stars](https://img.shields.io/github/stars/AnupamKumar-1/skymeetAI?style=social)](https://github.com/AnupamKumar-1/skymeetAI/stargazers)
+
+If you find this project useful, a ⭐ goes a long way — thank you!
 
 **Live Demo:** https://skymeetai.onrender.com
 
