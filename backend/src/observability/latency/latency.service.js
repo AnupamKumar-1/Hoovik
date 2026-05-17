@@ -8,7 +8,8 @@ const LOG_FILE = path.join(LOG_DIR, `latency-${process.env.PORT}.log`);
 
 function initLogFile() {
     fs.mkdirSync(LOG_DIR, { recursive: true });
-    fs.writeFileSync(LOG_FILE, "");
+    const startMarker = `\n[PROCESS START] ${new Date().toISOString()}\n`;
+    fs.appendFileSync(LOG_FILE, startMarker);
 }
 
 initLogFile();
