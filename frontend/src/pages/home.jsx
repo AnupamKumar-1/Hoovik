@@ -260,6 +260,7 @@ export default function Home() {
   const prevCountRef = useRef(0);
   const pollTimerRef = useRef(null);
   const pollAttemptsRef = useRef(0);
+  const txListRef = useRef(null);
 
   const loadTranscripts = useCallback(async (bustCache = false) => {
     if (!TRANSCRIPTS_ENABLED) return null;
@@ -374,7 +375,7 @@ export default function Home() {
   useEffect(() => {
     const state = location.state;
     if (state?.meetingEnded && state?.meetingCode) {
-      startPollingForTranscript(state.meetingCode, 30, 20000 );
+      startPollingForTranscript(state.meetingCode, 30, 20000);
       window.history.replaceState({}, "", window.location.pathname);
     }
   }, [location.state, startPollingForTranscript]);
@@ -389,6 +390,15 @@ export default function Home() {
   useEffect(() => {
     return () => stopPolling();
   }, [stopPolling]);
+
+  useEffect(() => {
+    const el = txListRef.current;
+    if (!el || visibleCount <= TRANSCRIPTS_PER_PAGE) return;
+    const fourthItem = el.children[3];
+    if (fourthItem) {
+      el.scrollTop = fourthItem.offsetTop - el.offsetTop;
+    }
+  }, [visibleCount]);
 
   function showSnack(message, severity = "success") {
     setSnackMsg(message);
@@ -616,7 +626,7 @@ export default function Home() {
             </div>
           )}
 
-          <div className="hm-tx-list">
+          <div className="hm-tx-list" ref={txListRef}>
             {visibleTranscripts.map((t, i) => {
               const key = getTranscriptKey(t, i);
               return (
