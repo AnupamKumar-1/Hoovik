@@ -127,23 +127,38 @@ async def run_processing(
     if user_token:
         node_headers["Authorization"] = f"Bearer {user_token}"
 
-    try:
-        res = requests.post(
-            NODE_API,
-            json={
-                "meetingCode": meeting_code,
-                "transcriptText": transcript_text,
-                "metadata": {
-                    "segments": merged,
-                    "analysis": analysis,
-                },
-            },
-            headers=node_headers,
-            timeout=None,
-        )
-        print(f"Node API response: {res.status_code} {res.text[:200]}")
-    except Exception as e:
-        print(f"Node API callback failed: {e}")
+    payload = {
+        "meetingCode": meeting_code,
+        "transcriptText": transcript_text,
+        "metadata": {
+            "segments": merged,
+            "analysis": analysis,
+        },
+    }
+
+    delays = [5, 15, 30]
+    for attempt in range(len(delays) + 1):
+        try:
+            res = requests.post(
+                NODE_API,
+                json=payload,
+                headers=node_headers,
+                timeout=None,
+            )
+            
+            if 500 <= res.status_code < 600:
+                raise requests.RequestException(f"HTTP {res.status_code}")
+                
+            print(f"Node API response: {res.status_code} {res.text[:200]}")
+            break
+            
+        except requests.RequestException as e:
+            if attempt < len(delays):
+                delay = delays[attempt]
+                print(f"Node API callback failed (attempt {attempt + 1}), retrying in {delay}s: {e}")
+                await asyncio.sleep(delay)
+            else:
+                print(f"Node API callback permanent failure after {len(delays)} retries: {e}")
 
 
 @app.post("/process_meeting")
