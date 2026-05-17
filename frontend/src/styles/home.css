@@ -467,6 +467,13 @@
 .hm-tx-loading-dots span:nth-child(2) { animation-delay: 0.2s; }
 .hm-tx-loading-dots span:nth-child(3) { animation-delay: 0.4s; }
 
+.hm-tx-scroll {
+  max-height: min(420px, 52vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
 .hm-tx-list {
   display: flex;
   flex-direction: column;

@@ -616,17 +616,19 @@ export default function Home() {
             </div>
           )}
 
-          <div className="hm-tx-list">
-            {visibleTranscripts.map((t, i) => {
-              const key = getTranscriptKey(t, i);
-              return (
-                <TranscriptItem
-                  key={key}
-                  t={t}
-                  onOpen={() => setViewingTranscript(t)}
-                />
-              );
-            })}
+          <div className="hm-tx-scroll" aria-label="Transcript list">
+            <div className="hm-tx-list">
+              {visibleTranscripts.map((t, i) => {
+                const key = getTranscriptKey(t, i);
+                return (
+                  <TranscriptItem
+                    key={key}
+                    t={t}
+                    onOpen={() => setViewingTranscript(t)}
+                  />
+                );
+              })}
+            </div>
           </div>
 
           {(hasMore || visibleCount > TRANSCRIPTS_PER_PAGE) && (
