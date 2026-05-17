@@ -76,6 +76,13 @@ export async function getState(code) {
     const raw = await safeRedisGet(KEYS.state(code));
     return raw ? JSON.parse(raw) : null;
 }
+
+function redisReadFailed(value, label, code) {
+    if (value !== null) return false;
+    log.warn("redis read failed", { label, code });
+    return true;
+}
+
 export async function setState(code, arr) {
     await safeRedisSet(
         KEYS.state(code),
@@ -166,6 +173,7 @@ export async function handleLeave(socket, code, io, userId) {
     await meeting.markParticipantLeft(socket.id);
 
     let stateArr = await getState(code);
+    if (redisReadFailed(stateArr, "state", code)) return;
     if (stateArr) {
         stateArr = stateArr.filter((id) => id !== socket.id);
         if (stateArr.length === 0) {
@@ -177,6 +185,7 @@ export async function handleLeave(socket, code, io, userId) {
     }
 
     const participants_map = await getParticipants(code);
+    if (redisReadFailed(participants_map, "participants", code)) return;
     if (participants_map.size) {
         participants_map.delete(userId);
         if (participants_map.size === 0) {
@@ -214,7 +223,17 @@ export async function handleJoinCall(socket, io, meetingCodeRaw, meta = {}) {
 
     await withRoomLock(code, async () => {
         let participants_map = await getParticipants(code);
-        let stateArr = await getState(code) || [];
+        if (redisReadFailed(participants_map, "participants", code)) {
+            socket.emit("error", "Unable to join room. Please try again.");
+            return;
+        }
+
+        let stateArr = await getState(code);
+        if (redisReadFailed(stateArr, "state", code)) {
+            socket.emit("error", "Unable to join room. Please try again.");
+            return;
+        }
+        stateArr ||= [];
 
         if (!participants_map.has(userId) && participants_map.size >= MAX_PARTICIPANTS_PER_ROOM) {
             socket.emit("error", "Room is full");
@@ -321,6 +340,7 @@ export async function handleUpdateParticipantState(socket, io, data = {}) {
     await updateMeetingParticipantMeta(code, socket.id, socket.data.meta);
 
     const participants_map = await getParticipants(code);
+    if (redisReadFailed(participants_map, "participants", code)) return;
     if (participants_map.has(socket.data.userId)) {
         participants_map.get(socket.data.userId).meta = socket.data.meta;
         await setParticipants(code, participants_map);
@@ -353,6 +373,7 @@ export async function handleUpdateMeta(socket, io, metaUpdate = {}) {
     await meeting.updateParticipantMeta(socket.id, socket.data.meta);
 
     const participants_map = await getParticipants(code);
+    if (redisReadFailed(participants_map, "participants", code)) return;
     if (participants_map.has(socket.data.userId)) {
         participants_map.get(socket.data.userId).meta = socket.data.meta;
         await setParticipants(code, participants_map);
