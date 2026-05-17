@@ -470,6 +470,16 @@
 .hm-tx-list {
   display: flex;
   flex-direction: column;
+  max-height: min(420px, 50vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.hm-tx-list::-webkit-scrollbar { width: 4px; }
+.hm-tx-list::-webkit-scrollbar-track { background: transparent; }
+.hm-tx-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
 }
 
 .hm-tx-item {
