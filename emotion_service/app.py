@@ -1212,9 +1212,21 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(lifespan=lifespan, title="Emotion WS Server")
 
-from observability.stats import stats_router, set_tracker
+from observability.stats import (
+    stats_router,
+    set_active_participant_provider,
+    set_tracker,
+)
+
+
+def _count_active_participants() -> int:
+    """Participants with at least one connected socket (excludes stale-only state)."""
+    with _state_lock:
+        return sum(1 for sids in _PID_TO_SIDS.values() if sids)
+
 
 set_tracker(_latency_tracker)
+set_active_participant_provider(_count_active_participants)
 app.include_router(stats_router)
 
 @app.get("/health")
