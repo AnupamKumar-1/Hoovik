@@ -1,4 +1,4 @@
-# Emotion Service - SkyMeetAI
+# Emotion Service - Hoovik
 
 
 Real-time multimodal emotion recognition for video meetings. The service ingests live audio and video streams via WebSocket, extracts face and speech embeddings, and runs ensemble inference (Transformer + XGBoost) with modality-stratified anomaly detection — emitting per-participant emotion results at sub-second latency.

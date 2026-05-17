@@ -143,17 +143,17 @@ export default function History() {
       return out;
     };
 
-    const isUserInMeeting = (skymeetai, user) => {
+    const isUserInMeeting = (hoovik, user) => {
       if (!user) return false;
-      if (skymeetai.hostId && user?._id && String(user._id) === String(skymeetai.hostId)) return true;
-      const raw = skymeetai.raw || {};
+      if (hoovik.hostId && user?._id && String(user._id) === String(hoovik.hostId)) return true;
+      const raw = hoovik.raw || {};
       const rawHost = raw.host || raw.host_info || null;
       if (rawHost && typeof rawHost === 'object') {
         if (user._id && String(rawHost._id || rawHost.id) === String(user._id)) return true;
         if (user.username && rawHost.username && String(user.username).toLowerCase() === String(rawHost.username).toLowerCase()) return true;
         if (user.email && rawHost.email && String(user.email).toLowerCase() === String(rawHost.email).toLowerCase()) return true;
       }
-      return (skymeetai.participants || []).some((p) => userMatchesParticipant(user, p));
+      return (hoovik.participants || []).some((p) => userMatchesParticipant(user, p));
     };
 
     const fetchHistory = async () => {
@@ -279,7 +279,7 @@ export default function History() {
             <path d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.89L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"
               stroke="var(--sky-bright)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
-          <span className="hist-brand-name">SkyMeetAI</span>
+          <span className="hist-brand-name">Hoovik</span>
         </div>
 
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="2" strokeLinecap="round" aria-hidden>

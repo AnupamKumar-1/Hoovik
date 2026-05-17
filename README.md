@@ -1,21 +1,21 @@
-# SkyMeetAI
+# Hoovik
 
 > A distributed, full-stack video meeting platform combining WebRTC peer-to-peer media, real-time multimodal emotion inference, in-meeting chat, and asynchronous transcript analysis — implemented as four independently deployed services.
 
-![CI](https://github.com/AnupamKumar-1/skymeetAI/actions/workflows/ci.yml/badge.svg)
-[![GitHub Stars](https://img.shields.io/github/stars/AnupamKumar-1/skymeetAI?style=social)](https://github.com/AnupamKumar-1/skymeetAI/stargazers)
+![CI](https://github.com/AnupamKumar-1/Hoovik/actions/workflows/ci.yml/badge.svg)
+[![GitHub Stars](https://img.shields.io/github/stars/AnupamKumar-1/Hoovik?style=social)](https://github.com/AnupamKumar-1/Hoovik/stargazers)
 
 If you find this project useful, a ⭐ goes a long way — thank you!
 
-**Live Demo:** https://skymeetai.onrender.com
+**Live Demo:** https://hoovik.onrender.com
 
 | Frontend | Backend (Node.js) | Emotion Service | Transcript Service |
 |----------|------------------|-----------------|-------------------|
 | Render | Render | Azure | Azure |
 
-![SkyMeetAI demo](docs/src/skymeetai_hd.gif)
+![Hoovik demo](docs/src/hoovik_hd.gif)
 
-SkyMeetAI was built from scratch to explore:
+Hoovik was built from scratch to explore:
 - real-time communication systems,
 - distributed backend coordination,
 - browser media pipelines,
@@ -72,7 +72,7 @@ These are the non-trivial engineering decisions made across the stack, grounded 
 
 ## Overview
 
-SkyMeetAI is composed of four services, each with its own runtime, dependency graph, and configuration:
+Hoovik is composed of four services, each with its own runtime, dependency graph, and configuration:
 
 | Service | Runtime | Primary Role |
 |---|---|---|
@@ -97,7 +97,7 @@ The backend exposes both a REST API and a Socket.IO namespace on the same HTTP s
 
 ```mermaid
 graph LR
-    Root["skymeetai/"]
+    Root["hoovik/"]
     FE["frontend/\nReact SPA"]
     BE["backend/\nNode.js · Express · Socket.IO"]
     EM["emotion_service/\nPython · FastAPI · PyTorch"]
@@ -306,9 +306,9 @@ graph TD
     LB["Reverse Proxy / Load Balancer\n(not included in repository)\nsticky-session required"]
 
     subgraph BackendCluster ["Backend — Node.js pm2"]
-        B0["skymeetai-8000 :8000\n512 MiB max RSS"]
-        B1["skymeetai-8001 :8001\n512 MiB max RSS"]
-        B2["skymeetai-8002 :8002\n512 MiB max RSS"]
+        B0["hoovik-8000 :8000\n512 MiB max RSS"]
+        B1["hoovik-8001 :8001\n512 MiB max RSS"]
+        B2["hoovik-8002 :8002\n512 MiB max RSS"]
     end
 
     subgraph PythonServices ["Python Services — uvicorn"]
@@ -334,7 +334,7 @@ graph TD
 ```
 
 - **Frontend**: Static SPA built with `react-scripts build`. Served by any static file host or CDN. Connects to all three backend services via environment-variable-configured URLs.
-- **Backend**: Three pm2 instances (`skymeetai-8000`, `skymeetai-8001`, `skymeetai-8002`) defined in `ecosystem.config.cjs`, each binding a distinct port. Socket.IO events are fanned out across processes via the Redis adapter. Each process is configured with a 512 MiB `max_memory_restart` threshold and exponential-backoff restart delay. An external reverse proxy with sticky-session support is required.
+- **Backend**: Three pm2 instances (`hoovik-8000`, `hoovik-8001`, `hoovik-8002`) defined in `ecosystem.config.cjs`, each binding a distinct port. Socket.IO events are fanned out across processes via the Redis adapter. Each process is configured with a 512 MiB `max_memory_restart` threshold and exponential-backoff restart delay. An external reverse proxy with sticky-session support is required.
 - **Emotion Service**: Single uvicorn process on port 5002. Participant state (embedding buffers, pump handles, EMA) is held in in-process Python dicts; no horizontal scaling is implemented.
 - **Transcript Service**: Single uvicorn process on port 5001. Whisper and DistilRoBERTa models are loaded as module-level singletons at startup. File uploads are written to a local `uploads/` directory and deleted after 120 seconds.
 - **MongoDB**: Required before any backend process starts; connection failure causes `process.exit(1)`.
@@ -479,7 +479,7 @@ pip install -r requirements.txt
 uvicorn app:app --host 0.0.0.0 --port 5001
 ```
 
-Note: the `uvicorn.run` call inside `app.py` references `"main:app"`; invoke via `uvicorn app:app` directly rather than `python app.py`. Whisper and DistilRoBERTa models are downloaded from HuggingFace on first run if not cached. ~~`ffmpeg` must be available in `PATH`.~~ *(fixed: ffmpeg is now checked on startup — [#8](https://github.com/AnupamKumar-1/skymeetAI/pull/8))*
+Note: the `uvicorn.run` call inside `app.py` references `"main:app"`; invoke via `uvicorn app:app` directly rather than `python app.py`. Whisper and DistilRoBERTa models are downloaded from HuggingFace on first run if not cached. ~~`ffmpeg` must be available in `PATH`.~~ *(fixed: ffmpeg is now checked on startup — [#8](https://github.com/AnupamKumar-1/Hoovik/pull/8))*
 
 ### 5. Frontend
 
@@ -623,9 +623,9 @@ The following constraints are grounded in the current implementation and are rel
 
 - **TURN credentials are hardcoded**: `meetConfig.js` contains plaintext `openrelayproject` credentials. Time-limited dynamic TURN provisioning is not implemented.
 
-- ~~**Emotion service health and readiness endpoints**: `GET /health` returns `{"status": "ok"}` (HTTP 200) as a lightweight liveness probe. `GET /ready` returns `{"status": "ready"}` (HTTP 200) only after successful model loading; returns HTTP 503 if the service is not yet initialised. These replace the previous TCP-probe requirement for load balancer health checks. The observability dashboard remains available at `GET /stats` (browser) and `GET /stats/json` (JSON).~~ *(merged: health and readiness endpoints added — [#3](https://github.com/AnupamKumar-1/skymeetAI/pull/3))*
+- ~~**Emotion service health and readiness endpoints**: `GET /health` returns `{"status": "ok"}` (HTTP 200) as a lightweight liveness probe. `GET /ready` returns `{"status": "ready"}` (HTTP 200) only after successful model loading; returns HTTP 503 if the service is not yet initialised. These replace the previous TCP-probe requirement for load balancer health checks. The observability dashboard remains available at `GET /stats` (browser) and `GET /stats/json` (JSON).~~ *(merged: health and readiness endpoints added — [#3](https://github.com/AnupamKumar-1/Hoovik/pull/3))*
 
-- **Backend CORS allowlist is hardcoded**: Origins outside `localhost:3000` and `skymeetai.onrender.com` are rejected. Adding origins requires a code change and redeployment.
+- **Backend CORS allowlist is hardcoded**: Origins outside `localhost:3000` and `hoovik.onrender.com` are rejected. Adding origins requires a code change and redeployment.
 
 - **Latency log is truncated on backend restart**: `latency.service.js` truncates `logs/latency-<PORT>.log` at process start. No log rotation or archival is implemented.
 
@@ -647,7 +647,7 @@ The following are platform-level limitations that emerge from the combined archi
 
 **English-only transcription**: The Whisper model is configured with `language="en"` hardcoded. Multilingual meetings will produce degraded or incorrect transcripts.
 
-**Multiple services must be independently operated**: There is no unified orchestration layer or supervisor across the four services. Operators must monitor each process separately. ~~The emotion service exposes `GET /health` and `GET /ready` for liveness and readiness probing; the other services do not yet expose dedicated health endpoints.~~ *(merged: health and readiness endpoints added — [#3](https://github.com/AnupamKumar-1/skymeetAI/pull/3))*
+**Multiple services must be independently operated**: There is no unified orchestration layer or supervisor across the four services. Operators must monitor each process separately. ~~The emotion service exposes `GET /health` and `GET /ready` for liveness and readiness probing; the other services do not yet expose dedicated health endpoints.~~ *(merged: health and readiness endpoints added — [#3](https://github.com/AnupamKumar-1/Hoovik/pull/3))*
 
 ---
 

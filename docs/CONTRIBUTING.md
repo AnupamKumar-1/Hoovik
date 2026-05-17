@@ -1,14 +1,14 @@
-# Contributing to SkyMeetAI
+# Contributing to Hoovik
 
-If SkyMeetAI has been useful to you, consider giving it a ⭐ on [GitHub](https://github.com/AnupamKumar-1/skymeetAI) — it helps the project grow!
+If Hoovik has been useful to you, consider giving it a ⭐ on [GitHub](https://github.com/AnupamKumar-1/Hoovik) — it helps the project grow!
 
-SkyMeetAI is a distributed real-time communication platform composed of four independent services across Node.js and Python ecosystems. Before contributing, please read the setup and documentation for the subsystem you plan to modify, and keep changes scoped where possible.
+Hoovik is a distributed real-time communication platform composed of four independent services across Node.js and Python ecosystems. Before contributing, please read the setup and documentation for the subsystem you plan to modify, and keep changes scoped where possible.
 
 ---
 
 ## Table of Contents
 
-- [Contributing to SkyMeetAI](#contributing-to-skymeetai)
+- [Contributing to Hoovik](#contributing-to-hoovik)
   - [Table of Contents](#table-of-contents)
   - [Prerequisites](#prerequisites)
   - [Local Setup](#local-setup)
@@ -47,8 +47,8 @@ SkyMeetAI is a distributed real-time communication platform composed of four ind
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/AnupamKumar-1/skymeetAI.git
-cd skymeetAI
+git clone https://github.com/AnupamKumar-1/Hoovik.git
+cd Hoovik
 ```
 
 ---
@@ -118,7 +118,7 @@ Edit `.env` and fill in the required values:
 ```dotenv
 # Required
 JWT_SECRET=<generate a 64-char random hex string — see below>
-MONGO_URI=mongodb://localhost:27017/skymeetai
+MONGO_URI=mongodb://localhost:27017/hoovik
 
 # Service URLs
 Ts_SERVICE_URL=http://localhost:5001/process_meeting
@@ -193,9 +193,9 @@ This starts three processes on ports 8000, 8001, and 8002 as defined in `ecosyst
 
 | Name | Port | Memory limit |
 |---|---|---|
-| `skymeetai-8000` | 8000 | 512 MiB |
-| `skymeetai-8001` | 8001 | 512 MiB |
-| `skymeetai-8002` | 8002 | 512 MiB |
+| `hoovik-8000` | 8000 | 512 MiB |
+| `hoovik-8001` | 8001 | 512 MiB |
+| `hoovik-8002` | 8002 | 512 MiB |
 
 Each process reads `.env` via `env_file` and restarts automatically with exponential backoff on failure.
 

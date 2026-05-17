@@ -1,4 +1,4 @@
-# SkyMeetAI Backend
+# Hoovik Backend
 
 A Node.js/Express HTTP and WebSocket server that manages real-time video-meeting rooms, chat, transcription storage, and user authentication. The implementation uses MongoDB for persistence, Redis for ephemeral state and distributed locking, and Socket.IO with a Redis adapter for multi-process event fan-out.
 
@@ -132,9 +132,9 @@ The codebase is designed for `pm2` multi-process deployment (`ecosystem.config.c
 
 | pm2 name | `PORT` | `NODE_ENV` |
 |---|---|---|
-| `skymeetai-8000` | `8000` | `production` |
-| `skymeetai-8001` | `8001` | `production` |
-| `skymeetai-8002` | `8002` | `production` |
+| `hoovik-8000` | `8000` | `production` |
+| `hoovik-8001` | `8001` | `production` |
+| `hoovik-8002` | `8002` | `production` |
 
 Shared `base` settings (all three processes):
 
@@ -231,7 +231,7 @@ sequenceDiagram
 
 Entry point. Configures:
 - `trust proxy: 1` for correct IP extraction behind a reverse proxy.
-- CORS allowlist: hardcoded to `http://localhost:3000` and `https://skymeetai.onrender.com`; additional origins require code changes.
+- CORS allowlist: hardcoded to `http://localhost:3000` and `https://hoovik.onrender.com`; additional origins require code changes.
 - Route mounting order (proxy route registered before the generic transcript route to prevent shadowing).
 - Sequential startup: MongoDB → Redis → HTTP listen → Socket.IO init.
 
@@ -365,9 +365,9 @@ flowchart TD
     LB["Load Balancer / Reverse Proxy\n(not in this repository)"]
 
     subgraph PM2 ["pm2 — ecosystem.config.cjs"]
-        P0["skymeetai-8000\nPORT=8000"]
-        P1["skymeetai-8001\nPORT=8001"]
-        P2["skymeetai-8002\nPORT=8002"]
+        P0["hoovik-8000\nPORT=8000"]
+        P1["hoovik-8001\nPORT=8001"]
+        P2["hoovik-8002\nPORT=8002"]
     end
 
     subgraph Shared Infra
@@ -624,7 +624,7 @@ The following mitigations are implemented in source:
 - **Meeting code validation**: regex `^[A-Z0-9\-]{3,32}$` enforced at socket and transcript layers.
 - **Host secret**: stored as `sha256` hash only; raw secret is returned once at room creation and never persisted.
 - **Redis lock CAS release**: the lock release Lua script compares the stored token to the caller's token before deleting, preventing accidental release of another process's lock.
-- **CORS**: allowlist is hardcoded in `app.js`; origins outside `["http://localhost:3000", "https://skymeetai.onrender.com"]` are rejected.
+- **CORS**: allowlist is hardcoded in `app.js`; origins outside `["http://localhost:3000", "https://hoovik.onrender.com"]` are rejected.
 - **`trust proxy: 1`**: enabled; IP extraction in `getClientIp` uses `x-forwarded-for` first. Misconfigured proxy chains could allow IP spoofing.
 - **`signal` relay**: no validation that `targetId` is a member of the same room. Any authenticated socket can relay to any other socket ID.
 - **Transcript proxy**: forwards `x-host-secret` and `x-user-token` headers as-is; no validation of these values before forwarding.

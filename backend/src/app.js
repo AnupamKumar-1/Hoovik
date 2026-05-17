@@ -25,7 +25,7 @@ const server = createServer(app);
 
 const allowedOrigins = [
   "http://localhost:3000",
-  "https://skymeetai.onrender.com",
+  "https://hoovik.onrender.com",
 
 ];
 
@@ -105,7 +105,7 @@ const start = async () => {
 
             "http://localhost:3000",
 
-            "https://skymeetai.onrender.com",
+            "https://hoovik.onrender.com",
 
           ],
           credentials: true,

@@ -9,12 +9,12 @@
     "face_frames": 10,
     "audio_frames": 10,
     "paths": {
-      "face": "/Users/anupamkumar/Desktop/skymeetai/emotion_service/sample_inputs/xf_angry_0.npy",
-      "audio": "/Users/anupamkumar/Desktop/skymeetai/emotion_service/sample_inputs/xa_angry_0.npy",
-      "face_mask": "/Users/anupamkumar/Desktop/skymeetai/emotion_service/sample_inputs/fm_angry_0.npy",
-      "audio_mask": "/Users/anupamkumar/Desktop/skymeetai/emotion_service/sample_inputs/am_angry_0.npy"
+      "face": "/Users/anupamkumar/Desktop/hoovik/emotion_service/sample_inputs/xf_angry_0.npy",
+      "audio": "/Users/anupamkumar/Desktop/hoovik/emotion_service/sample_inputs/xa_angry_0.npy",
+      "face_mask": "/Users/anupamkumar/Desktop/hoovik/emotion_service/sample_inputs/fm_angry_0.npy",
+      "audio_mask": "/Users/anupamkumar/Desktop/hoovik/emotion_service/sample_inputs/am_angry_0.npy"
     },
-    "run_cmd": "python inference/predict.py --face /Users/anupamkumar/Desktop/skymeetai/emotion_service/sample_inputs/xf_angry_0.npy --audio /Users/anupamkumar/Desktop/skymeetai/emotion_service/sample_inputs/xa_angry_0.npy --face_mask /Users/anupamkumar/Desktop/skymeetai/emotion_service/sample_inputs/fm_angry_0.npy --audio_mask /Users/anupamkumar/Desktop/skymeetai/emotion_service/sample_inputs/am_angry_0.npy"
+    "run_cmd": "python inference/predict.py --face /Users/anupamkumar/Desktop/hoovik/emotion_service/sample_inputs/xf_angry_0.npy --audio /Users/anupamkumar/Desktop/hoovik/emotion_service/sample_inputs/xa_angry_0.npy --face_mask /Users/anupamkumar/Desktop/hoovik/emotion_service/sample_inputs/fm_angry_0.npy --audio_mask /Users/anupamkumar/Desktop/hoovik/emotion_service/sample_inputs/am_angry_0.npy"
   },
   {
     "index": 0,
@@ -26,12 +26,12 @@
     "face_frames": 10,
     "audio_frames": 10,
     "paths": {
-      "face": "/Users/anupamkumar/Desktop/skymeetai/emotion_service/sample_inputs/xf_fearful_0.npy",
-      "audio": "/Users/anupamkumar/Desktop/skymeetai/emotion_service/sample_inputs/xa_fearful_0.npy",
-      "face_mask": "/Users/anupamkumar/Desktop/skymeetai/emotion_service/sample_inputs/fm_fearful_0.npy",
-      "audio_mask": "/Users/anupamkumar/Desktop/skymeetai/emotion_service/sample_inputs/am_fearful_0.npy"
+      "face": "/Users/anupamkumar/Desktop/hoovik/emotion_service/sample_inputs/xf_fearful_0.npy",
+      "audio": "/Users/anupamkumar/Desktop/hoovik/emotion_service/sample_inputs/xa_fearful_0.npy",
+      "face_mask": "/Users/anupamkumar/Desktop/hoovik/emotion_service/sample_inputs/fm_fearful_0.npy",
+      "audio_mask": "/Users/anupamkumar/Desktop/hoovik/emotion_service/sample_inputs/am_fearful_0.npy"
     },
-    "run_cmd": "python inference/predict.py --face /Users/anupamkumar/Desktop/skymeetai/emotion_service/sample_inputs/xf_fearful_0.npy --audio /Users/anupamkumar/Desktop/skymeetai/emotion_service/sample_inputs/xa_fearful_0.npy --face_mask /Users/anupamkumar/Desktop/skymeetai/emotion_service/sample_inputs/fm_fearful_0.npy --audio_mask /Users/anupamkumar/Desktop/skymeetai/emotion_service/sample_inputs/am_fearful_0.npy"
+    "run_cmd": "python inference/predict.py --face /Users/anupamkumar/Desktop/hoovik/emotion_service/sample_inputs/xf_fearful_0.npy --audio /Users/anupamkumar/Desktop/hoovik/emotion_service/sample_inputs/xa_fearful_0.npy --face_mask /Users/anupamkumar/Desktop/hoovik/emotion_service/sample_inputs/fm_fearful_0.npy --audio_mask /Users/anupamkumar/Desktop/hoovik/emotion_service/sample_inputs/am_fearful_0.npy"
   },
   {
     "index": 2,
@@ -43,12 +43,12 @@
     "face_frames": 10,
     "audio_frames": 10,
     "paths": {
-      "face": "/Users/anupamkumar/Desktop/skymeetai/emotion_service/sample_inputs/xf_disgust_0.npy",
-      "audio": "/Users/anupamkumar/Desktop/skymeetai/emotion_service/sample_inputs/xa_disgust_0.npy",
-      "face_mask": "/Users/anupamkumar/Desktop/skymeetai/emotion_service/sample_inputs/fm_disgust_0.npy",
-      "audio_mask": "/Users/anupamkumar/Desktop/skymeetai/emotion_service/sample_inputs/am_disgust_0.npy"
+      "face": "/Users/anupamkumar/Desktop/hoovik/emotion_service/sample_inputs/xf_disgust_0.npy",
+      "audio": "/Users/anupamkumar/Desktop/hoovik/emotion_service/sample_inputs/xa_disgust_0.npy",
+      "face_mask": "/Users/anupamkumar/Desktop/hoovik/emotion_service/sample_inputs/fm_disgust_0.npy",
+      "audio_mask": "/Users/anupamkumar/Desktop/hoovik/emotion_service/sample_inputs/am_disgust_0.npy"
     },
-    "run_cmd": "python inference/predict.py --face /Users/anupamkumar/Desktop/skymeetai/emotion_service/sample_inputs/xf_disgust_0.npy --audio /Users/anupamkumar/Desktop/skymeetai/emotion_service/sample_inputs/xa_disgust_0.npy --face_mask /Users/anupamkumar/Desktop/skymeetai/emotion_service/sample_inputs/fm_disgust_0.npy --audio_mask /Users/anupamkumar/Desktop/skymeetai/emotion_service/sample_inputs/am_disgust_0.npy"
+    "run_cmd": "python inference/predict.py --face /Users/anupamkumar/Desktop/hoovik/emotion_service/sample_inputs/xf_disgust_0.npy --audio /Users/anupamkumar/Desktop/hoovik/emotion_service/sample_inputs/xa_disgust_0.npy --face_mask /Users/anupamkumar/Desktop/hoovik/emotion_service/sample_inputs/fm_disgust_0.npy --audio_mask /Users/anupamkumar/Desktop/hoovik/emotion_service/sample_inputs/am_disgust_0.npy"
   },
   {
     "index": 1,
@@ -60,12 +60,12 @@
     "face_frames": 10,
     "audio_frames": 10,
     "paths": {
-      "face": "/Users/anupamkumar/Desktop/skymeetai/emotion_service/sample_inputs/xf_happy_0.npy",
-      "audio": "/Users/anupamkumar/Desktop/skymeetai/emotion_service/sample_inputs/xa_happy_0.npy",
-      "face_mask": "/Users/anupamkumar/Desktop/skymeetai/emotion_service/sample_inputs/fm_happy_0.npy",
-      "audio_mask": "/Users/anupamkumar/Desktop/skymeetai/emotion_service/sample_inputs/am_happy_0.npy"
+      "face": "/Users/anupamkumar/Desktop/hoovik/emotion_service/sample_inputs/xf_happy_0.npy",
+      "audio": "/Users/anupamkumar/Desktop/hoovik/emotion_service/sample_inputs/xa_happy_0.npy",
+      "face_mask": "/Users/anupamkumar/Desktop/hoovik/emotion_service/sample_inputs/fm_happy_0.npy",
+      "audio_mask": "/Users/anupamkumar/Desktop/hoovik/emotion_service/sample_inputs/am_happy_0.npy"
     },
-    "run_cmd": "python inference/predict.py --face /Users/anupamkumar/Desktop/skymeetai/emotion_service/sample_inputs/xf_happy_0.npy --audio /Users/anupamkumar/Desktop/skymeetai/emotion_service/sample_inputs/xa_happy_0.npy --face_mask /Users/anupamkumar/Desktop/skymeetai/emotion_service/sample_inputs/fm_happy_0.npy --audio_mask /Users/anupamkumar/Desktop/skymeetai/emotion_service/sample_inputs/am_happy_0.npy"
+    "run_cmd": "python inference/predict.py --face /Users/anupamkumar/Desktop/hoovik/emotion_service/sample_inputs/xf_happy_0.npy --audio /Users/anupamkumar/Desktop/hoovik/emotion_service/sample_inputs/xa_happy_0.npy --face_mask /Users/anupamkumar/Desktop/hoovik/emotion_service/sample_inputs/fm_happy_0.npy --audio_mask /Users/anupamkumar/Desktop/hoovik/emotion_service/sample_inputs/am_happy_0.npy"
   },
   {
     "index": 6,
@@ -77,12 +77,12 @@
     "face_frames": 10,
     "audio_frames": 10,
     "paths": {
-      "face": "/Users/anupamkumar/Desktop/skymeetai/emotion_service/sample_inputs/xf_sad_0.npy",
-      "audio": "/Users/anupamkumar/Desktop/skymeetai/emotion_service/sample_inputs/xa_sad_0.npy",
-      "face_mask": "/Users/anupamkumar/Desktop/skymeetai/emotion_service/sample_inputs/fm_sad_0.npy",
-      "audio_mask": "/Users/anupamkumar/Desktop/skymeetai/emotion_service/sample_inputs/am_sad_0.npy"
+      "face": "/Users/anupamkumar/Desktop/hoovik/emotion_service/sample_inputs/xf_sad_0.npy",
+      "audio": "/Users/anupamkumar/Desktop/hoovik/emotion_service/sample_inputs/xa_sad_0.npy",
+      "face_mask": "/Users/anupamkumar/Desktop/hoovik/emotion_service/sample_inputs/fm_sad_0.npy",
+      "audio_mask": "/Users/anupamkumar/Desktop/hoovik/emotion_service/sample_inputs/am_sad_0.npy"
     },
-    "run_cmd": "python inference/predict.py --face /Users/anupamkumar/Desktop/skymeetai/emotion_service/sample_inputs/xf_sad_0.npy --audio /Users/anupamkumar/Desktop/skymeetai/emotion_service/sample_inputs/xa_sad_0.npy --face_mask /Users/anupamkumar/Desktop/skymeetai/emotion_service/sample_inputs/fm_sad_0.npy --audio_mask /Users/anupamkumar/Desktop/skymeetai/emotion_service/sample_inputs/am_sad_0.npy"
+    "run_cmd": "python inference/predict.py --face /Users/anupamkumar/Desktop/hoovik/emotion_service/sample_inputs/xf_sad_0.npy --audio /Users/anupamkumar/Desktop/hoovik/emotion_service/sample_inputs/xa_sad_0.npy --face_mask /Users/anupamkumar/Desktop/hoovik/emotion_service/sample_inputs/fm_sad_0.npy --audio_mask /Users/anupamkumar/Desktop/hoovik/emotion_service/sample_inputs/am_sad_0.npy"
   },
   {
     "index": 4,
@@ -94,11 +94,11 @@
     "face_frames": 10,
     "audio_frames": 10,
     "paths": {
-      "face": "/Users/anupamkumar/Desktop/skymeetai/emotion_service/sample_inputs/xf_neutral_calm_0.npy",
-      "audio": "/Users/anupamkumar/Desktop/skymeetai/emotion_service/sample_inputs/xa_neutral_calm_0.npy",
-      "face_mask": "/Users/anupamkumar/Desktop/skymeetai/emotion_service/sample_inputs/fm_neutral_calm_0.npy",
-      "audio_mask": "/Users/anupamkumar/Desktop/skymeetai/emotion_service/sample_inputs/am_neutral_calm_0.npy"
+      "face": "/Users/anupamkumar/Desktop/hoovik/emotion_service/sample_inputs/xf_neutral_calm_0.npy",
+      "audio": "/Users/anupamkumar/Desktop/hoovik/emotion_service/sample_inputs/xa_neutral_calm_0.npy",
+      "face_mask": "/Users/anupamkumar/Desktop/hoovik/emotion_service/sample_inputs/fm_neutral_calm_0.npy",
+      "audio_mask": "/Users/anupamkumar/Desktop/hoovik/emotion_service/sample_inputs/am_neutral_calm_0.npy"
     },
-    "run_cmd": "python inference/predict.py --face /Users/anupamkumar/Desktop/skymeetai/emotion_service/sample_inputs/xf_neutral_calm_0.npy --audio /Users/anupamkumar/Desktop/skymeetai/emotion_service/sample_inputs/xa_neutral_calm_0.npy --face_mask /Users/anupamkumar/Desktop/skymeetai/emotion_service/sample_inputs/fm_neutral_calm_0.npy --audio_mask /Users/anupamkumar/Desktop/skymeetai/emotion_service/sample_inputs/am_neutral_calm_0.npy"
+    "run_cmd": "python inference/predict.py --face /Users/anupamkumar/Desktop/hoovik/emotion_service/sample_inputs/xf_neutral_calm_0.npy --audio /Users/anupamkumar/Desktop/hoovik/emotion_service/sample_inputs/xa_neutral_calm_0.npy --face_mask /Users/anupamkumar/Desktop/hoovik/emotion_service/sample_inputs/fm_neutral_calm_0.npy --audio_mask /Users/anupamkumar/Desktop/hoovik/emotion_service/sample_inputs/am_neutral_calm_0.npy"
   }
 ]

@@ -18,7 +18,7 @@ export default function MeetTopBar({ roomId, isHost, duration, participantCount,
             <div className={s.topBarLeft}>
                 <div className={s.logo}>
                     <span className={s.logoDot} />
-                    <span className={s.logoText}>SkyMeetAI</span>
+                    <span className={s.logoText}>Hoovik</span>
                 </div>
                 <div className={s.roomCode}>
                     <span className={s.roomCodeLabel}>Room</span>

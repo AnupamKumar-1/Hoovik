@@ -1,7 +1,7 @@
 {
   "name": "backend",
   "version": "1.0.0",
-  "description": "SkyMeetAI backend API",
+  "description": "Hoovik backend API",
   "main": "src/app.js",
   "type": "module",
   "scripts": {

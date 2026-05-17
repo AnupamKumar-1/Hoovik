@@ -1,5 +1,5 @@
 {
-  "name": "skymeetai",
+  "name": "hoovik",
   "private": true,
   "scripts": {
     "dev": "concurrently -n FRONTEND,BACKEND,EMOTION,TRANSCRIPT -c blue,green,magenta,yellow \"npm run dev:frontend\" \"npm run dev:backend\" \"npm run dev:emotion\" \"npm run dev:transcript\"",

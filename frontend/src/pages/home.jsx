@@ -472,7 +472,7 @@ export default function Home() {
               />
             </svg>
           </div>
-          <span className="hm-brand-name">SkyMeetAI</span>
+          <span className="hm-brand-name">Hoovik</span>
         </div>
         <div className="hm-topbar-right">
           <button className="hm-icon-btn" onClick={() => navigate("/history")} title="History" aria-label="Open history">

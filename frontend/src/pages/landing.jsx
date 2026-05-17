@@ -22,7 +22,7 @@ export default function LandingPage() {
               />
             </svg>
           </div>
-          <span className="lp-brand-name">SkyMeetAI</span>
+          <span className="lp-brand-name">Hoovik</span>
         </div>
 
         <div className="lp-nav-right">
@@ -32,7 +32,7 @@ export default function LandingPage() {
           <button
             className="lp-nav-cta"
             onClick={() => navigate("/auth")}
-            aria-label="Get started with SkyMeetAI"
+            aria-label="Get started with Hoovik"
           >
             Get Started →
           </button>
@@ -174,7 +174,7 @@ export default function LandingPage() {
 
       <footer className="lp-foot">
         <p>
-          Made with ❤️ at <strong>SkyMeetAI</strong> — where meetings become smarter in real time.
+          Made with ❤️ at <strong>Hoovik</strong> — where meetings become smarter in real time.
         </p>
         <span className="lp-foot-status">
           Emotion & transcription services active

@@ -61,7 +61,7 @@ export default function Authentication() {
                 stroke="#38bdf8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
               />
             </svg>
-            <span>SkyMeetAI</span>
+            <span>Hoovik</span>
           </div>
 
           <div className="au-hero-content">
@@ -131,7 +131,7 @@ export default function Authentication() {
                 />
               </svg>
             </div>
-            <span className="au-form-brand-name">SkyMeetAI</span>
+            <span className="au-form-brand-name">Hoovik</span>
           </div>
 
           {/* Heading */}
@@ -140,7 +140,7 @@ export default function Authentication() {
           </h1>
           <p className="au-form-sub">
             {isLogin
-              ? "Sign in to your SkyMeetAI account"
+              ? "Sign in to your Hoovik account"
               : "Join the intelligent meeting platform"}
           </p>
 
