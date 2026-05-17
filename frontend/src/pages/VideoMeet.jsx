@@ -679,6 +679,7 @@ export default function VideoMeet() {
         displayName={localStorage.getItem("displayName") || "You"}
         isHost={isHost} isSpeaking={stableSpeakerId === "local"}
         muted={muted} videoOff={videoOff} shareEmotion={shareEmotion}
+        chatOpen={chatOpen && !isMobile}
         onToggleMute={() => toggleMute(muted, setMuted, mutedRef, TRANSCRIPTS_ENABLED, recordersRef)}
         onToggleVideo={() => toggleVideo(videoOff, setVideoOff)}
         onToggleEmotion={handleToggleEmotion}

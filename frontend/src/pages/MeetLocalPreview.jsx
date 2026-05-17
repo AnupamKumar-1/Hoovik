@@ -8,7 +8,7 @@ import s from "../styles/videoComponent.module.css";
 
 export default function MeetLocalPreview({
     localVideoRef, displayName, isHost, isSpeaking,
-    muted, videoOff, shareEmotion,
+    muted, videoOff, shareEmotion, chatOpen,
     onToggleMute, onToggleVideo, onToggleEmotion,
 }) {
     const [showControls, setShowControls] = useState(false);
@@ -20,8 +20,8 @@ export default function MeetLocalPreview({
     return (
         <motion.div
             className={`${s.localPreview} ${isSpeaking ? s.localPreviewSpeaking : ""}`}
-            initial={{ opacity: 0, scale: 0.9, y: 10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
+            initial={{ opacity: 0, scale: 0.9, y: 10, x: 0 }}
+            animate={{ opacity: 1, scale: 1, y: 0, x: chatOpen ? -335 : 0 }}
             transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
             drag
             dragMomentum={false}
