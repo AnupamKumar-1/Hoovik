@@ -158,10 +158,8 @@ export async function loginService(req) {
         if (!user) {
             await recordLoginFailure(username);
             return {
-                status: httpStatus.NOT_FOUND,
-                body: { success: false,
-                    message: "User not found."
-                }
+                status: httpStatus.UNAUTHORIZED,
+                body: { success: false, message: "Invalid username or password." }
             };
         }
 
