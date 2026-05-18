@@ -31,6 +31,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 stats_router = APIRouter()
 
 _tracker = None
+_active_participant_provider = None
 
 
 def set_tracker(tracker) -> None:
@@ -44,6 +45,25 @@ def set_tracker(tracker) -> None:
     """
     global _tracker
     _tracker = tracker
+
+
+def set_active_participant_provider(provider) -> None:
+    """Wire a callable that returns the current active participant count.
+
+    Must be called once during application startup before any request hits
+    /stats or /stats/json.
+    """
+    global _active_participant_provider
+    _active_participant_provider = provider
+
+
+def _active_participants() -> int:
+    if _active_participant_provider is None:
+        return 0
+    try:
+        return max(0, int(_active_participant_provider()))
+    except Exception:
+        return 0
 
 
 def _percentile(sorted_data: list[float], p: float) -> float:
@@ -73,7 +93,12 @@ def _build_snapshot() -> dict:
         Returns an empty snapshot dict when no tracker is wired.
     """
     if _tracker is None:
-        return {"generated_at": time.time(), "modalities": {}, "overall": {}}
+        return {
+            "generated_at": time.time(),
+            "active_participants": _active_participants(),
+            "modalities": {},
+            "overall": {},
+        }
 
     with _tracker._lock:
         raw: dict[str, list[float]] = {
@@ -98,6 +123,7 @@ def _build_snapshot() -> dict:
 
     return {
         "generated_at": time.time(),
+        "active_participants": _active_participants(),
         "modalities": modalities,
         "overall": overall,
     }
@@ -339,6 +365,14 @@ def stats_html() -> HTMLResponse:
   </div>
 </header>
 
+<p class="section-label">Participants</p>
+<div class="overall-card" id="participants-card" style="margin-bottom:1.5rem;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));">
+  <div class="overall-stat">
+    <span class="val p50" id="active-participants">—</span>
+    <span class="lbl">active now</span>
+  </div>
+</div>
+
 <p class="section-label">Overall</p>
 <div class="overall-card" id="overall-card">
   <div class="overall-stat"><span class="val muted" id="ov-n">—</span><span class="lbl">samples</span></div>
@@ -391,6 +425,10 @@ async function refresh() {
 
     const ts = new Date(data.generated_at * 1000).toLocaleTimeString();
     document.getElementById('ts').textContent = 'last update ' + ts;
+
+    const active = data.active_participants;
+    document.getElementById('active-participants').textContent =
+      active == null ? '—' : active;
 
     const ov = data.overall;
     if (ov && ov.n) {
