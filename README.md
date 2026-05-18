@@ -2,7 +2,7 @@
 
 <br/>
 
-<img src="./docs/logo.svg" width="88" alt="Hoovik Logo" />
+<img src="./frontend/public/logo.svg" width="88" alt="Hoovik Logo" />
 
 <h1>
   <picture>
@@ -14,7 +14,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/WebRTC-Peer--to--Peer_Media-FF6B35?style=for-the-badge&logo=webrtc&logoColor=white" />
   &nbsp;
-  <img src="https://img.shields.io/badge/Emotion_AI-Multimodal_Inference-7C3AED?style=for-the-badge&logo=pytorch&logoColor=white" />
+  <img src="https://img.shields.io/badge/Emotion_Analysis-Multimodal_Inference-7C3AED?style=for-the-badge&logo=pytorch&logoColor=white" />
   &nbsp;
   <img src="https://img.shields.io/badge/Real--Time-4_Microservices-0EA5E9?style=for-the-badge&logo=socketdotio&logoColor=white" />
 </p>
