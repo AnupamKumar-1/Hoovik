@@ -1,0 +1,73 @@
+<svg width="200" height="200" viewBox="0 0 680 680" xmlns="http://www.w3.org/2000/svg">
+  <!-- wings -->
+  <path d="M240 320 L130 250 L100 340 L120 420 L190 460 L240 420 Z" fill="#4f6ef7"/>
+  <path d="M240 320 L145 260 L120 330 L140 400 L195 440 L240 400 Z" fill="#6b84f8"/>
+  <line x1="235" y1="325" x2="155" y2="280" stroke="#a0b4ff" stroke-width="1.8" opacity=".6"/>
+  <line x1="235" y1="350" x2="140" y2="330" stroke="#a0b4ff" stroke-width="1.8" opacity=".6"/>
+  <line x1="235" y1="375" x2="148" y2="385" stroke="#a0b4ff" stroke-width="1.8" opacity=".6"/>
+  <line x1="235" y1="400" x2="165" y2="425" stroke="#a0b4ff" stroke-width="1.8" opacity=".6"/>
+
+  <path d="M440 320 L550 250 L580 340 L560 420 L490 460 L440 420 Z" fill="#3a5af5"/>
+  <path d="M440 320 L535 260 L560 330 L540 400 L485 440 L440 400 Z" fill="#4f6ef7"/>
+  <line x1="445" y1="325" x2="525" y2="280" stroke="#a0b4ff" stroke-width="1.8" opacity=".6"/>
+  <line x1="445" y1="350" x2="540" y2="330" stroke="#a0b4ff" stroke-width="1.8" opacity=".6"/>
+  <line x1="445" y1="375" x2="532" y2="385" stroke="#a0b4ff" stroke-width="1.8" opacity=".6"/>
+  <line x1="445" y1="400" x2="515" y2="425" stroke="#a0b4ff" stroke-width="1.8" opacity=".6"/>
+
+  <!-- body -->
+  <ellipse cx="340" cy="390" rx="120" ry="155" fill="#2d3a8c"/>
+
+  <!-- chest -->
+  <ellipse cx="340" cy="420" rx="72" ry="100" fill="#e8eeff"/>
+  <ellipse cx="340" cy="395" rx="50" ry="16" fill="#b8c4ff" opacity=".6"/>
+  <ellipse cx="340" cy="418" rx="58" ry="16" fill="#b8c4ff" opacity=".5"/>
+  <ellipse cx="340" cy="442" rx="63" ry="16" fill="#b8c4ff" opacity=".4"/>
+  <ellipse cx="340" cy="468" rx="62" ry="14" fill="#b8c4ff" opacity=".3"/>
+  <ellipse cx="340" cy="492" rx="55" ry="12" fill="#b8c4ff" opacity=".2"/>
+
+  <!-- head -->
+  <ellipse cx="340" cy="300" rx="110" ry="100" fill="#2d3a8c"/>
+
+  <!-- ear tufts -->
+  <polygon points="270,220 248,155 295,200" fill="#7c8fff"/>
+  <polygon points="295,200 248,155 305,172" fill="#9aaaf8"/>
+  <polygon points="410,220 432,155 385,200" fill="#6b7ef7"/>
+  <polygon points="385,200 432,155 375,172" fill="#8899f8"/>
+
+  <!-- face disc -->
+  <ellipse cx="340" cy="305" rx="88" ry="80" fill="#3d4fa8"/>
+
+  <!-- eye rings -->
+  <polygon points="287,275 275,290 275,310 287,325 313,325 325,310 325,290 313,275" fill="#7c8fff"/>
+  <polygon points="367,275 355,290 355,310 367,325 393,325 405,310 405,290 393,275" fill="#9aaaf8"/>
+
+  <!-- eye -->
+  <circle cx="300" cy="300" r="20" fill="#1a2060"/>
+  <circle cx="380" cy="300" r="20" fill="#1a2060"/>
+  <circle cx="300" cy="300" r="14" fill="#c8d4ff"/>
+  <circle cx="380" cy="300" r="14" fill="#c8d4ff"/>
+  <circle cx="300" cy="300" r="7" fill="#0a0f3a"/>
+  <circle cx="380" cy="300" r="7" fill="#0a0f3a"/>
+  <circle cx="304" cy="296" r="3" fill="#fff"/>
+  <circle cx="384" cy="296" r="3" fill="#fff"/>
+
+  <!-- beak -->
+  <polygon points="330,318 340,345 350,318 340,325" fill="#fbbf24"/>
+
+  <!-- forehead lines -->
+  <line x1="300" y1="250" x2="310" y2="270" stroke="#a0b4ff" stroke-width="1.5" opacity=".7"/>
+  <line x1="315" y1="245" x2="320" y2="268" stroke="#a0b4ff" stroke-width="1.5" opacity=".6"/>
+  <line x1="340" y1="242" x2="340" y2="268" stroke="#a0b4ff" stroke-width="1.5" opacity=".5"/>
+  <line x1="365" y1="245" x2="360" y2="268" stroke="#a0b4ff" stroke-width="1.5" opacity=".6"/>
+  <line x1="380" y1="250" x2="370" y2="270" stroke="#a0b4ff" stroke-width="1.5" opacity=".7"/>
+
+  <!-- talons -->
+  <polygon points="290,520 278,548 292,542 296,560 304,540 308,558 316,538 310,520" fill="#fbbf24"/>
+  <polygon points="390,520 378,548 392,542 396,560 404,540 408,558 416,538 410,520" fill="#fbbf24"/>
+
+  <!-- branch -->
+  <rect x="220" y="518" width="240" height="12" rx="6" fill="#4f6ef7" opacity=".6"/>
+
+  <!-- accent dot -->
+  <circle cx="340" cy="285" r="4" fill="#c8d4ff" opacity=".8"/>
+</svg>

@@ -275,10 +275,7 @@ export default function History() {
         </button>
 
         <div className="hist-brand" aria-hidden>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-            <path d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.89L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"
-              stroke="var(--sky-bright)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+          <img src="/logo.svg" alt="Hoovik" width="28" height="28" />
           <span className="hist-brand-name">Hoovik</span>
         </div>
 

@@ -1,4 +1,3 @@
-
 :root {
   --au-bg:            #04080f;
   --au-bg1:           #070d1a;
@@ -301,16 +300,10 @@ html, body, #root {
   margin-bottom: 28px;
 }
 
-.au-form-brand-icon {
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, #0c2340, #0a3a5c);
-  border: 1px solid rgba(14, 165, 233, 0.3);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 0 14px rgba(14, 165, 233, 0.15);
+.au-form-brand img,
+.au-hero-logo img {
+  width: 32px;
+  height: 32px;
   flex-shrink: 0;
 }
 

@@ -55,12 +55,7 @@ export default function Authentication() {
       <aside className="au-hero" aria-hidden>
         <div className="au-hero-inner">
           <div className="au-hero-logo">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-              <path
-                d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.89L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"
-                stroke="#38bdf8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
-              />
-            </svg>
+            <img src="/logo.svg" alt="Hoovik" width="32" height="32" />
             <span>Hoovik</span>
           </div>
 
@@ -123,14 +118,7 @@ export default function Authentication() {
         <div className="au-form-card">
 
           <div className="au-form-brand">
-            <div className="au-form-brand-icon">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                <path
-                  d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.89L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"
-                  stroke="#38bdf8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
-                />
-              </svg>
-            </div>
+            <img src="/logo.svg" alt="Hoovik" width="32" height="32" />
             <span className="au-form-brand-name">Hoovik</span>
           </div>
 

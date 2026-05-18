@@ -11,17 +11,7 @@ export default function LandingPage() {
       <div className="lp-bg-mesh" aria-hidden />
       <header className="lp-nav" role="navigation" aria-label="Main navigation">
         <div className="lp-brand" onClick={() => navigate("/")}>
-          <div className="lp-brand-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
-              <path
-                d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.89L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"
-                stroke="#38bdf8"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </div>
+          <img src="/logo.svg" alt="Hoovik" width="36" height="36" />
           <span className="lp-brand-name">Hoovik</span>
         </div>
 
