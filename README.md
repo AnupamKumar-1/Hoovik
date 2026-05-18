@@ -1,19 +1,85 @@
-# Hoovik
+<div align="center">
 
+<br/>
 
+<img src="./docs/logo.svg" width="88" alt="Hoovik Logo" />
 
-> A distributed, full-stack video meeting platform combining WebRTC peer-to-peer media, real-time multimodal emotion inference, in-meeting chat, and asynchronous transcript analysis — implemented as four independently deployed services.
+<h1>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://readme-typing-svg.demolab.com?font=Syne&weight=800&size=52&pause=1000&color=FFFFFF&center=true&vCenter=true&width=400&height=70&lines=Hoovik" />
+    <img src="https://readme-typing-svg.demolab.com?font=Syne&weight=800&size=52&pause=1000&color=0F0F0F&center=true&vCenter=true&width=400&height=70&lines=Hoovik" alt="Hoovik" />
+  </picture>
+</h1>
 
-![CI](https://github.com/AnupamKumar-1/Hoovik/actions/workflows/ci.yml/badge.svg)
-[![GitHub Stars](https://img.shields.io/github/stars/AnupamKumar-1/Hoovik?style=social)](https://github.com/AnupamKumar-1/Hoovik/stargazers)
+<p align="center">
+  <img src="https://img.shields.io/badge/WebRTC-Peer--to--Peer_Media-FF6B35?style=for-the-badge&logo=webrtc&logoColor=white" />
+  &nbsp;
+  <img src="https://img.shields.io/badge/Emotion_AI-Multimodal_Inference-7C3AED?style=for-the-badge&logo=pytorch&logoColor=white" />
+  &nbsp;
+  <img src="https://img.shields.io/badge/Real--Time-4_Microservices-0EA5E9?style=for-the-badge&logo=socketdotio&logoColor=white" />
+</p>
 
-If you find this project useful, a ⭐ goes a long way — thank you!
+<p align="center">
+  <em>A distributed, full-stack video meeting platform combining WebRTC peer-to-peer media,<br/>real-time multimodal emotion inference, in-meeting chat, and asynchronous transcript analysis<br/>— implemented as four independently deployed services.</em>
+</p>
 
-**Live Demo:** https://hoovik.onrender.com
+<br/>
 
-| Frontend | Backend (Node.js) | Emotion Service | Transcript Service |
-|----------|------------------|-----------------|-------------------|
-| Render | Render | Azure | Azure |
+<p align="center">
+  <a href="https://github.com/AnupamKumar-1/Hoovik/actions/workflows/ci.yml">
+    <img src="https://github.com/AnupamKumar-1/Hoovik/actions/workflows/ci.yml/badge.svg" alt="CI" />
+  </a>
+  &nbsp;
+  <a href="https://github.com/AnupamKumar-1/Hoovik/stargazers">
+    <img src="https://img.shields.io/github/stars/AnupamKumar-1/Hoovik?style=social" alt="GitHub Stars" />
+  </a>
+  &nbsp;
+  <img src="https://img.shields.io/badge/License-MIT-22C55E?style=flat-square" />
+  &nbsp;
+  <img src="https://img.shields.io/badge/PRs-Welcome-F59E0B?style=flat-square" />
+</p>
+
+<p align="center">If you find this project useful, a ⭐ goes a long way — thank you!</p>
+
+<br/>
+
+<a href="https://hoovik.onrender.com">
+  <img src="https://img.shields.io/badge/🚀%20Live%20Demo-hoovik.onrender.com-000000?style=for-the-badge&logoColor=white" alt="Live Demo" />
+</a>
+
+<br/><br/>
+
+<!-- Deployment Table -->
+<table>
+  <thead>
+    <tr>
+      <th align="center">🖥️ Frontend</th>
+      <th align="center">⚙️ Backend (Node.js)</th>
+      <th align="center">🧠 Emotion Service</th>
+      <th align="center">📝 Transcript Service</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td align="center">
+        <img src="https://img.shields.io/badge/Render-46E3B7?style=for-the-badge&logo=render&logoColor=000" />
+      </td>
+      <td align="center">
+        <img src="https://img.shields.io/badge/Render-46E3B7?style=for-the-badge&logo=render&logoColor=000" />
+      </td>
+      <td align="center">
+        <img src="https://img.shields.io/badge/Azure-0078D4?style=for-the-badge&logo=microsoftazure&logoColor=white" />
+      </td>
+      <td align="center">
+        <img src="https://img.shields.io/badge/Azure-0078D4?style=for-the-badge&logo=microsoftazure&logoColor=white" />
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<br/>
+
+</div>
 
 ![Hoovik demo](docs/src/Hoovik.gif)
 
