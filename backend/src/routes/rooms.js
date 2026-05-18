@@ -83,6 +83,20 @@ router.post("/", async (req, res) => {
   }
 });
 
+router.get("/mine", async (req, res) => {
+  try {
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    const rooms = await findRoomsByOwner(req.user.id);
+    res.json({ rooms });
+  } catch (err) {
+    console.error("Error fetching owner rooms:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 router.get("/:roomCode", async (req, res) => {
   try {
     const { roomCode } = req.params;
@@ -106,20 +120,6 @@ router.get("/:roomCode", async (req, res) => {
     });
   } catch (err) {
     console.error("Error fetching room:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-router.get("/mine", async (req, res) => {
-  try {
-    if (!req.user || !req.user.id) {
-      return res.status(401).json({ error: "Authentication required" });
-    }
-
-    const rooms = await findRoomsByOwner(req.user.id);
-    res.json({ rooms });
-  } catch (err) {
-    console.error("Error fetching owner rooms:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
