@@ -18,7 +18,7 @@ Real-time multimodal emotion recognition for video meetings. The service ingests
 - **Optuna hyperparameter tuning** — separate search for the Transformer (`tune.py`) and XGBoost (`tune_xgb.py`)
 - **Locust load testing** — WebSocket stress testing via `locustfile.py`
 - **Health and readiness endpoints** — `GET /health` returns `{"status": "ok"}` (HTTP 200) as a lightweight liveness probe with no model dependency; `GET /ready` returns `{"status": "ready"}` (HTTP 200) only after successful model loading, or HTTP 503 if initialisation is incomplete — suitable for load balancer health checks
-- **Live latency dashboard** — `GET /stats` renders a browser-friendly auto-refreshing dashboard; `GET /stats/json` exposes the same P50/P90/P95/min/max snapshot for programmatic access
+- **Live latency dashboard** — `GET /stats` renders a browser-friendly auto-refreshing dashboard showing P50/P90/P95/min/mean/max per modality plus active participant count; `GET /stats/json` exposes the same snapshot (including an `active_participants` field) for programmatic access ([#11](https://github.com/AnupamKumar-1/Hoovik/issues/11))
 
 ---
 
@@ -308,12 +308,12 @@ Modality flags are assigned structurally from filename parsing — not retroacti
 
 ### `observability/stats.py` — Live Latency Dashboard
 
-Mounted on the FastAPI app as a `stats_router` (`APIRouter`). Wired to `_LatencyTracker` through `set_tracker()`, called once during `app.py` startup before any request is served.
+Mounted on the FastAPI app as a `stats_router` (`APIRouter`). Wired to `_LatencyTracker` through `set_tracker()`, called once during `app.py` startup before any request is served. Also wired to the participant state registry to expose `active_participants` — the count of participant IDs that currently have active pump coroutines, excluding empty or stale entries ([#11](https://github.com/AnupamKumar-1/Hoovik/issues/11)).
 
 | Route | Response | Description |
 |---|---|---|
-| `GET /stats/json` | JSON | Snapshot of per-modality and overall P50/P90/P95/min/mean/max (ms), computed from the tracker's rolling 500-sample window |
-| `GET /stats` | HTML | Self-contained auto-refreshing dashboard; polls `/stats/json` every 5 s and re-renders stat cards in-place without a full page reload |
+| `GET /stats/json` | JSON | Snapshot of per-modality and overall P50/P90/P95/min/mean/max (ms) from the tracker's rolling 500-sample window, plus `active_participants` count |
+| `GET /stats` | HTML | Self-contained auto-refreshing dashboard; polls `/stats/json` every 5 s and re-renders stat cards in-place without a full page reload; displays active participant count alongside latency metrics |
 
 The module imports nothing from `app.py` — it holds only a module-level `_tracker` reference populated by `set_tracker`. Percentiles use linear interpolation on a sorted copy of the deque, consistent with `_LatencyTracker._report()`. Modality cards are rendered for `audio_only`, `video_only`, and `both`; an empty snapshot is returned safely when no tracker is wired or no samples have been recorded yet.
 
@@ -598,8 +598,8 @@ While the server is running, inference latency statistics are available without 
 |---|---|---|
 | `GET /health` | HTTP | Liveness probe — returns `{"status": "ok"}` (HTTP 200); lightweight, no model dependency |
 | `GET /ready` | HTTP | Readiness probe — returns `{"status": "ready"}` (HTTP 200) after successful model loading; returns HTTP 503 if not yet initialised |
-| `GET /stats` | Browser | Auto-refreshing HTML dashboard showing P50/P90/P95/min/mean/max per modality and overall; updates every 5 s |
-| `GET /stats/json` | HTTP | JSON snapshot of the same data; suitable for monitoring scripts or dashboards |
+| `GET /stats` | Browser | Auto-refreshing HTML dashboard showing P50/P90/P95/min/mean/max per modality and overall, plus active participant count; updates every 5 s |
+| `GET /stats/json` | HTTP | JSON snapshot of the same data including `active_participants`; suitable for monitoring scripts or dashboards |
 
 The dashboard reads from the `_LatencyTracker` rolling window (500 samples per modality). Data resets on server restart; no persistent latency store is maintained.
 

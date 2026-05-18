@@ -36,7 +36,7 @@ A Python-based HTTP service that accepts multi-speaker audio uploads, performs s
 
 This service exposes a single `POST /process_meeting` endpoint via FastAPI. It accepts one or more audio files alongside metadata (meeting code, speaker name map), processes each file through a transcription and emotion-detection pipeline, merges and sorts segments across speakers, and POSTs the resulting transcript and analysis JSON to a configurable Node.js callback URL.
 
-Processing is intentionally dispatched as a background task (`BackgroundTasks`), so the HTTP response (HTTP 202) is returned immediately while the pipeline runs asynchronously.
+Processing is intentionally dispatched as a background task (`BackgroundTasks`), so the HTTP response (HTTP 202) is returned immediately while the pipeline runs asynchronously. The `NODE_API` callback retries up to 3 times on transient network errors or HTTP 5xx responses (backoff: 5 s → 15 s → 30 s) before giving up ([#4](https://github.com/AnupamKumar-1/Hoovik/issues/4)).
 
 ---
 
@@ -44,7 +44,7 @@ Processing is intentionally dispatched as a background task (`BackgroundTasks`),
 
 - **Multi-file upload**: Accepts a list of audio files in a single request (`audio_files: list[UploadFile]`).
 - **Format support**: Accepts `webm`, `wav`, `mp3`, `m4a`, `ogg`, `aac`, `mp4` (defined in `config.py` as `ALLOWED_EXT`).
-- **Audio normalisation**: Converts all accepted formats to mono 16 kHz WAV via `ffmpeg` before transcription.
+- **Audio normalisation**: Converts all accepted formats to mono 16 kHz WAV via `ffmpeg` before transcription. `ffmpeg` availability is validated at service startup; the process exits immediately with a clear error message if `ffmpeg` is not found in `PATH` ([#7](https://github.com/AnupamKumar-1/Hoovik/issues/7)).
 - **Speech-to-text**: Uses OpenAI Whisper `small` model, loaded once at module import in `asr_service.py`.
 - **Segment merging**: Consecutive segments from the same speaker with a gap ≤ `MERGE_GAP_SEC` (2.0 s, hardcoded in `asr_service.py`) and combined word count ≤ `MERGE_MAX_WORDS` (60 words, hardcoded) are merged, unless the buffer ends with a sentence-terminal punctuation mark.
 - **Emotion classification**: Uses `j-hartmann/emotion-english-distilroberta-base` via HuggingFace `transformers` pipeline. Segments with fewer than 4 words are assigned `"neutral"` without model inference.
@@ -87,7 +87,7 @@ flowchart TD
         B4 --> Merge --> Transcript --> Summary --> Cleanup
     end
 
-    NodeAPI(["NODE_API\nPOST — requests, timeout=None"])
+    NodeAPI(["NODE_API\nPOST — requests, timeout=None\nup to 3 retries on network error / 5xx"])
 
     Client -->|"multipart/form-data"| EP
     EP --> R202
@@ -134,7 +134,7 @@ Entry point. Defines the FastAPI application, CORS middleware, the `POST /proces
 
 | Symbol | Role |
 |---|---|
-| `run_processing` | Async background task; orchestrates per-file processing and the Node.js callback |
+| `run_processing` | Async background task; orchestrates per-file processing and the Node.js callback. Retries the `NODE_API` POST up to 3 times on network errors or HTTP 5xx responses (backoff: 5 s → 15 s → 30 s); does not retry on 4xx ([#4](https://github.com/AnupamKumar-1/Hoovik/issues/4)) |
 | `process_meeting` | FastAPI route handler; reads uploads into memory, delegates to `run_processing` via `BackgroundTasks` |
 
 ### `config.py`
@@ -178,7 +178,7 @@ Cross-speaker segment operations and transcript formatting.
 
 ### `utils/audio.py`
 
-Wraps `ffmpeg` for audio conversion. Calls `ffmpeg -y -i <src> -ac 1 -ar 16000 -vn <dst>` as a subprocess with `check=True`. Raises `subprocess.CalledProcessError` on non-zero exit.
+Wraps `ffmpeg` for audio conversion. Calls `ffmpeg -y -i <src> -ac 1 -ar 16000 -vn <dst>` as a subprocess with `check=True`. Raises `subprocess.CalledProcessError` on non-zero exit. A startup check (`shutil.which("ffmpeg")`) is performed at module import time; if `ffmpeg` is not found in `PATH` the service raises an error and refuses to start ([#7](https://github.com/AnupamKumar-1/Hoovik/issues/7)).
 
 ### `utils/emotion.py`
 
@@ -298,7 +298,8 @@ If `merge_segments` returns an empty list, `run_processing` returns early and th
 | `_get_emotion` | Any exception from `emotion_pipeline` | Logs to stdout; returns `"neutral"` |
 | `run_processing` — `convert_to_wav` | Any exception | Falls back to original file path; logs nothing (bare `except Exception`) |
 | `run_processing` — `json.loads(speaker_map)` | Any exception | Falls back to `{}` |
-| `run_processing` — `requests.post` to NODE_API | Any exception | Logs `"Node API callback failed: {e}"` to stdout; no retry |
+| `run_processing` — `requests.post` to NODE_API | Network error or HTTP 5xx | Retries up to 3 times with backoff (5 s → 15 s → 30 s); logs each attempt. After all retries exhausted logs `"Node API callback failed after retries: {e}"`. Does not retry on 4xx. |
+| `run_processing` — `requests.post` to NODE_API (4xx) | HTTP 4xx response | No retry; logs `"Node API callback failed: {status}"` and exits |
 | `schedule_file_cleanup` | `OSError` / any exception per file | Logs `"helpers: file cleanup failed for {p} — {e}"`; continues to next file |
 
 No exceptions bubble up to the HTTP layer from `run_processing` (it is a background task). Client-visible errors are limited to request validation failures handled by FastAPI.
@@ -320,8 +321,15 @@ No exceptions bubble up to the HTTP layer from `run_processing` (it is a backgro
 - **Sequential per-file processing**: Files in a single request are processed one at a time in a `for` loop. There is no intra-request parallelism.
 - **No request deduplication or queueing**: Concurrent requests start independent background tasks with no backpressure or queue depth limit.
 - **Shared model singletons without locking**: `asr_model` and `emotion_pipeline` are module-level objects. Thread safety under concurrent requests depends entirely on Whisper and HuggingFace Transformers internals.
-- **No NODE_API timeout**: `requests.post(..., timeout=None)` means a hung downstream server will block the background thread indefinitely.
+- **No NODE_API timeout**: `requests.post(..., timeout=None)` means a hung downstream server will block the background thread indefinitely (even across retry attempts).
 - **English-only transcription**: `whisper.transcribe` is called with `language="en"` hardcoded; other languages are not supported by the current configuration.
+- **Retry does not cover 4xx or empty-segment results**: The `NODE_API` callback retries on network errors and 5xx responses ([#4](https://github.com/AnupamKumar-1/Hoovik/issues/4)), but 4xx responses and empty merged-segment results still cause silent data loss.
+
+---
+
+> **Resolved in recent PRs** — the following items from earlier versions of this list have been fixed:
+> - ~~`ffmpeg` not validated at startup — failures only surfaced during audio conversion~~ — `utils/audio.py` now checks `ffmpeg` availability at module import and raises immediately if missing ([#7](https://github.com/AnupamKumar-1/Hoovik/issues/7) / [#8](https://github.com/AnupamKumar-1/Hoovik/pull/8))
+> - ~~No retry on `NODE_API` callback failure — single `requests.post` with silent loss~~ — up to 3 retries added for network errors and 5xx responses ([#4](https://github.com/AnupamKumar-1/Hoovik/issues/4))
 
 ---
 

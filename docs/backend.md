@@ -259,6 +259,8 @@ Partial upload state is tracked via:
 - `partial:<key>` — binary data key.
 - `partial:meta:<key>` — JSON metadata; TTL `PARTIAL_UPLOAD_TTL_SEC` (derived from `PARTIAL_UPLOAD_TTL_MS`, default `600 000` ms → `600` seconds).
 
+**Redis null-guards** ([#5](https://github.com/AnupamKumar-1/Hoovik/issues/5)): `handleJoinCall`, `handleLeave`, `broadcastParticipants`, and `getPartialMeta` call sites now explicitly check for `null` returns from `safeRedisGet`. On a Redis failure, `handleJoinCall` emits an `"error"` to the socket and aborts instead of proceeding with fabricated empty participant state; `handleLeave` guards `stateArr` before mutation; `broadcastParticipants` skips the emit when Redis is unavailable. Redis failures are logged as warnings rather than being silently swallowed.
+
 ### `src/services/transcript.service.js`
 
 - **Noise filtering**: lines are dropped if they fail any of: minimum word count (`NOISE_MIN_WORDS`, default `4`), alpha ratio < `NOISE_MIN_ALPHA_RATIO` (default `0.6`), unique-word ratio < `NOISE_MIN_UNIQUE_RATIO` (default `0.4`), excessive character repetition (run > `NOISE_MAX_CHAR_REPEAT`, default `4`), or match `FILLER_ONLY_RE`.
@@ -274,10 +276,11 @@ Partial upload state is tracked via:
 - Meetings list cache TTL: `MEETINGS_CACHE_TTL_SEC` (default `60` s).
 - User cache TTL: `USER_CACHE_TTL_SEC` (default `300` s).
 - `getMeetingsService` queries up to `cfg.user.meetingsQueryLimit` (default `200`) documents.
+- **Username enumeration fix**: `loginService` returns `401 Unauthorized` with `"Invalid username or password."` for both unknown-username and wrong-password cases. The previous `404 Not Found` + `"User not found."` path that allowed username enumeration has been removed ([#15](https://github.com/AnupamKumar-1/Hoovik/issues/15)).
 
 ### `src/observability/latency/latency.service.js`
 
-Writes a structured latency log line per measured operation to `logs/latency-<PORT>.log`. Log file is truncated (`writeFileSync` with `""`) on each process start. Measurements use `process.hrtime.bigint()` for nanosecond resolution, converted to milliseconds.
+Writes a structured latency log line per measured operation to `logs/latency-<PORT>.log`. On process start, the file is **not** truncated; instead, a `[PROCESS START]` separator is appended via `fs.appendFileSync` so runs remain distinguishable in a single file. Entries from previous runs are preserved across restarts ([#12](https://github.com/AnupamKumar-1/Hoovik/issues/12)). Measurements use `process.hrtime.bigint()` for nanosecond resolution, converted to milliseconds.
 
 ### `src/models/meeting.model.js`
 
@@ -393,7 +396,7 @@ flowchart TD
 - pm2 restarts a process automatically when its RSS exceeds `512M` (`max_memory_restart`).
 - On crash, pm2 applies exponential backoff starting at `100 ms` (`exp_backoff_restart_delay`).
 - Each process re-runs the full startup sequence (MongoDB connect → Redis connect → HTTP listen → Socket.IO init) on restart. A failed MongoDB or Redis connection at startup calls `process.exit(1)`, triggering another pm2 restart cycle.
-- Because `latency.service.js` truncates `logs/latency-<PORT>.log` at module load time, every pm2 restart destroys the latency log for that port.
+- On each restart, `latency.service.js` appends a `[PROCESS START]` marker to `logs/latency-<PORT>.log` without truncating it; historical latency entries are preserved across pm2 restarts ([#12](https://github.com/AnupamKumar-1/Hoovik/issues/12)).
 
 ### Log Aggregation
 
@@ -466,8 +469,8 @@ Some routes (e.g., `GET /api/v1/meetings`) use optional auth: the handler runs r
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | `POST` | `/` | None (optional via `req.user`) | Body: `{ hostName }`. Returns `{ roomCode, hostSecret, owner }` |
+| `GET` | `/mine` | Requires `req.user` set by caller | Returns rooms owned by `req.user.id`. Registered **before** `/:roomCode` to prevent Express route-order shadowing ([#26](https://github.com/AnupamKumar-1/Hoovik/issues/26)) |
 | `GET` | `/:roomCode` | None | Returns room metadata if `active: true` |
-| `GET` | `/mine` | Requires `req.user` set by caller | Returns rooms owned by `req.user.id` |
 
 ### Meeting Routes — `/api/v1/meetings`
 
@@ -583,7 +586,7 @@ Instrumented labels (defined in `latency.constants.js`):
 | `SOCKET_MESSAGE` | `"socket.message"` | `handleChatMessage` exit |
 | `SOCKET_SIGNAL` | `"socket.signal"` | `signal` event handler |
 
-> The log file is **truncated on process start** (`fs.writeFileSync(LOG_FILE, "")`). Logs from previous runs are not retained.
+On each process start a `[PROCESS START]` marker is appended to the log file; entries from previous runs are retained. No log rotation or archival beyond file-system limits is implemented.
 
 ### Redis Metric Counters
 
@@ -602,7 +605,7 @@ Instrumented labels (defined in `latency.constants.js`):
 - **Unhandled promise rejections**: caught via `process.on("unhandledRejection")` in `app.js`; logged but process is **not** terminated.
 - **Uncaught exceptions**: caught via `process.on("uncaughtException")`; logged and `process.exit(1)` is called.
 - **HTTP handler errors**: the global Express error middleware (`app.use((err, req, res, next) => ...)`) returns a JSON body with `err.status` (or `500`) and `err.message`.
-- **Redis operation failures**: all `safeRedis*` functions in `redis.utils.js` catch exceptions, log a warning, and return `null`. Callers that check for `null` degrade gracefully; callers that do not may propagate `null` values.
+- **Redis operation failures**: all `safeRedis*` functions in `redis.utils.js` catch exceptions, log a warning, and return `null`. Key call sites in `socket.service.js` now null-guard these returns and abort or warn rather than propagating `null` values into socket event handlers ([#5](https://github.com/AnupamKumar-1/Hoovik/issues/5)).
 - **Socket event errors**: each event handler in `socket.controller.js` is wrapped in a `try/catch`; on catch it logs and optionally emits `"error"` to the socket.
 - **Lock timeout**: `withRoomLock` throws `Error("timeout acquiring lock for room: <code>")` after `REDIS_LOCK_MAX_WAIT_MS`; this propagates to the `join-call` handler, which emits `"error"` to the socket.
 - **Transcript duplicate key (11000)**: `createTranscriptDoc` catches Mongoose duplicate-key errors and falls back to `findOne`.
@@ -623,6 +626,7 @@ The following mitigations are implemented in source:
 - **Input sanitisation**: `sanitize-html` is applied to chat messages, participant names, transcription chunks, and keywords.
 - **Meeting code validation**: regex `^[A-Z0-9\-]{3,32}$` enforced at socket and transcript layers.
 - **Host secret**: stored as `sha256` hash only; raw secret is returned once at room creation and never persisted.
+- **Username enumeration prevention**: `loginService` returns `401 Unauthorized` with a uniform `"Invalid username or password."` message for both unknown-username and wrong-password cases. The previous code path that returned `404 Not Found` with `"User not found."` for absent usernames has been removed ([#15](https://github.com/AnupamKumar-1/Hoovik/issues/15)).
 - **Redis lock CAS release**: the lock release Lua script compares the stored token to the caller's token before deleting, preventing accidental release of another process's lock.
 - **CORS**: allowlist is hardcoded in `app.js`; origins outside `["http://localhost:3000", "https://hoovik.onrender.com"]` are rejected.
 - **`trust proxy: 1`**: enabled; IP extraction in `getClientIp` uses `x-forwarded-for` first. Misconfigured proxy chains could allow IP spoofing.
@@ -637,19 +641,23 @@ The following are grounded in implementation constraints visible in the source:
 
 1. **CORS allowlist is hardcoded** in two places (`app.js` CORS config and `connectToSocket` call). Adding new origins requires a code change and redeployment.
 
-2. **Latency log truncated on restart**: `latency.service.js` calls `fs.writeFileSync(LOG_FILE, "")` at module load time, destroying previous log data.
+2. **Cleanup timer runs in every process**: `setInterval` for `cleanupOldMeetings` is registered at module import time in `meeting.model.js`. In a multi-process `pm2` deployment, all processes run the cleanup independently at the same interval.
 
-3. **Cleanup timer runs in every process**: `setInterval` for `cleanupOldMeetings` is registered at module import time in `meeting.model.js`. In a multi-process `pm2` deployment, all processes run the cleanup independently at the same interval.
+3. **`signal` relay is unscoped**: `socket.controller.js` forwards `signal` events to any `targetId` without verifying room co-membership, allowing cross-room signal delivery.
 
-4. **`signal` relay is unscoped**: `socket.controller.js` forwards `signal` events to any `targetId` without verifying room co-membership, allowing cross-room signal delivery.
+4. **Participant map serialisation**: `getParticipants` / `setParticipants` serialise the full participant map on every read/write. For rooms near the 50-participant cap, this produces proportionally larger Redis payloads per event.
 
-5. **Participant map serialisation**: `getParticipants` / `setParticipants` serialise the full participant map on every read/write. For rooms near the 50-participant cap, this produces proportionally larger Redis payloads per event.
+5. **Chat history is capped at 500 messages** (`meeting.model.js:addChatMessage`); older messages are discarded in-place on the document. No archival mechanism is implemented.
 
-6. **Chat history is capped at 500 messages** (`meeting.model.js:addChatMessage`); older messages are discarded in-place on the document. No archival mechanism is implemented.
+6. **No refresh token implementation**: `logout` clears a `refreshToken` cookie, but no route issues or validates a refresh token.
 
-7. **`safeRedis*` null returns are not uniformly handled**: some callers in `socket.service.js` proceed with `null` values from Redis, which may produce unexpected behaviour if Redis is unavailable.
+---
 
-8. **No refresh token implementation**: `logout` clears a `refreshToken` cookie, but no route issues or validates a refresh token.
+> **Resolved in recent PRs** — the following items from earlier versions of this list have been fixed:
+> - ~~Latency log truncated on restart~~ — log now appends a `[PROCESS START]` marker; previous entries are preserved ([#12](https://github.com/AnupamKumar-1/Hoovik/issues/12) / [#13](https://github.com/AnupamKumar-1/Hoovik/pull/13))
+> - ~~`safeRedis*` null returns not uniformly handled in `socket.service.js`~~ — null-guards added to `handleJoinCall`, `handleLeave`, `broadcastParticipants`, and `getPartialMeta` call sites ([#5](https://github.com/AnupamKumar-1/Hoovik/issues/5) / [#19](https://github.com/AnupamKumar-1/Hoovik/pull/19))
+> - ~~Username enumeration via distinct 404 / 401 login responses~~ — `loginService` now returns uniform `401` for both cases ([#15](https://github.com/AnupamKumar-1/Hoovik/issues/15))
+> - ~~`GET /rooms/mine` always returning 404 due to route shadowing by `/:roomCode`~~ — static route now registered before parameterised route ([#26](https://github.com/AnupamKumar-1/Hoovik/issues/26) / [#27](https://github.com/AnupamKumar-1/Hoovik/pull/27))
 
 ---
 
@@ -658,7 +666,6 @@ The following are grounded in implementation constraints visible in the source:
 These follow directly from the limitations documented above:
 
 - Externalise the CORS allowlist to environment configuration to avoid redeployment for origin changes.
-- Add a log rotation or append strategy to `latency.service.js` to preserve logs across restarts.
 - Coordinate the cleanup timer via a Redis-based leader election or distributed cron to prevent duplicate execution in multi-process deployments.
 - Scope `signal` relay to verified room co-members by checking the Redis participant map before forwarding.
-- Implement consistent null-guard handling for all `safeRedis*` return values in `socket.service.js`.
+- Implement a refresh token flow so sessions can be extended without requiring re-login.

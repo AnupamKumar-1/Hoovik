@@ -64,7 +64,7 @@ These are the non-trivial engineering decisions made across the stack, grounded 
 | **Browser media pipeline** | `AudioWorklet` + `AnalyserNode` for RMS-gated noise detection; `MediaRecorder` per participant for post-meeting audio; `RTCPeerConnection` lifecycle managed per remote peer in React; JPEG frames captured from `<video>` elements at self-throttled rates |
 | **Asynchronous transcript pipeline** | HTTP 202 accepted immediately; background FastAPI task runs ffmpeg → Whisper (`small`) → DistilRoBERTa per-segment emotion → multi-speaker segment merge → HTTP POST callback to backend |
 | **Multi-process backend** | Three pm2 instances on separate ports, unified by `@socket.io/redis-adapter` pub/sub; all room state externalised to Redis so no instance holds authoritative in-process state |
-| **Rate limiting and account locking** | Per-IP and per-user rate limiting via Redis counters; account lock after `ACCOUNT_LOCK_THRESHOLD` consecutive failed logins with a fixed TTL (`ACCOUNT_LOCK_SEC`, default 900 s) implemented in the auth layer |
+| **Rate limiting and account locking** | Per-IP and per-user rate limiting via Redis counters; account lock after `ACCOUNT_LOCK_THRESHOLD` consecutive failed logins with a fixed TTL (`ACCOUNT_LOCK_SEC`, default 900 s) implemented in the auth layer; login endpoint returns uniform `401` for both unknown username and wrong password to prevent username enumeration |
 | **Chat with client-side ACK timeout** | Backend appends sanitised messages to MongoDB (capped at 500), broadcasts, and emits `chat-ack`; client marks message failed after 5 000 ms with no acknowledgement |
 | **Load testing** | Locust-based WebSocket stress tests in `load_testing/locustfile.py`; participant face images placed in `load_testing/src/*.jpg`; run against the emotion service at `http://localhost:5002` |
 
@@ -178,7 +178,7 @@ graph TD
 
 ### Frontend
 
-**Responsibility**: Renders the meeting UI; manages local media via `getUserMedia`; negotiates WebRTC peer connections for all remote participants; streams video frames and audio to the emotion service; handles in-meeting chat; records participant audio for post-meeting transcription; submits recorded blobs to the transcription service after the host ends the meeting.
+**Responsibility**: Renders the meeting UI; manages local media via `getUserMedia`; negotiates WebRTC peer connections for all remote participants; streams video frames and audio to the emotion service; handles in-meeting chat; records participant audio for post-meeting transcription; submits recorded blobs to the transcription service after the host ends the meeting. The transcript panel uses a fixed-height scrollable container to prevent unbounded vertical expansion. The local video preview repositions dynamically when the chat panel is open to avoid covering the chat input area.
 
 **Key technologies**: React, React Router, WebRTC (`RTCPeerConnection`), Web Audio API (`AudioWorklet`, `AnalyserNode`), `MediaRecorder`, Socket.IO client.
 
@@ -190,7 +190,7 @@ graph TD
 
 ### Backend
 
-**Responsibility**: Authenticates users (JWT via `passport-jwt`); manages meeting room lifecycle; relays WebRTC signalling (SDP/ICE) between peers; delivers and persists chat; stores and retrieves transcripts; proxies transcript upload requests to the transcription service.
+**Responsibility**: Authenticates users (JWT via `passport-jwt`); manages meeting room lifecycle; relays WebRTC signalling (SDP/ICE) between peers; delivers and persists chat; stores and retrieves transcripts; proxies transcript upload requests to the transcription service. Static routes (e.g. `GET /rooms/mine`) are registered before parameterised routes (`GET /rooms/:roomCode`) to prevent Express route-order shadowing.
 
 **Key technologies**: Node.js, Express, Socket.IO with `@socket.io/redis-adapter`, Mongoose (MongoDB), `redis` v5, `passport-jwt`, pm2.
 
@@ -206,7 +206,7 @@ graph TD
 
 **Key technologies**: Python, FastAPI, Socket.IO (python-socketio), PyTorch (`EmotionTransformer`), XGBoost, MediaPipe, HuggingFace `wav2vec2-large-robust`, APScheduler, uvicorn.
 
-**Protocols used**: Socket.IO — client sends `emotion.frame`, `audio_chunk`, `participant.media_state`; service returns `emotion.result`, `backpressure`, `server.status`. HTTP GET — `GET /health` (liveness probe), `GET /ready` (readiness probe), `GET /stats` (HTML dashboard), `GET /stats/json` (programmatic snapshot).
+**Protocols used**: Socket.IO — client sends `emotion.frame`, `audio_chunk`, `participant.media_state`; service returns `emotion.result`, `backpressure`, `server.status`. HTTP GET — `GET /health` (liveness probe), `GET /ready` (readiness probe), `GET /stats` (HTML dashboard including active participant count), `GET /stats/json` (programmatic snapshot including `active_participants` field).
 
 **Observed inference latency**: median 300–500 ms at 10 concurrent participants (runtime log, 2026-05-07); hardware-dependent. Live per-modality percentiles (P50/P90/P95) are visible at `/stats` while the server is running.
 
@@ -220,7 +220,7 @@ graph TD
 
 **Key technologies**: Python, FastAPI, OpenAI Whisper, HuggingFace Transformers (DistilRoBERTa), ffmpeg, uvicorn.
 
-**Protocols used**: HTTP multipart POST (`POST /process_meeting`, returns HTTP 202 immediately); HTTP POST callback to `NODE_API` — asynchronous, no retry.
+**Protocols used**: HTTP multipart POST (`POST /process_meeting`, returns HTTP 202 immediately); HTTP POST callback to `NODE_API` — asynchronous, with up to 3 retries on network errors or 5xx responses (backoff delays: 5 s → 15 s → 30 s); startup validates `ffmpeg` availability and aborts if missing.
 
 **See**: [`docs/transcript_service.md`](docs/transcript_service.md)
 
@@ -284,7 +284,7 @@ sequenceDiagram
 
     Note over TS,MG: 7 — Transcript Persistence and Display (asynchronous)
     TS->>TS: ffmpeg convert → Whisper ASR → DistilRoBERTa emotion
-    TS->>BE: POST NODE_API /api/v1/transcripts (no retry)
+    TS->>BE: POST NODE_API /api/v1/transcripts (up to 3 retries on failure)
     BE->>MG: upsert transcript
     BE->>RD: cache transcript (TTL 300 s)
     loop poll every 20 s (max 30 attempts)
@@ -479,7 +479,7 @@ pip install -r requirements.txt
 uvicorn app:app --host 0.0.0.0 --port 5001
 ```
 
-Note: the `uvicorn.run` call inside `app.py` references `"main:app"`; invoke via `uvicorn app:app` directly rather than `python app.py`. Whisper and DistilRoBERTa models are downloaded from HuggingFace on first run if not cached. ~~`ffmpeg` must be available in `PATH`.~~ *(fixed: ffmpeg is now checked on startup — [#8](https://github.com/AnupamKumar-1/Hoovik/pull/8))*
+Note: the `uvicorn.run` call inside `app.py` references `"main:app"`; invoke via `uvicorn app:app` directly rather than `python app.py`. Whisper and DistilRoBERTa models are downloaded from HuggingFace on first run if not cached. `ffmpeg` must be available in `PATH`; the service now validates this at startup and exits immediately with a clear error message if `ffmpeg` is missing — [#8](https://github.com/AnupamKumar-1/Hoovik/pull/8).
 
 ### 5. Frontend
 
@@ -607,7 +607,7 @@ When a participant disconnects and reconnects, the backend reconstructs their pa
 
 The following constraints are grounded in the current implementation and are relevant to anyone operating or extending the platform.
 
-- **Backend requires Redis**: Room state, Socket.IO fan-out, distributed join locks, and all rate-limiting depend on Redis. Partial Redis unavailability may propagate `null` values into socket event handlers; see [`docs/backend.md`](docs/backend.md) for known null-guard gaps.
+- **Backend requires Redis**: Room state, Socket.IO fan-out, distributed join locks, and all rate-limiting depend on Redis. Redis failures are now distinguishable from valid empty state: `handleJoinCall()`, `handleLeave()`, and `broadcastParticipants()` null-guard Redis reads and abort or log warnings rather than proceeding with fabricated empty state — see [`docs/backend.md`](docs/backend.md).
 
 - **Backend requires an external load balancer**: The three pm2 processes bind separate ports (8000–8001–8002). Distributing Socket.IO connections across them requires sticky-session routing at the load balancer to avoid session mismatch with the Redis adapter.
 
@@ -615,19 +615,19 @@ The following constraints are grounded in the current implementation and are rel
 
 - **Emotion service state is in-process only**: Per-participant embedding buffers, EMA state, and pump coroutines are stored in Python process memory. The service cannot be horizontally scaled without externalising this state.
 
-- **Transcript pipeline is asynchronous with no retry**: The transcription service returns HTTP 202 and processes in a background task. If the `NODE_API` callback fails, the transcript is lost. The frontend polls for up to 10 minutes (30 × 20 s) with no backoff.
+- **Transcript pipeline retry on callback failure**: The transcription service returns HTTP 202 and processes in a background task. The `NODE_API` callback now retries up to 3 times on network errors or 5xx responses (5 s → 15 s → 30 s backoff) before giving up. 4xx responses and empty merged-segment results still cause silent data loss. The frontend polls for up to 10 minutes (30 × 20 s) with no backoff.
 
 - **Cleanup timer runs in all backend processes**: `cleanupOldMeetings` uses a `setInterval` registered at module import time. In a three-process pm2 deployment, all three processes execute it every hour independently.
 
-- **Transcript upload has no retry**: `runBackgroundTranscript` in the frontend makes a single fetch call with a silent `.catch(() => {})`. Failures produce no user-visible notification.
+- **Transcript upload has no retry**: `runBackgroundTranscript` in the frontend makes a single fetch call with a silent `.catch(() => {})`. Failures produce no user-visible notification. Retry logic was added to the server-side callback ([#4](https://github.com/AnupamKumar-1/Hoovik/issues/4)) but the frontend upload itself remains fire-and-forget.
 
 - **TURN credentials are hardcoded**: `meetConfig.js` contains plaintext `openrelayproject` credentials. Time-limited dynamic TURN provisioning is not implemented.
 
-- ~~**Emotion service health and readiness endpoints**: `GET /health` returns `{"status": "ok"}` (HTTP 200) as a lightweight liveness probe. `GET /ready` returns `{"status": "ready"}` (HTTP 200) only after successful model loading; returns HTTP 503 if the service is not yet initialised. These replace the previous TCP-probe requirement for load balancer health checks. The observability dashboard remains available at `GET /stats` (browser) and `GET /stats/json` (JSON).~~ *(merged: health and readiness endpoints added — [#3](https://github.com/AnupamKumar-1/Hoovik/pull/3))*
+- **Emotion service exposes health and readiness endpoints**: `GET /health` returns `{"status": "ok"}` (HTTP 200) as a lightweight liveness probe. `GET /ready` returns `{"status": "ready"}` (HTTP 200) only after successful model loading; returns HTTP 503 if the service is not yet initialised. The observability dashboard is available at `GET /stats` (browser, now includes active participant count) and `GET /stats/json` (JSON, now includes `active_participants` field) — [#2](https://github.com/AnupamKumar-1/Hoovik/pull/3), [#11](https://github.com/AnupamKumar-1/Hoovik/pull/21).
 
 - **Backend CORS allowlist is hardcoded**: Origins outside `localhost:3000` and `hoovik.onrender.com` are rejected. Adding origins requires a code change and redeployment.
 
-- **Latency log is truncated on backend restart**: `latency.service.js` truncates `logs/latency-<PORT>.log` at process start. No log rotation or archival is implemented.
+- **Latency log is preserved across backend restarts**: `latency.service.js` no longer truncates `logs/latency-<PORT>.log` at process start. A `[PROCESS START]` marker is appended on each startup so runs remain distinguishable, and historical entries are preserved across deployments and crash-recovery cycles — [#12](https://github.com/AnupamKumar-1/Hoovik/pull/13).
 
 ---
 
@@ -639,7 +639,7 @@ The following are platform-level limitations that emerge from the combined archi
 
 **No horizontal scaling for inference services**: The emotion service's in-process state design and single inference thread mean it cannot be scaled by adding instances without externalising state (e.g., Redis-backed participant buffers). The transcription service similarly holds model singletons without inter-instance coordination.
 
-**Transcript delivery is eventually consistent with no guarantee**: The transcript is written to MongoDB only after the transcription service's background task completes and its HTTP callback to the backend succeeds. A crashed transcription process, network failure to `NODE_API`, or empty merged-segment result each cause silent data loss with no notification to the user.
+**Transcript delivery retries on transient failure but has no guarantee**: The transcript callback now retries up to 3 times on network errors or 5xx responses before giving up. However, 4xx responses, a crashed transcription process, or an empty merged-segment result each still cause silent data loss with no notification to the user.
 
 **Host-role enforcement is not fully server-authoritative**: The backend does not validate the host identity on socket events (`end-meeting`, recording data emission). Enforcement relies on the client holding `host:<code>` in `localStorage`.
 
@@ -647,7 +647,7 @@ The following are platform-level limitations that emerge from the combined archi
 
 **English-only transcription**: The Whisper model is configured with `language="en"` hardcoded. Multilingual meetings will produce degraded or incorrect transcripts.
 
-**Multiple services must be independently operated**: There is no unified orchestration layer or supervisor across the four services. Operators must monitor each process separately. ~~The emotion service exposes `GET /health` and `GET /ready` for liveness and readiness probing; the other services do not yet expose dedicated health endpoints.~~ *(merged: health and readiness endpoints added — [#3](https://github.com/AnupamKumar-1/Hoovik/pull/3))*
+**Multiple services must be independently operated**: There is no unified orchestration layer or supervisor across the four services. Operators must monitor each process separately. The emotion service exposes `GET /health` and `GET /ready` for liveness and readiness probing; the other services do not yet expose dedicated health endpoints.
 
 ---
 

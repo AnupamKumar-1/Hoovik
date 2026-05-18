@@ -414,7 +414,7 @@ The following are observable from the implementation:
 
 All items below are grounded in code structure or explicit comments:
 
-1. **No retry for transcript upload** — `runBackgroundTranscript` has a single `fetch` call with a `.catch(() => {})`. There is no retry or user notification on failure.
+1. **No retry for transcript upload** — `runBackgroundTranscript` has a single `fetch` call with a `.catch(() => {})`. There is no retry or user notification on failure. (Retry logic was added on the server-side callback in [#4](https://github.com/AnupamKumar-1/Hoovik/issues/4); the frontend upload itself remains fire-and-forget.)
 2. **TURN credentials are hardcoded** — `ICE_CONFIG` in `meetConfig.js` contains plaintext `openrelayproject` credentials.
 3. **Host role is client-enforced** — the frontend checks `localStorage.getItem("host:<code>")`. Any client that sets this key would receive the host UI. Server-side enforcement is not visible in the frontend.
 4. **Safari video preview refresh workaround** — explicitly implemented in `refreshSafariPreview` to ensure reliable video rendering on Safari.
@@ -423,6 +423,12 @@ All items below are grounded in code structure or explicit comments:
 7. **Transcript polling interval is 20 seconds** — `startPollingForTranscript` in `home.jsx` uses 20 s intervals with a maximum of 30 attempts (10 minutes total). No backoff is applied.
 8. **`MAX_TEXT_LENGTH` is enforced client-side only** — `useChat.js` truncates to 2000 characters via `String.slice`. The server is expected to enforce its own limit independently.
 9. **`_activeRooms` is a module-level `Set`** — in `useMeetingLifecycle.js`. It persists across React hot-reloads in development, which can cause the guard to suppress room re-entry.
+
+---
+
+> **Resolved in recent PRs** — the following items from earlier versions of this list have been fixed:
+> - ~~Transcript panel expands indefinitely when "Show more" is clicked~~ — the panel now uses a fixed-height scrollable container ([#9](https://github.com/AnupamKumar-1/Hoovik/issues/9) / [#23](https://github.com/AnupamKumar-1/Hoovik/pull/23))
+> - ~~Local video preview overlaps chat input area on desktop when the chat panel is open~~ — preview now repositions dynamically when chat is expanded ([#10](https://github.com/AnupamKumar-1/Hoovik/issues/10))
 
 ---
 
