@@ -13,7 +13,7 @@ If you find this project useful, a ⭐ goes a long way — thank you!
 |----------|------------------|-----------------|-------------------|
 | Render | Render | Azure | Azure |
 
-![Hoovik demo](docs/src/hoovik_hd.gif)
+![Hoovik demo](docs/src/Hoovik.gif)
 
 Hoovik was built from scratch to explore:
 - real-time communication systems,
