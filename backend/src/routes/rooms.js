@@ -1,5 +1,7 @@
 import express from "express";
 import crypto from "crypto";
+import passport from "passport";
+import "../../config/passport.js";
 import { startTimer, endTimer } from "../observability/latency/latency.service.js";
 import { LATENCY_LABELS } from "../observability/latency/latency.constants.js";
 import {
@@ -11,6 +13,17 @@ import {
 
 const router = express.Router();
 
+//  rejects unauthenticated requests with 401
+const jwtAuth = passport.authenticate("jwt", { session: false });
+
+// sets req.user if token is valid, continues either way
+const aAuth = (req, _res, next) => {
+  passport.authenticate("jwt", { session: false }, (_err, user) => {
+    if (user) req.user = user;
+    next();
+  })(req, _res, next);
+};
+
 function generateHostSecretPair() {
   const hostSecret = crypto.randomBytes(32).toString("hex");
   const hostSecretHash = crypto.createHash("sha256").update(hostSecret).digest("hex");
@@ -21,7 +34,7 @@ function generateRoomCode() {
   return crypto.randomBytes(4).toString("hex").toUpperCase();
 }
 
-router.post("/", async (req, res) => {
+router.post("/", aAuth, async (req, res) => {
   const start = startTimer();
   try {
     const { hostName } = req.body;
@@ -83,7 +96,7 @@ router.post("/", async (req, res) => {
   }
 });
 
-router.get("/mine", async (req, res) => {
+router.get("/mine", jwtAuth, async (req, res) => {
   try {
     if (!req.user || !req.user.id) {
       return res.status(401).json({ error: "Authentication required" });
