@@ -44,7 +44,7 @@
 <br/>
 
 <a href="https://hoovik.onrender.com">
-  <img src="https://img.shields.io/badge/🚀%20Live%20Demo-hoovik.onrender.com-000000?style=for-the-badge&logoColor=white" alt="Live Demo" />
+  <img src="https://img.shields.io/badge/%20Live%20Demo-hoovik.onrender.com-000000?style=for-the-badge&logoColor=white" alt="Live Demo" />
 </a>
 
 <br/><br/>
