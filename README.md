@@ -53,10 +53,10 @@
 <table>
   <thead>
     <tr>
-      <th align="center">🖥️ Frontend</th>
-      <th align="center">⚙️ Backend (Node.js)</th>
-      <th align="center">🧠 Emotion Service</th>
-      <th align="center">📝 Transcript Service</th>
+      <th align="center">Frontend</th>
+      <th align="center">Backend (Node.js)</th>
+      <th align="center">Emotion Service</th>
+      <th align="center">Transcript Service</th>
     </tr>
   </thead>
   <tbody>
