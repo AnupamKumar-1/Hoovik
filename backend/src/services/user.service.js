@@ -131,7 +131,8 @@ export async function loginService(req) {
 
         return {
             status: httpStatus.TOO_MANY_REQUESTS,
-            body: { success: false,
+            body: {
+                success: false,
                 message: "Account temporarily locked due to repeated failed login attempts."
             }
         };
@@ -150,7 +151,8 @@ export async function loginService(req) {
             body: {
                 success: false,
                 message: "Too many login attempts, please wait before trying again."
-            } };
+            }
+        };
     }
 
     try {
@@ -169,7 +171,8 @@ export async function loginService(req) {
             await recordLoginFailure(username);
             return {
                 status: httpStatus.UNAUTHORIZED,
-                body: { success: false, message: "Invalid username or password." } };
+                body: { success: false, message: "Invalid username or password." }
+            };
         }
 
         await clearLoginFailures(username);
@@ -200,7 +203,8 @@ export async function loginService(req) {
 
         return {
             status: httpStatus.INTERNAL_SERVER_ERROR,
-            body: { success: false, message: "Something went wrong." } };
+            body: { success: false, message: "Something went wrong." }
+        };
     }
 }
 
@@ -224,7 +228,8 @@ export async function registerService(req) {
 
     if (usernameErr) return {
         status: httpStatus.BAD_REQUEST,
-        body: { success: false, message: usernameErr
+        body: {
+            success: false, message: usernameErr
 
         }
     };
@@ -378,8 +383,10 @@ export async function addToHistoryService(req) {
 
         const existing = await findMeetingByCode(meeting_code);
         if (existing) {
-            return { status: httpStatus.OK,
-                body: { success: true, message: "Meeting already exists.", meeting: existing
+            return {
+                status: httpStatus.OK,
+                body: {
+                    success: true, message: "Meeting already exists.", meeting: existing
 
                 }
             };
@@ -396,10 +403,12 @@ export async function addToHistoryService(req) {
 
         await batchDel(RKEYS.history(userId), RKEYS.meetingsList(userId, "true"), RKEYS.meetingsList(userId, "false"));
 
-        return { status: httpStatus.CREATED,
-            body: { success: true, message: "Meeting created and saved to history.", meeting: newMeeting } };
+        return {
+            status: httpStatus.CREATED,
+            body: { success: true, message: "Meeting created and saved to history.", meeting: newMeeting }
+        };
 
-        } catch (error) {
+    } catch (error) {
         log.error("addToHistory error", { err: error.message });
         return { status: httpStatus.INTERNAL_SERVER_ERROR, body: { success: false, message: "Something went wrong." } };
     }
@@ -423,7 +432,8 @@ export async function addParticipantService(req) {
         if (codeParam.length > MAX_MEETINGCODE_LEN) {
             return {
                 status: httpStatus.BAD_REQUEST,
-                body: { success: false, message: `Meeting code must be ${MAX_MEETINGCODE_LEN} characters or fewer.` } };
+                body: { success: false, message: `Meeting code must be ${MAX_MEETINGCODE_LEN} characters or fewer.` }
+            };
         }
 
         const meetingCode = codeParam.toUpperCase();
@@ -431,7 +441,8 @@ export async function addParticipantService(req) {
         const meeting = await findMeetingForParticipant(meetingCode);
         if (!meeting) return {
             status: httpStatus.NOT_FOUND,
-            body: { success: false, message: "Meeting not found." } };
+            body: { success: false, message: "Meeting not found." }
+        };
 
         const participantName = (req.body.name || req.user?.name || req.user?.username || "Guest").toString();
 
@@ -529,7 +540,8 @@ export async function upsertMeetingService(req) {
             await batchDel(RKEYS.meetingsList(userId, "true"), RKEYS.meetingsList(userId, "false"));
         }
 
-        return { status: 200,
+        return {
+            status: 200,
             body: {
                 success: true,
                 meeting: saved, hostSecret: rawSecret
@@ -538,8 +550,10 @@ export async function upsertMeetingService(req) {
 
     } catch (err) {
         log.error("upsertMeeting error", { err: err.message });
-        return { status: 500,
-            body: { success: false, message: "Failed to upsert meeting" } };
+        return {
+            status: 500,
+            body: { success: false, message: "Failed to upsert meeting" }
+        };
     }
 }
 
@@ -573,5 +587,18 @@ export async function ensureMeetingIndexes() {
         log2.info("Meeting indexes verified");
     } catch (err) {
         log2.error("Failed to create Meeting indexes", { err: err.message });
+    }
+}
+export async function logoutService(req) {
+    try {
+        const authHeader = req.headers?.authorization;
+        const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+        if (token) {
+            await safeRedisSet(`blacklist:${token}`, "1", { EX: 3600 });
+        }
+        return { status: httpStatus.OK, body: { success: true, message: "Logged out" } };
+    } catch (err) {
+        log.error("logout error", { err: err.message });
+        return { status: httpStatus.INTERNAL_SERVER_ERROR, body: { success: false, message: "Failed to logout" } };
     }
 }

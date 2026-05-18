@@ -10,6 +10,7 @@ import {
   upsertMeetingService,
   getMeService,
   ensureMeetingIndexes,
+  logoutService,
 } from "../services/user.service.js";
 
 const log = makeLogger("user");
@@ -21,22 +22,9 @@ const logout = async (req, res) => {
     sameSite: "Strict",
     path: "/",
   };
-  try {
-    res.clearCookie("refreshToken", cookieOpts);
-    return res.status(httpStatus.OK).json({
-      success: true, message: "Logged out"
-
-    });
-
-  } catch (err) {
-
-    log.error("logout error", { err: err.message });
-    try {
-      res.clearCookie("refreshToken", cookieOpts);
-    } catch { }
-
-    return res.status(httpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: "Failed to logout" });
-  }
+  const { status, body } = await logoutService(req);
+  res.clearCookie("refreshToken", cookieOpts);
+  return res.status(status).json(body);
 };
 
 const login = async (req, res) => {
@@ -89,5 +77,5 @@ export {
   upsertMeeting,
   logout,
   getMe,
-  ensureMeetingIndexes
+  ensureMeetingIndexes,
 };

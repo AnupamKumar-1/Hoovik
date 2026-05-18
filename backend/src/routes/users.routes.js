@@ -1,4 +1,3 @@
-
 import { Router } from "express";
 import passport from "passport";
 import "../../config/passport.js";
@@ -17,11 +16,10 @@ const router = Router();
 
 const jwtAuth = passport.authenticate("jwt", { session: false });
 
-
 router.post("/login", login);
 router.post("/register", register);
 
-router.post("/logout", logout);
+router.post("/logout", jwtAuth, logout);
 
 router.post("/add_to_activity", jwtAuth, addToHistory);
 router.get("/get_all_activity", jwtAuth, getUserHistory);
