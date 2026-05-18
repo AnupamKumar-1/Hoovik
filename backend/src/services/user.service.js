@@ -407,7 +407,6 @@ export async function addToHistoryService(req) {
             status: httpStatus.CREATED,
             body: { success: true, message: "Meeting created and saved to history.", meeting: newMeeting }
         };
-
     } catch (error) {
         log.error("addToHistory error", { err: error.message });
         return { status: httpStatus.INTERNAL_SERVER_ERROR, body: { success: false, message: "Something went wrong." } };
