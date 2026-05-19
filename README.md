@@ -709,7 +709,7 @@ The following are platform-level limitations that emerge from the combined archi
 
 **Transcript delivery retries on transient failure but has no guarantee**: The transcript callback now retries up to 3 times on network errors or 5xx responses before giving up. However, 4xx responses, a crashed transcription process, or an empty merged-segment result each still cause silent data loss with no notification to the user.
 
-**Host-role enforcement is not fully server-authoritative**: The backend does not validate the host identity on socket events (`end-meeting`, recording data emission). Enforcement relies on the client holding `host:<code>` in `localStorage`.
+**Host-role enforcement** on several socket events is only partially server-authoritative. While transcript-related routes validate the `x-host-secret`, socket events such as `end-meeting` rely primarily on client-side host state and are not fully verified by the backend.
 
 **Signal relay is unscoped**: The backend's `signal` event forwards SDP/ICE messages to any target socket ID without verifying that both sockets are members of the same room.
 
