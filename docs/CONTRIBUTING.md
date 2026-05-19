@@ -69,7 +69,7 @@ Ubuntu:
 sudo apt install redis-server
 ```
 
-Windows — Redis doesn't have an official native build. Use [Upstash](https://upstash.com) (recommended) — free tier, no install required:
+Windows — Use [Upstash](https://upstash.com) (recommended) — free tier, no install required:
 
 1. Create a free account at [upstash.com](https://upstash.com)
 2. Create a new Redis database
