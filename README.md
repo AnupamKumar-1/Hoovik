@@ -20,7 +20,7 @@
 </p>
 
 <p align="center">
-  <em>A distributed, full-stack video meeting platform combining WebRTC peer-to-peer media,<br/>real-time multimodal emotion inference, in-meeting chat, and asynchronous transcript analysis<br/>— implemented as four independently deployed services.</em>
+  <em>Hoovik (formerly SkymeetAI) - A distributed, full-stack video meeting platform combining WebRTC peer-to-peer media,<br/>real-time multimodal emotion inference, in-meeting chat, and asynchronous transcript analysis<br/>— implemented as four independently deployed services.</em>
 </p>
 
 <br/>
