@@ -134,7 +134,7 @@ These are the non-trivial engineering decisions made across the stack, grounded 
 | **Multi-process backend** | Three pm2 instances on separate ports, unified by `@socket.io/redis-adapter` pub/sub; all room state externalised to Redis so no instance holds authoritative in-process state |
 | **Rate limiting and account locking** | Per-IP and per-user rate limiting via Redis counters; account lock after `ACCOUNT_LOCK_THRESHOLD` consecutive failed logins with a fixed TTL (`ACCOUNT_LOCK_SEC`, default 900 s) implemented in the auth layer; login endpoint returns uniform `401` for both unknown username and wrong password to prevent username enumeration |
 | **Chat with client-side ACK timeout** | Backend appends sanitised messages to MongoDB (capped at 500), broadcasts, and emits `chat-ack`; client marks message failed after 5 000 ms with no acknowledgement |
-| **Load testing** | Locust-based WebSocket stress tests in `load_testing/locustfile.py`; participant face images placed in `load_testing/src/*.jpg`; run against the emotion service at `http://localhost:5002` |
+| **Load testing** | Locust-based WebSocket stress tests in `emotion_service/load_testing/locustfile.py`; participant face images placed in `emotion_service/load_testing/src/*.jpg`; run against the emotion service at `http://localhost:5002` |
 
 ---
 
@@ -179,7 +179,8 @@ graph LR
     ED["emotion-service.md"]
     TD["transcript_service.md"]
 
-    Root --> FE & BE & EM & TR & LT & DO
+    Root --> FE & BE & EM & TR & DO
+    EM --> LT
     LT --> LF & SR
     DO --> FD & BD & ED & TD
 ```
