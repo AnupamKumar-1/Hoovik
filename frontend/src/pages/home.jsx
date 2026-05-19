@@ -464,9 +464,10 @@ export default function Home() {
   }
 
   const displayInitial = (name || "?")[0].toUpperCase();
-  const visibleTranscripts = transcripts.slice(0, visibleCount);
-  const hasMore = visibleCount < transcripts.length;
-  const hiddenCount = transcripts.length - visibleCount;
+  const dedupedTranscripts = dedupeByCode(transcripts);
+  const visibleTranscripts = dedupedTranscripts.slice(0, visibleCount);
+  const hasMore = visibleCount < dedupedTranscripts.length;
+  const hiddenCount = dedupedTranscripts.length - visibleCount;
 
   return (
     <div className="hm-root">
@@ -566,8 +567,8 @@ export default function Home() {
               <div className="hm-card-sub">From your hosted meetings</div>
             </div>
             <div className="hm-tx-header-actions">
-              {transcripts.length > 0 && (
-                <span className="hm-tx-badge">{transcripts.length} meeting{transcripts.length !== 1 ? "s" : ""}</span>
+              {dedupedTranscripts.length > 0 && (
+                <span className="hm-tx-badge">{dedupedTranscripts.length} meeting{dedupedTranscripts.length !== 1 ? "s" : ""}</span>
               )}
               <button
                 className={`hm-tx-refresh-btn ${txLoading ? "hm-tx-refresh-spinning" : ""}`}
@@ -599,7 +600,7 @@ export default function Home() {
             </div>
           )}
 
-          {transcripts.length === 0 && TRANSCRIPTS_ENABLED && !txLoading && (
+          {dedupedTranscripts.length === 0 && TRANSCRIPTS_ENABLED && !txLoading && (
             <div className="hm-tx-empty">
               <div className="hm-tx-empty-icon" aria-hidden>
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="1.5" strokeLinecap="round">
@@ -611,7 +612,7 @@ export default function Home() {
             </div>
           )}
 
-          {txLoading && transcripts.length === 0 && (
+          {txLoading && dedupedTranscripts.length === 0 && (
             <div className="hm-tx-loading">
               <div className="hm-tx-loading-dots">
                 <span /><span /><span />
