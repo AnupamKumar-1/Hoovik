@@ -357,8 +357,12 @@ def _decode_audio_bytes(raw: bytes) -> Optional[np.ndarray]:
                 audio,
             ).astype(np.float32)
         return audio
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug(
+            "_decode_audio_bytes soundfile decode failed len=%d error=%s",
+            len(raw),
+            exc,
+        )
 
     if len(raw) % 4 == 0:
         try:
