@@ -153,5 +153,13 @@
     "prefetch_factor": 2,
     "ravdess_weight_a": 1.2,
     "ravdess_weight_b": 1.432926
+  },
+  "inference": {
+    "smoothing_alpha": 0.65,
+    "confidence_threshold": 0.45,
+    "emotion_history_ttl": 2.0,
+    "modality_stale_sec": 0.4,
+    "min_inference_interval": 0.30,
+    "target_client_fps": 5
   }
 }

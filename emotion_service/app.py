@@ -94,15 +94,15 @@ _CLASS_NAMES: list[str] = _CFG["misc"]["class_names"]
 _NEUTRAL_LABEL: str = _CLASS_NAMES[-1]
 
 
-SMOOTHING_ALPHA: float = 0.65
-CONFIDENCE_THRESHOLD: float = 0.45
-EMOTION_HISTORY_TTL: float = 2.0
+SMOOTHING_ALPHA: float = _CFG["inference"]["smoothing_alpha"]
+CONFIDENCE_THRESHOLD: float = _CFG["inference"]["confidence_threshold"]
+EMOTION_HISTORY_TTL: float = _CFG["inference"]["emotion_history_ttl"]
 
-MODALITY_STALE_SEC: float = 0.4
+MODALITY_STALE_SEC: float = _CFG["inference"]["modality_stale_sec"]
 
-MIN_INFERENCE_INTERVAL: float = 0.30
+MIN_INFERENCE_INTERVAL: float = _CFG["inference"]["min_inference_interval"]
 
-TARGET_CLIENT_FPS: int = 5
+TARGET_CLIENT_FPS: int = _CFG["inference"]["target_client_fps"]
 FRAME_MIN_INTERVAL_SEC: float = 1.0 / TARGET_CLIENT_FPS
 
 BACKPRESSURE_QUEUE_DEPTH: int = 3
