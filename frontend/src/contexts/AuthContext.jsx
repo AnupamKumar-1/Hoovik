@@ -28,14 +28,17 @@ function authHeader() {
   return t ? { Authorization: `Bearer ${t}` } : {};
 }
 
-apiClient.interceptors.request.use((config) => {
+const attachToken = (config) => {
   const token = readToken();
   if (token) {
     config.headers = config.headers || {};
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
-});
+};
+
+client.interceptors.request.use(attachToken);
+apiClient.interceptors.request.use(attachToken);
 
 function extractArray(body) {
   if (!body) return null;
@@ -107,24 +110,22 @@ export const AuthProvider = ({ children }) => {
       return;
     }
 
+    const decoded = decodeTokenUser(token);
+    if (decoded) setUserData(decoded);
+
     apiClient
       .get("/users/me")
       .then((resp) => {
         const user = resp.data?.user ?? resp.data ?? null;
         if (user && (user._id || user.id || user.username)) {
           setUserData(user);
-        } else {
-          const decoded = decodeTokenUser(token);
-          if (decoded) setUserData(decoded);
         }
       })
       .catch((err) => {
         const status = err?.response?.status;
         if (status === 401) {
           localStorage.removeItem("token");
-        } else {
-          const decoded = decodeTokenUser(token);
-          if (decoded) setUserData(decoded);
+          setUserData(null);
         }
       })
       .finally(() => {
@@ -133,19 +134,6 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    const clientReqId = client.interceptors.request.use(
-      (config) => {
-        const token = readToken();
-        config.headers = config.headers || {};
-        if (token) {
-          config.headers.Authorization = `Bearer ${token}`;
-          apiClient.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-        }
-        return config;
-      },
-      (err) => Promise.reject(err)
-    );
-
     const clientResId = client.interceptors.response.use(
       (resp) => resp,
       (err) => {
@@ -167,7 +155,6 @@ export const AuthProvider = ({ children }) => {
     );
 
     return () => {
-      client.interceptors.request.eject(clientReqId);
       client.interceptors.response.eject(clientResId);
       apiClient.interceptors.response.eject(apiResId);
     };
@@ -248,7 +235,20 @@ export const AuthProvider = ({ children }) => {
     try {
       const resp = await client.get("/get_all_activity");
       const items = extractArray(resp?.data);
-      if (items && items.length > 0) return items;
+      const serverItems = items ?? [];
+      try {
+        const raw = localStorage.getItem("meeting_history_v1");
+        const localItems = raw ? JSON.parse(raw) : [];
+        const merged = [...serverItems];
+        const seenCodes = new Set(merged.map(m => (m?.meetingCode || m?.meeting_code || m?.code || "").toUpperCase()).filter(Boolean));
+        for (const l of (Array.isArray(localItems) ? localItems : [])) {
+          const code = (l?.meetingCode || l?.meeting_code || l?.code || "").toUpperCase();
+          if (!code || !seenCodes.has(code)) merged.push(l);
+        }
+        return merged;
+      } catch {
+        return serverItems;
+      }
     } catch (err) {
       console.warn("getHistoryOfUser: get_all_activity failed", err?.response?.status ?? err.message);
     }
@@ -404,4 +404,3 @@ export const AuthProvider = ({ children }) => {
 };
 
 export { apiClient };
-

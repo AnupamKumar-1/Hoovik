@@ -166,8 +166,7 @@ export default function History() {
         const localArr = readLocalFallback();
         const merged = mergeServerAndLocal(serverArr, localArr);
         const normalized = merged.map(normalize);
-        const filtered = userData ? normalized.filter((m) => isUserInMeeting(m, userData)) : [];
-        const sorted = filtered.sort((a, b) => toM(b.createdAt) - toM(a.createdAt));
+        const sorted = normalized.sort((a, b) => toM(b.createdAt) - toM(a.createdAt));
         if (mounted) setMeetings(sorted);
       } catch (err) {
         console.error('fetchHistory error:', err);
@@ -179,7 +178,7 @@ export default function History() {
 
     fetchHistory();
 
-    const onStorage = (ev) => { if (ev.key === 'meeting_history_v1' && mounted) setTimeout(fetchHistory, 60); };
+    const onStorage = (ev) => { if (ev.key === 'meeting_history_v1' && mounted) setTimeout(() => fetchHistory(), 60); };
     const onCustomUpdate = () => { if (mounted) fetchHistory(); };
     window.addEventListener('storage', onStorage);
     window.addEventListener('meeting_history_updated', onCustomUpdate);
