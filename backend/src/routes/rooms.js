@@ -43,17 +43,19 @@ router.post("/", aAuth, async (req, res) => {
       return res.status(400).json({ error: "Host name is required" });
     }
 
-    let roomCode;
-    let tries = 0;
     const maxTries = 5;
-    do {
-      roomCode = generateRoomCode();
-      const existing = await findMeetingByCode(roomCode);
-      if (!existing) break;
-      tries += 1;
-    } while (tries < maxTries);
+    let roomCode = null;
 
-    if (tries >= maxTries) {
+    for (let i = 0; i < maxTries; i++) {
+      const code = generateRoomCode();
+      const existing = await findMeetingByCode(code);
+      if (!existing) {
+        roomCode = code;
+        break;
+      }
+    }
+
+    if (!roomCode) {
       return res.status(500).json({ error: "Failed to generate unique room code, try again" });
     }
 
