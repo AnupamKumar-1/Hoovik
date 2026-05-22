@@ -40,6 +40,7 @@ router.post("/", aAuth, async (req, res) => {
     const { hostName } = req.body;
 
     if (!hostName || typeof hostName !== "string" || !hostName.trim()) {
+      endTimer(LATENCY_LABELS.SOCKET_JOIN, start, { route: "POST /rooms", error: true });
       return res.status(400).json({ error: "Host name is required" });
     }
 
@@ -56,6 +57,7 @@ router.post("/", aAuth, async (req, res) => {
     }
 
     if (!roomCode) {
+      endTimer(LATENCY_LABELS.SOCKET_JOIN, start, { route: "POST /rooms", error: true });
       return res.status(500).json({ error: "Failed to generate unique room code, try again" });
     }
 
@@ -73,8 +75,8 @@ router.post("/", aAuth, async (req, res) => {
       hostSecretHash,
     };
 
-    if (req.user && req.user.id) {
-      meetingPayload.ownerId = req.user.id;
+    if (req.user && (req.user._id || req.user.id)) {
+      meetingPayload.ownerId = req.user._id || req.user.id;
     }
 
     const meeting = await createMeetingRoom(meetingPayload);
@@ -100,11 +102,11 @@ router.post("/", aAuth, async (req, res) => {
 
 router.get("/mine", jwtAuth, async (req, res) => {
   try {
-    if (!req.user || !req.user.id) {
+    if (!req.user || !(req.user._id || req.user.id)) {
       return res.status(401).json({ error: "Authentication required" });
     }
 
-    const rooms = await findRoomsByOwner(req.user.id);
+    const rooms = await findRoomsByOwner(req.user._id || req.user.id);
     res.json({ rooms });
   } catch (err) {
     console.error("Error fetching owner rooms:", err);
