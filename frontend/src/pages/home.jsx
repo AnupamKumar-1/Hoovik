@@ -326,36 +326,53 @@ export default function Home() {
     localStorage.removeItem(PENDING_TRANSCRIPT_KEY);
   }, []);
 
-  const startPollingForTranscript = useCallback((meetingCode, maxAttempts = 12, intervalMs = 5000) => {
+  const startPollingForTranscript = useCallback((meetingCode) => {
     if (pollTimerRef.current) return;
     stopPolling();
     pollAttemptsRef.current = 0;
     localStorage.setItem(PENDING_TRANSCRIPT_KEY, meetingCode);
 
-    const poll = async () => {
-      pollAttemptsRef.current++;
-      const fresh = await loadTranscripts(true);
+    const BACKOFFS = [5000, 10000, 20000, 40000];
+    const MAX_TOTAL_MS = 10 * 60 * 1000;
+    const startTime = Date.now();
 
-      if (fresh) {
-        const found = fresh.find(
-          (t) => t.meetingCode?.toUpperCase() === meetingCode?.toUpperCase()
-        );
-        if (found) {
-          stopPolling();
-          setViewingTranscript(found);
-          showSnack("Transcript ready!", "success");
-          return;
+    const getDelay = (attempt) => {
+      const base = attempt < BACKOFFS.length ? BACKOFFS[attempt] : BACKOFFS[BACKOFFS.length - 1];
+      const jitter = base * 0.2 * (Math.random() * 2 - 1);
+      return Math.round(base + jitter);
+    };
+
+    const poll = async () => {
+      const attempt = pollAttemptsRef.current;
+      pollAttemptsRef.current++;
+
+      try {
+        const fresh = await loadTranscripts(true);
+
+        if (fresh) {
+          const found = fresh.find(
+            (t) => t.meetingCode?.toUpperCase() === meetingCode?.toUpperCase()
+          );
+          if (found) {
+            stopPolling();
+            setViewingTranscript(found);
+            showSnack("Transcript ready!", "success");
+            return;
+          }
         }
+      } catch {
+        stopPolling();
+        return;
       }
 
-      if (pollAttemptsRef.current < maxAttempts) {
-        pollTimerRef.current = setTimeout(poll, intervalMs);
+      if (Date.now() - startTime < MAX_TOTAL_MS) {
+        pollTimerRef.current = setTimeout(poll, getDelay(attempt));
       } else {
         stopPolling();
       }
     };
 
-    pollTimerRef.current = setTimeout(poll, intervalMs);
+    pollTimerRef.current = setTimeout(poll, getDelay(0));
   }, [loadTranscripts, stopPolling]);
 
   useEffect(() => {
@@ -375,7 +392,7 @@ export default function Home() {
   useEffect(() => {
     const state = location.state;
     if (state?.meetingEnded && state?.meetingCode) {
-      startPollingForTranscript(state.meetingCode, 30, 20000);
+      startPollingForTranscript(state.meetingCode);
       window.history.replaceState({}, "", window.location.pathname);
     }
   }, [location.state, startPollingForTranscript]);
@@ -383,7 +400,7 @@ export default function Home() {
   useEffect(() => {
     const pending = localStorage.getItem(PENDING_TRANSCRIPT_KEY);
     if (pending && TRANSCRIPTS_ENABLED) {
-      startPollingForTranscript(pending, 30, 20000);
+      startPollingForTranscript(pending);
     }
   }, [startPollingForTranscript]);
 
