@@ -62,7 +62,7 @@ const userMatchesParticipant = (user, participant) => {
 
 
 export default function History() {
-  const { getHistoryOfUser, userData } = useContext(AuthContext);
+  const { getHistoryOfUser, userData, authLoading } = useContext(AuthContext);
   const [meetings, setMeetings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -72,6 +72,7 @@ export default function History() {
   const routeTo = useNavigate();
 
   useEffect(() => {
+    if (authLoading) return;
     let mounted = true;
 
     const toArrayShape = (res) => {
@@ -187,7 +188,7 @@ export default function History() {
       window.removeEventListener('storage', onStorage);
       window.removeEventListener('meeting_history_updated', onCustomUpdate);
     };
-  }, [getHistoryOfUser, userData]);
+  }, [getHistoryOfUser, userData, authLoading]);
 
   const buildLink = (m) =>
     m?.link || (m?.meetingCode
@@ -295,10 +296,10 @@ export default function History() {
 
       <div className="hist-content">
 
-        {loading && (
+        {(authLoading || loading) && (
           <div className="hist-loading-row">
             <span className="hist-spinner" />
-            Loading history…
+            {authLoading ? 'Loading…' : 'Loading history…'}
           </div>
         )}
 
