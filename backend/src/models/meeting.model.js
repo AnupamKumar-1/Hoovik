@@ -1,4 +1,3 @@
-
 import mongoose from "mongoose";
 import crypto from "crypto";
 
@@ -69,15 +68,12 @@ const meetingSchema = new Schema(
   { timestamps: true }
 );
 
-
 meetingSchema.methods.getHostName = function () {
   if (this.host && typeof this.host === "object") {
     if (this.host.name) return this.host.name;
     if (this.host.username) return this.host.username;
   }
-  if (this.hostInfo && this.hostInfo.name) return this.hostInfo.name;
-  if (this.host && this.host.name) return this.host.name;
-  if (this.host && this.host.userId && this.host.name) return this.host.name;
+  if (this.hostInfo?.name) return this.hostInfo.name;
   return null;
 };
 
@@ -197,24 +193,31 @@ meetingSchema.methods.removeParticipant = async function (socketId) {
 };
 
 meetingSchema.methods.markParticipantLeft = async function (socketId) {
+  const now = new Date();
+
+
   await this.constructor.updateOne(
     { _id: this._id, "participants.socketId": socketId },
-    {
-      $set: {
-        "participants.$.leftAt": new Date(),
-        lastActivityAt: new Date(),
-      },
-    }
+    { $set: { "participants.$.leftAt": now, lastActivityAt: now } }
   );
-  const updated = await this.constructor.findById(this._id);
-  const stillActive = updated.participants.some((p) => !p.leftAt);
-  if (!stillActive) {
-    await this.constructor.updateOne(
-      { _id: this._id },
-      { $set: { active: false } }
-    );
-  }
-  return updated;
+
+
+
+
+  await this.constructor.updateOne(
+    {
+      _id: this._id,
+      $expr: {
+        $eq: [
+          { $size: { $filter: { input: "$participants", cond: { $not: "$$this.leftAt" } } } },
+          0,
+        ],
+      },
+    },
+    { $set: { active: false } }
+  );
+
+  return this.constructor.findById(this._id);
 };
 
 meetingSchema.methods.addChatMessage = async function (msg) {
@@ -250,7 +253,6 @@ meetingSchema.methods.setHostSecretHash = async function (rawSecret) {
   return this.save();
 };
 
-
 meetingSchema.statics.verifyHostSecret = async function (meetingCode, providedSecret) {
   if (!meetingCode || !providedSecret) return null;
   const code = String(meetingCode).toUpperCase().trim();
@@ -271,9 +273,10 @@ meetingSchema.statics.verifyHostSecret = async function (meetingCode, providedSe
 meetingSchema.statics.upsertByMeetingCode = async function (meetingCode, payload = {}) {
   if (!meetingCode) throw new Error("meetingCode is required for upsert");
   const code = String(meetingCode).toUpperCase().trim();
-  const update = { ...payload, meetingCode: code, lastActivityAt: new Date() };
+  const setFields = { ...payload, meetingCode: code, lastActivityAt: new Date() };
   const opts = { upsert: true, new: true, setDefaultsOnInsert: true };
-  const doc = await this.findOneAndUpdate({ meetingCode: code }, update, opts).exec();
+
+  const doc = await this.findOneAndUpdate({ meetingCode: code }, { $set: setFields }, opts).exec();
   return doc;
 };
 

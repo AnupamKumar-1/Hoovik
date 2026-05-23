@@ -24,7 +24,6 @@ const cfg = JSON.parse(
     fs.readFileSync(new URL("../config/config.json", import.meta.url))
 );
 
-
 const PARTIAL_UPLOAD_MAX_BYTES = parseInt(process.env.PARTIAL_UPLOAD_MAX_BYTES || `${200 * 1024 * 1024}`, 10);
 
 const PARTIAL_UPLOAD_TTL_MS = parseInt(process.env.PARTIAL_UPLOAD_TTL_MS || `${10 * 60 * 1000}`, 10);
@@ -120,8 +119,8 @@ export async function setPartialMeta(key, meta) {
         KEYS.partialMeta(key),
         JSON.stringify(meta),
         {
-        EX: PARTIAL_UPLOAD_TTL_SEC
-    });
+            EX: PARTIAL_UPLOAD_TTL_SEC
+        });
 }
 export async function deletePartialMeta(key) {
 
@@ -270,8 +269,8 @@ export async function handleJoinCall(socket, io, meetingCodeRaw, meta = {}) {
             await meeting.restoreParticipant(
 
                 socket.id, {
-                    userId, name
-                }, cleanMeta);
+                userId, name
+            }, cleanMeta);
 
         } else {
 
@@ -406,9 +405,7 @@ export async function handleChatMessage(socket, io, meetingCodeRaw, msg = {}) {
     const meeting = await findMeetingByCode(code);
     if (!meeting) return { ok: false };
 
-    const DEFAULT_NAME_VAL = cfg.sanitize?.defaultName ?? "Guest";
-
-    const name = socket.data?.meta?.name || socket.data?.name || DEFAULT_NAME_VAL;
+    const name = socket.data?.meta?.name || socket.data?.name || DEFAULT_NAME;
     const msgId = msg.id || crypto.randomBytes(10).toString("hex");
     const ts = Date.now();
 
@@ -443,12 +440,10 @@ export async function handleTranscriptionUpdate(socket, io, chunk) {
     const code = socket.data?.meetingCode;
     if (!code) return;
 
-    await updateMeetingAnalytics(code, { transcription: sanitizeHtml(String(chunk || "").slice(0, MAX_TRANSCRIPT_LEN)) });
     const cleanChunk = sanitizeHtml(String(chunk || "").slice(0, MAX_TRANSCRIPT_LEN));
+    await updateMeetingAnalytics(code, { transcription: cleanChunk });
     socket.to(`meeting:${code}`).emit("transcription-update", { from: socket.id, text: cleanChunk });
 }
-
-
 
 export async function handleKeywordsUpdate(socket, io, keywords) {
     const code = socket.data?.meetingCode;

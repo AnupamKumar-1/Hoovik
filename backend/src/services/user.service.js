@@ -4,10 +4,6 @@ import mongoose from "mongoose";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import fs from "fs";
-
-const cfg = JSON.parse(
-    fs.readFileSync(new URL("../config/config.json", import.meta.url))
-);
 import { makeLogger, safeRedisGet, safeRedisSet, safeRedisDel, safeRedisIncr, safeRedisExpire, batchDel, isRateLimited } from "../utils/redis.utils.js";
 import {
     findUserByUsername,
@@ -24,6 +20,10 @@ import {
     ensureMeetingIndexes as repoEnsureMeetingIndexes,
 } from "../data-access/user.repository.js";
 
+const cfg = JSON.parse(
+    fs.readFileSync(new URL("../config/config.json", import.meta.url))
+);
+
 const HISTORY_CACHE_TTL_SEC = parseInt(process.env.HISTORY_CACHE_TTL_SEC || "120", 10);
 const MEETINGS_CACHE_TTL_SEC = parseInt(process.env.MEETINGS_CACHE_TTL_SEC || "60", 10);
 const USER_CACHE_TTL_SEC = parseInt(process.env.USER_CACHE_TTL_SEC || "300", 10);
@@ -38,7 +38,7 @@ const ACCOUNT_LOCK_THRESHOLD = parseInt(process.env.ACCOUNT_LOCK_THRESHOLD || "1
 const ACCOUNT_LOCK_SEC = parseInt(process.env.ACCOUNT_LOCK_SEC || "900", 10);
 
 const BCRYPT_SALT_ROUNDS = cfg.user?.bcryptSaltRounds ?? 10;
-const JWT_EXPIRES_IN = cfg.user?.jwtExpiresIn ?? "1h";
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN ?? cfg.user?.jwtExpiresIn ?? "1h";
 const MEETINGS_QUERY_LIMIT = cfg.user?.meetingsQueryLimit ?? 200;
 
 const PASSWORD_MIN_LEN = 8;
@@ -259,7 +259,6 @@ export async function registerService(req) {
         return { status: httpStatus.INTERNAL_SERVER_ERROR, body: { success: false, message: "Something went wrong." } };
     }
 }
-
 
 export async function getUserHistoryService(req) {
     try {
@@ -529,9 +528,16 @@ export async function upsertMeetingService(req) {
             payload.ownerId = objectUserId;
         }
 
-        const rawSecret = crypto.randomBytes(32).toString("hex");
-        payload.hostSecretHash = crypto.createHash("sha256").update(rawSecret).digest("hex");
         payload.hostInfo = { name: body.hostName || body.host_name || null, userId: userId || null };
+
+
+
+        const existing = await findMeetingByCode(meetingCode);
+        let rawSecret = null;
+        if (!existing) {
+            rawSecret = crypto.randomBytes(32).toString("hex");
+            payload.hostSecretHash = crypto.createHash("sha256").update(rawSecret).digest("hex");
+        }
 
         const saved = await upsertMeetingByCode(meetingCode, payload);
 
@@ -543,7 +549,8 @@ export async function upsertMeetingService(req) {
             status: 200,
             body: {
                 success: true,
-                meeting: saved, hostSecret: rawSecret
+                meeting: saved,
+                ...(rawSecret ? { hostSecret: rawSecret } : {}),
             }
         };
 
@@ -588,12 +595,24 @@ export async function ensureMeetingIndexes() {
         log2.error("Failed to create Meeting indexes", { err: err.message });
     }
 }
+
+function parseExpiresInToSeconds(expiresIn) {
+    if (typeof expiresIn === "number") return expiresIn;
+    if (typeof expiresIn !== "string") return 3600;
+    const match = expiresIn.match(/^(\d+)(s|m|h|d)?$/);
+    if (!match) return 3600;
+    const value = parseInt(match[1], 10);
+    const unit = match[2] || "s";
+    const multipliers = { s: 1, m: 60, h: 3600, d: 86400 };
+    return value * (multipliers[unit] ?? 1);
+}
 export async function logoutService(req) {
     try {
         const authHeader = req.headers?.authorization;
         const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
         if (token) {
-            await safeRedisSet(`blacklist:${token}`, "1", { EX: 3600 });
+            const ttl = parseExpiresInToSeconds(JWT_EXPIRES_IN);
+            await safeRedisSet(`blacklist:${token}`, "1", { EX: ttl });
         }
         return { status: httpStatus.OK, body: { success: true, message: "Logged out" } };
     } catch (err) {

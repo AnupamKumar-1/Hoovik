@@ -20,13 +20,12 @@ import {
 import { startTimer, endTimer } from "../observability/latency/latency.service.js";
 
 import { LATENCY_LABELS } from "../observability/latency/latency.constants.js";
-import { updateMeetingAnalytics } from "../data-access/socket.repository.js";
 import fs from "fs";
+import { Meeting } from "../models/meeting.model.js";
 
 const cfg = JSON.parse(
   fs.readFileSync(new URL("../config/config.json", import.meta.url))
 );
-
 
 const SOCKET_MAX_HTTP_BUFFER = parseInt(process.env.SOCKET_MAX_HTTP_BUFFER || `${100 * 1024 * 1024}`, 10);
 
@@ -83,8 +82,6 @@ function broadcastParticipants(code, io) {
   }, 150));
 }
 
-
-
 async function getHostSocketId(io, meetingCode) {
   try {
     const roomName = `meeting:${meetingCode}`;
@@ -97,7 +94,6 @@ async function getHostSocketId(io, meetingCode) {
     if (stateArr === REDIS_READ_FAILED) return null;
 
     return stateArr?.[0] ?? null;
-
 
   } catch {
     const stateArr = await getState(meetingCode);
@@ -140,12 +136,25 @@ export function connectToSocket(
       }
     });
 
-    socket.on("declare-host", (meetingCodeRaw) => {
+    socket.on("declare-host", async (meetingCodeRaw, secret, ack) => {
       const code = String(meetingCodeRaw || "").trim().toUpperCase();
-      if (!code || !validateCode(code)) return;
-      if (socket.data?.meetingCode !== code) return;
+      if (!code || !validateCode(code)) {
+        if (typeof ack === "function") ack({ ok: false, reason: "invalid_code" });
+        return;
+      }
+      if (socket.data?.meetingCode !== code) {
+        if (typeof ack === "function") ack({ ok: false, reason: "not_in_room" });
+        return;
+      }
+      const verified = await Meeting.verifyHostSecret(code, secret);
+      if (!verified) {
+        log.warn("declare-host failed: bad secret", { socketId: socket.id, code });
+        if (typeof ack === "function") ack({ ok: false, reason: "unauthorized" });
+        return;
+      }
       socket.data.isHost = true;
-      log.info("host declared", { socketId: socket.id, code });
+      log.info("host declared and verified", { socketId: socket.id, code });
+      if (typeof ack === "function") ack({ ok: true });
     });
 
     socket.on("update-participant-state", async (data = {}) => {
@@ -218,8 +227,6 @@ export function connectToSocket(
         log.error("leave-call error", { err: err.message });
       }
     });
-
-
 
     socket.on("disconnect", async () => {
       try {
