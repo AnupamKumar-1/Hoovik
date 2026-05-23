@@ -458,3 +458,10 @@ export async function handleKeywordsUpdate(socket, io, keywords) {
     await updateMeetingAnalytics(code, { keywords: cleanKeywords });
     socket.to(`meeting:${code}`).emit("keywords-update", { from: socket.id, keywords: cleanKeywords });
 }
+
+export async function handleEmotionState(socket, io, data = {}) {
+    const code = socket.data?.meetingCode;
+    if (!code) return;
+    const enabled = data?.enabled === true;
+    io.in(`meeting:${code}`).emit("emotion-state", { enabled });
+}

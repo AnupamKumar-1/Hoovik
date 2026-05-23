@@ -24,6 +24,7 @@ export default function useSocket({
   notifyPcsChanged,
   makingOfferRef,
   socketReady,
+  onEmotionState,
 }) {
   const h = useRef({});
 
@@ -48,6 +49,7 @@ export default function useSocket({
     handleAck,
     notifyPcsChanged,
     makingOfferRef,
+    onEmotionState,
   };
 
   useEffect(() => {
@@ -266,6 +268,12 @@ export default function useSocket({
 
     socket.on("disconnect", onDisconnect);
 
+    const onEmotionState = ({ enabled }) => {
+      h.current.onEmotionState?.(enabled);
+    };
+
+    socket.on("emotion-state", onEmotionState);
+
     return () => {
       if (disconnectTimer) {
         clearTimeout(disconnectTimer);
@@ -284,6 +292,7 @@ export default function useSocket({
       socket.off("end-meeting", onEndMeeting);
       socket.off("disconnect", onDisconnect);
       socket.off("update-participant-state", onParticipantStateUpdate);
+      socket.off("emotion-state", onEmotionState);
     };
   }, [socketReady]);
 }

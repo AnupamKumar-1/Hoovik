@@ -118,6 +118,7 @@ export default function VideoMeet() {
   const myIdRef = useRef(null);
 
   const [shareEmotion, setShareEmotion] = useState(false);
+  const [emotionActive, setEmotionActive] = useState(false);
   const [emotionsMap, setEmotionsMap] = useState({});
   const [stableSpeakerId, setStableSpeakerId] = useState(null);
   const [meetDuration, setMeetDuration] = useState(0);
@@ -440,6 +441,11 @@ export default function VideoMeet() {
   }, [shareEmotion, isHost, startPeriodicEmotionCapture, stopPeriodicEmotionCapture]);
 
   useEffect(() => {
+    if (!isHost) return;
+    socketRef.current?.emit("emotion-state", { enabled: shareEmotion });
+  }, [shareEmotion, isHost]);
+
+  useEffect(() => {
     const onKeyDown = (e) => {
       const tag = (e.target?.tagName || "").toUpperCase();
       if (tag === "INPUT" || tag === "TEXTAREA" || e.target?.isContentEditable) return;
@@ -484,6 +490,7 @@ export default function VideoMeet() {
     notifyPcsChanged,
     makingOfferRef,
     socketReady,
+    onEmotionState: setEmotionActive,
   });
 
   const remoteEntries = useMemo(
@@ -579,6 +586,7 @@ export default function VideoMeet() {
       <MeetTopBar
         roomId={roomId} isHost={isHost} duration={meetDuration}
         participantCount={participantsMeta.length + 1} connecting={connecting}
+        emotionActive={emotionActive}
       />
 
       <div className={s.body}>

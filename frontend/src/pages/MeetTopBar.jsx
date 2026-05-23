@@ -10,7 +10,7 @@ function formatDuration(secs) {
     return `${String(m).padStart(2, "0")}:${String(sc).padStart(2, "0")}`;
 }
 
-export default function MeetTopBar({ roomId, isHost, duration, participantCount, connecting }) {
+export default function MeetTopBar({ roomId, isHost, duration, participantCount, connecting, emotionActive }) {
     const code = useMemo(() => (roomId || "").toUpperCase(), [roomId]);
 
     return (
@@ -46,6 +46,17 @@ export default function MeetTopBar({ roomId, isHost, duration, participantCount,
                         <span className={s.liveDot} />
                         LIVE
                     </div>
+                )}
+                {emotionActive && (
+                    <motion.div
+                        className={s.emotionActivePill}
+                        initial={{ opacity: 0, y: -6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.2 }}
+                    >
+                        <span className={s.emotionActiveDot} />
+                        Emotion AI Active
+                    </motion.div>
                 )}
             </div>
 

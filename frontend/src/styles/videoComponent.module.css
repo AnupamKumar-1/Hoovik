@@ -1356,6 +1356,30 @@
   border: 1.5px solid var(--m-bg);
 }
 
+.emotionActivePill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  background: rgba(14,165,233,0.12);
+  border: 1px solid rgba(14,165,233,0.3);
+  border-radius: var(--m-r-pill);
+  font-family: var(--m-font-head);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--m-cyan);
+  white-space: nowrap;
+  margin-left: 8px;
+}
+.emotionActiveDot {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--m-cyan);
+  box-shadow: 0 0 6px var(--m-cyan);
+  animation: blink 1.8s ease infinite;
+}
+
 @keyframes blink {
   0%, 100% { opacity: 1; }
   50%       { opacity: 0.25; }

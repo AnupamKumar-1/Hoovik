@@ -12,6 +12,7 @@ import {
   handleChatMessage,
   handleTranscriptionUpdate,
   handleKeywordsUpdate,
+  handleEmotionState,
   handleLeave,
   validateCode,
   getParticipants,
@@ -205,6 +206,14 @@ export function connectToSocket(
         await handleKeywordsUpdate(socket, io, keywords);
       } catch (err) {
         log.error("keywords-update error", { err: err.message });
+      }
+    });
+
+    socket.on("emotion-state", async (data = {}) => {
+      try {
+        await handleEmotionState(socket, io, data);
+      } catch (err) {
+        log.error("emotion-state error", { err: err.message });
       }
     });
 
