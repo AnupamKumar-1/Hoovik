@@ -43,7 +43,7 @@ Models are declared in `src/models/` and imported independently of the layered f
 
 The following capabilities are directly evidenced by source code:
 
-- **JWT authentication** via `passport-jwt` (`config/passport.js`); tokens are signed with `JWT_SECRET` and expire per `cfg.user.jwtExpiresIn` (default `"1h"`, from `config.json`).
+- **JWT authentication** via `passport-jwt` (`config/passport.js`); tokens are signed with `JWT_SECRET` and expire per `process.env.JWT_EXPIRES_IN` (falls back to `cfg.user.jwtExpiresIn`, default `"1h"`). The logout blacklist TTL is derived from the same value via `parseExpiresInToSeconds` so it always matches the actual token lifetime.
 - **User registration and login** with bcrypt hashing (`cfg.user.bcryptSaltRounds`, default `10`) and per-IP / per-username rate limiting backed by a Redis Lua script (`redis.utils.js:isRateLimited`).
 - **Account lockout** after `ACCOUNT_LOCK_THRESHOLD` (default `10`) consecutive failed logins; lock TTL is `ACCOUNT_LOCK_SEC` (default `900` seconds) — implemented in `user.service.js`.
 - **Meeting room creation** with a randomly generated 8-hex-character `meetingCode` and a `sha256`-hashed host secret (`rooms.js`).
@@ -286,11 +286,11 @@ Writes a structured latency log line per measured operation to `logs/latency-<PO
 
 Mongoose model with instance methods:
 - `addParticipant` — upserts by `socketId` or `userId`; sets `active = true`, updates `lastActivityAt`.
-- `markParticipantLeft` — atomic `updateOne` setting `participants.$.leftAt`; sets `active = false` if no participant has `leftAt == null`.
+- `markParticipantLeft` — two atomic `updateOne` calls: first sets `participants.$.leftAt`; second uses a `$expr` filter to set `active = false` only when no participant remains without a `leftAt`, eliminating the race condition from the previous read-then-write pattern.
 - `restoreParticipant` — finds a participant with a matching `userId` or `name` (within a 5-minute cutoff) that has `leftAt` set.
 - `addChatMessage` — appends to `chat`; trims array to last `500` messages.
 - `cleanupOldMeetings` (static) — deletes where `active: false` and `updatedAt < now - maxAgeHours * 3600000`.
-- `upsertByMeetingCode` (static) — `findOneAndUpdate` with `upsert: true`.
+- `upsertByMeetingCode` (static) — `findOneAndUpdate` with `{ $set: payload }` and `upsert: true`; uses `$set` explicitly to prevent document replacement on existing meetings.
 
 ---
 
@@ -323,6 +323,7 @@ Mongoose model with instance methods:
 | `MONGO_URI` | — | MongoDB connection string (required) |
 | `REDIS_URL` | `redis://localhost:6379` | Redis connection URL |
 | `JWT_SECRET` | — | JWT signing secret (required; warns if < 32 chars) |
+| `JWT_EXPIRES_IN` | `1h` (from `config.json`) | JWT lifetime and logout blacklist TTL; supports `"1h"`, `"7d"`, integer seconds |
 | `PORT` | `8000` | HTTP listen port |
 | `Ts_SERVICE_URL` | — | Upstream URL for transcript proxy |
 | `REDIS_LOCK_TTL_MS` | `10000` | Lock TTL in milliseconds |
@@ -460,7 +461,7 @@ Some routes (e.g., `GET /api/v1/meetings`) use optional auth: the handler runs r
 | `GET` | `/me` | JWT | Returns `{ user: { _id, username, name } }` |
 | `GET` | `/get_all_activity` | JWT | Returns `{ meetings }` array |
 | `POST` | `/add_to_activity` | JWT | Body: `{ meeting_code \| meetingCode, link? }` |
-| `POST` | `/meetings` | JWT | Upserts a meeting; returns `{ meeting, hostSecret }` |
+| `POST` | `/meetings` | JWT | Upserts a meeting; returns `{ meeting, hostSecret }` on creation only — `hostSecret` is omitted on subsequent upserts to avoid invalidating the host's stored secret |
 | `POST` | `/meetings/:code/participants` | JWT | Adds or updates participant record |
 | `POST` | `/add_participant` | JWT | Same as above; code from body |
 
@@ -514,7 +515,7 @@ All events are handled in `socket.controller.js`, which delegates to `socket.ser
 | Event | Payload | Description |
 |---|---|---|
 | `join-call` | `(meetingCode: string, meta: object)` | Join a room. `meta` may include `{ name, userId, muted, video, screen }`. |
-| `declare-host` | `(meetingCode: string)` | Sets `socket.data.isHost = true` for the caller. Validated against `socket.data.meetingCode`. |
+| `declare-host` | `(meetingCode: string, hostSecret: string, ack?)` | Verifies `hostSecret` against `hostSecretHash` via `Meeting.verifyHostSecret`; sets `socket.data.isHost = true` on success. Ack receives `{ ok: true }` or `{ ok: false, reason: "invalid_code" \| "not_in_room" \| "unauthorized" }`. |
 | `update-participant-state` | `{ muted?: boolean, screen?: boolean }` | Updates mute/screen state in Redis and MongoDB; broadcasts to room. |
 | `update-meta` | `metaUpdate: object` | Merges `{ name?, muted?, video?, screen? }` into `socket.data.meta`; broadcasts `participant-meta-updated`. |
 | `signal` | `(targetId: string, message: any)` | Relays `message` to `targetId` socket as `emit("signal", socket.id, message)`. No validation of `targetId` membership. |
@@ -550,7 +551,7 @@ The following are implementation-level observations, not benchmarks:
 
 - **Redis caching** is applied to: user objects, meeting history, meetings list, and transcript lookups. Cache TTLs are configurable via environment variables; see the configuration table above.
 - **`getParticipants` / `setState`** perform a full Redis GET + JSON parse + JSON stringify + SET on each relevant socket event. For rooms approaching `MAX_PARTICIPANTS_PER_ROOM` (50), the serialised participant map grows proportionally.
-- **`addParticipant` and `markParticipantLeft`** issue separate `findOne` + `save` or `updateOne` + `findById` calls to MongoDB per event.
+- **`addParticipant` and `markParticipantLeft`** — `addParticipant` issues a `findOne` + `save` per event. `markParticipantLeft` now uses two atomic `updateOne` calls with no intermediate `findById`, eliminating the previous three-round-trip pattern.
 - **`broadcastParticipants`** debounces at `150 ms` per room, reducing redundant `getParticipants` Redis reads under burst join/meta-update traffic.
 - **`setInterval` cleanup** in `meeting.model.js` runs every `3 600 000 ms`. This is a process-local timer; in multi-process deployments all processes execute it independently.
 - **Transcript noise filter** runs synchronously in the service layer before any DB or Redis I/O; complexity is O(n) in transcript line count.
@@ -625,7 +626,7 @@ The following mitigations are implemented in source:
 - **Per-IP registration rate limiting**.
 - **Input sanitisation**: `sanitize-html` is applied to chat messages, participant names, transcription chunks, and keywords.
 - **Meeting code validation**: regex `^[A-Z0-9\-]{3,32}$` enforced at socket and transcript layers.
-- **Host secret**: stored as `sha256` hash only; raw secret is returned once at room creation and never persisted.
+- **Host secret**: stored as `sha256` hash only; raw secret returned once at room creation (`POST /rooms`) and never persisted. On subsequent `upsertMeeting` calls the secret is not regenerated, preserving the host's stored value. The `declare-host` socket event verifies the provided raw secret against the stored hash via `Meeting.verifyHostSecret` before granting host status; unverified claims are rejected with a reason code.
 - **Username enumeration prevention**: `loginService` returns `401 Unauthorized` with a uniform `"Invalid username or password."` message for both unknown-username and wrong-password cases. The previous code path that returned `404 Not Found` with `"User not found."` for absent usernames has been removed ([#15](https://github.com/AnupamKumar-1/Hoovik/issues/15)).
 - **Redis lock CAS release**: the lock release Lua script compares the stored token to the caller's token before deleting, preventing accidental release of another process's lock.
 - **CORS**: allowlist is hardcoded in `app.js`; origins outside `["http://localhost:3000", "https://hoovik.onrender.com"]` are rejected.
@@ -650,6 +651,8 @@ The following are grounded in implementation constraints visible in the source:
 5. **Chat history is capped at 500 messages** (`meeting.model.js:addChatMessage`); older messages are discarded in-place on the document. No archival mechanism is implemented.
 
 6. **No refresh token implementation**: `logout` clears a `refreshToken` cookie, but no route issues or validates a refresh token.
+
+7. **`User` model has an unused `token` field**: `user.model.js` declares `token: { type: String }` which is never written or read by any service or repository. Likely a leftover from a pre-JWT session approach.
 
 ---
 
