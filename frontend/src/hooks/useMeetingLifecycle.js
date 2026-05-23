@@ -261,11 +261,15 @@ export default function useMeetingLifecycle({
       socketRef.current.emit("join-call", roomId, { name: displayName, userId: uid });
 
       if (isHostRef.current) {
-        setTimeout(() => {
+        socketRef.current.once("assigned-role", () => {
           if (socketRef.current?.connected) {
-            socketRef.current.emit("declare-host", code);
+            const hostDataRaw = localStorage.getItem(`host:${code}`);
+            const hostData = hostDataRaw ? JSON.parse(hostDataRaw) : null;
+            socketRef.current.emit("declare-host", code, hostData?.hostSecret, (ack) => {
+              if (!ack?.ok) console.error("[declare-host] rejected by server:", ack?.reason);
+            });
           }
-        }, 200);
+        });
       }
     } catch (err) {
       console.error(err);

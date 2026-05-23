@@ -130,10 +130,11 @@ These are the non-trivial engineering decisions made across the stack, grounded 
 | **WebRTC signalling** | Full SDP/ICE relay over Socket.IO with Redis-adapter fan-out across three pm2 processes; distributed join lock (Redis `SET NX PX`) prevents race conditions when multiple participants join simultaneously |
 | **Multimodal emotion inference** | Per-participant ensemble pipeline: MediaPipe face landmarks + Wav2Vec2 audio embeddings → custom `EmotionTransformer` (PyTorch) + XGBoost → EMA smoothing + modality-stratified anomaly detection; served over Socket.IO with server-side backpressure signalling; live per-modality latency percentiles exposed at `GET /stats` and `GET /stats/json` |
 | **Browser media pipeline** | `AudioWorklet` + `AnalyserNode` for RMS-gated noise detection; `MediaRecorder` per participant for post-meeting audio; `RTCPeerConnection` lifecycle managed per remote peer in React; JPEG frames captured from `<video>` elements at self-throttled rates |
-| **Asynchronous transcript pipeline** | HTTP 202 accepted immediately; background FastAPI task runs ffmpeg → Whisper (`small`) → DistilRoBERTa per-segment emotion → multi-speaker segment merge → HTTP POST callback to backend |
+| **Asynchronous transcript pipeline** | HTTP 202 accepted immediately; background FastAPI task runs ffmpeg → Whisper (`small`) → DistilRoBERTa per-segment emotion → multi-speaker segment merge → HTTP POST callback to backend (up to 3 retries, 5 s → 15 s → 30 s backoff); frontend upload independently retries up to 3 times with exponential backoff and alerts user on final failure |
 | **Multi-process backend** | Three pm2 instances on separate ports, unified by `@socket.io/redis-adapter` pub/sub; all room state externalised to Redis so no instance holds authoritative in-process state |
 | **Rate limiting and account locking** | Per-IP and per-user rate limiting via Redis counters; account lock after `ACCOUNT_LOCK_THRESHOLD` consecutive failed logins with a fixed TTL (`ACCOUNT_LOCK_SEC`, default 900 s) implemented in the auth layer; login endpoint returns uniform `401` for both unknown username and wrong password to prevent username enumeration |
-| **Chat with client-side ACK timeout** | Backend appends sanitised messages to MongoDB (capped at 500), broadcasts, and emits `chat-ack`; client marks message failed after 5 000 ms with no acknowledgement |
+| **Chat with client-side ACK timeout** | Backend appends sanitised messages to MongoDB (capped at 500), broadcasts, and emits `chat-ack`; client marks message failed after 5 000 ms with no acknowledgement; `ts` is always server-assigned to prevent stale timestamps on retried messages |
+| **Host secret verification** | `declare-host` socket event now verified server-side against `hostSecretHash` (SHA-256); unverified clients are rejected with a reason code; secret generated once on meeting creation and never rotated on subsequent upserts |
 | **Load testing** | Locust-based WebSocket stress tests in `emotion_service/load_testing/locustfile.py`; participant face images placed in `emotion_service/load_testing/src/*.jpg`; run against the emotion service at `http://localhost:5002` |
 
 ---
@@ -310,8 +311,10 @@ sequenceDiagram
     FE->>BE: POST /api/v1/users/login
     BE-->>FE: JWT
     FE->>BE: POST /api/v1/rooms
-    BE-->>FE: meetingCode + hostSecret (raw, once)
+    BE-->>FE: meetingCode + hostSecret (raw, once — only on creation)
     Note over FE: stores host:<code> in localStorage
+    FE->>BE: emit declare-host (meetingCode, hostSecret)
+    BE-->>FE: ack {ok: true} after verifying hostSecretHash
 
     Note over FE,RD: 2 — Join and WebRTC Signalling
     FE->>BE: emit join-call (meetingCode, meta)
@@ -435,6 +438,8 @@ TURN credentials are currently hardcoded in `meetConfig.js` (`openrelayproject`)
 |---|---|
 | `MONGO_URI` | Required; no default |
 | `JWT_SECRET` | Required; warned if shorter than 32 characters |
+| `JWT_EXPIRES_IN` | JWT lifetime and logout blacklist TTL (e.g. `1h`, `7d`); defaults to `1h` |
+| `CLIENT_ORIGIN` | Frontend base URL used to build meeting links (e.g. `https://yourdomain.com`); defaults to `http://localhost:3000` |
 | `REDIS_URL` | Defaults to `redis://localhost:6379` |
 | `PORT` | Per-process port; set by pm2 `ecosystem.config.cjs` |
 | `Ts_SERVICE_URL` | Upstream URL for the transcript proxy route |
@@ -576,7 +581,7 @@ flowchart LR
         CE4["signal (SDP/ICE relay)"]
         CE5["chat-message"]
         CE6["update-participant-state"]
-        CE7["declare-host"]
+        CE7["declare-host (meetingCode, hostSecret → ack)"]
     end
 
     subgraph ServerEmits ["Backend → Client"]
@@ -680,7 +685,7 @@ The following constraints are grounded in the current implementation and are rel
 
 - **Backend requires an external load balancer**: The three pm2 processes bind separate ports (8000–8001–8002). Distributing Socket.IO connections across them requires sticky-session routing at the load balancer to avoid session mismatch with the Redis adapter.
 
-- **Host role is partially client-enforced**: The frontend determines the host role by checking `localStorage` for `host:<code>`. The backend validates the `x-host-secret` header only on the transcript proxy route, not on socket events like `end-meeting`. A client with the key set gains the host UI without additional server verification.
+- **Host role is server-verified on `declare-host`**: The `declare-host` socket event now requires the client to pass the `hostSecret` received at room creation. The backend verifies it against the stored `hostSecretHash` (SHA-256) before granting `isHost` status; unauthenticated claims are rejected with a reason code. The `x-host-secret` header is still validated on the transcript proxy route.
 
 - **Emotion service state is in-process only**: Per-participant embedding buffers, EMA state, and pump coroutines are stored in Python process memory. The service cannot be horizontally scaled without externalising this state.
 
@@ -688,7 +693,7 @@ The following constraints are grounded in the current implementation and are rel
 
 - **Cleanup timer runs in all backend processes**: `cleanupOldMeetings` uses a `setInterval` registered at module import time. In a three-process pm2 deployment, all three processes execute it every hour independently.
 
-- **Transcript upload has no retry**: `runBackgroundTranscript` in the frontend makes a single fetch call with a silent `.catch(() => {})`. Failures produce no user-visible notification. Retry logic was added to the server-side callback ([#4](https://github.com/AnupamKumar-1/Hoovik/issues/4)) but the frontend upload itself remains fire-and-forget.
+- **Transcript upload retries on failure**: `uploadTranscriptWithRetry` in the frontend makes up to 3 attempts with exponential backoff (1 s → 2 s → 4 s). 4xx responses are not retried. If all attempts fail, the user is alerted. The server-side callback (`run_processing` in the transcript service) independently retries up to 3 times on network errors or 5xx responses (5 s → 15 s → 30 s backoff).
 
 - **TURN credentials are hardcoded**: `meetConfig.js` contains plaintext `openrelayproject` credentials. Time-limited dynamic TURN provisioning is not implemented.
 
@@ -708,9 +713,9 @@ The following are platform-level limitations that emerge from the combined archi
 
 **No horizontal scaling for inference services**: The emotion service's in-process state design and single inference thread mean it cannot be scaled by adding instances without externalising state (e.g., Redis-backed participant buffers). The transcription service similarly holds model singletons without inter-instance coordination.
 
-**Transcript delivery retries on transient failure but has no guarantee**: The transcript callback now retries up to 3 times on network errors or 5xx responses before giving up. However, 4xx responses, a crashed transcription process, or an empty merged-segment result each still cause silent data loss with no notification to the user.
+**Transcript delivery retries on both sides but has no guarantee**: The frontend upload retries up to 3 times with exponential backoff and alerts the user on final failure. The server-side callback retries up to 3 times on network errors or 5xx responses. However, 4xx responses, a crashed transcription process, or an empty merged-segment result each still cause silent data loss with no notification to the user.
 
-**Host-role enforcement** on several socket events is only partially server-authoritative. While transcript-related routes validate the `x-host-secret`, socket events such as `end-meeting` rely primarily on client-side host state and are not fully verified by the backend.
+**Host-role enforcement** on `declare-host` is now fully server-authoritative: the backend verifies the provided secret against `hostSecretHash` before granting host status. Socket events downstream of host status (e.g. `end-meeting`) still rely on the `isHost` flag set after verification; they are not independently re-verified per event.
 
 **Signal relay is unscoped**: The backend's `signal` event forwards SDP/ICE messages to any target socket ID without verifying that both sockets are members of the same room.
 
