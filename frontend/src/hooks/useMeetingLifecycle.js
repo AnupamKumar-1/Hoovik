@@ -287,7 +287,7 @@ export default function useMeetingLifecycle({
     navigate("/home");
   }
 
-  function runBackgroundTranscript(code, hostSecret, recordersSnapshot, participantsSnapshot) {
+  async function uploadTranscriptWithRetry(code, hostSecret, recordersSnapshot, participantsSnapshot, maxRetries = 3) {
     console.log("[transcript] participantsSnapshot:", JSON.stringify(participantsSnapshot));
     console.log("[transcript] recorderSnapshot keys:", Object.keys(recordersSnapshot));
     const speakerMap = {};
@@ -323,44 +323,62 @@ export default function useMeetingLifecycle({
 
     const token = localStorage.getItem("token");
 
-    fetch(TRANSCRIPT_ENDPOINT, {
-      method: "POST",
-      headers: {
-        "x-host-secret": hostSecret,
-        ...(token ? { "x-user-token": token } : {}),
-      },
-      body: fd,
-    })
-      .then((resp) => {
-        if (!resp?.ok) return;
-        return resp.json();
-      })
-      .then((data) => {
-        if (!data?.success) return;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const resp = await fetch(TRANSCRIPT_ENDPOINT, {
+          method: "POST",
+          headers: {
+            "x-host-secret": hostSecret,
+            ...(token ? { "x-user-token": token } : {}),
+          },
+          body: fd,
+        });
 
-        const text =
-          data?.transcriptText ||
-          data?.transcript ||
-          data?.metadata?.transcriptText ||
-          "";
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data?.success) {
+            const text =
+              data?.transcriptText ||
+              data?.transcript ||
+              data?.metadata?.transcriptText ||
+              "";
 
-        if (!text.trim()) return;
+            if (text.trim()) {
+              try {
+                const existingRaw = localStorage.getItem(`host:${code}`);
+                const existing = existingRaw ? JSON.parse(existingRaw) : {};
 
-        try {
-          const existingRaw = localStorage.getItem(`host:${code}`);
-          const existing = existingRaw ? JSON.parse(existingRaw) : {};
+                localStorage.setItem(
+                  `host:${code}`,
+                  JSON.stringify({
+                    ...existing,
+                    meetingCode: code,
+                    lastTranscriptAt: new Date().toISOString(),
+                  })
+                );
+              } catch { }
+            }
+          }
+          return;
+        }
 
-          localStorage.setItem(
-            `host:${code}`,
-            JSON.stringify({
-              ...existing,
-              meetingCode: code,
-              lastTranscriptAt: new Date().toISOString(),
-            })
-          );
-        } catch { }
-      })
-      .catch(() => { });
+        if (resp.status >= 400 && resp.status < 500) {
+          console.error(`[transcript] upload failed with client error ${resp.status} – not retrying`);
+          return;
+        }
+
+        console.warn(`[transcript] upload failed with status ${resp.status}, attempt ${attempt}/${maxRetries}`);
+      } catch (err) {
+        console.warn(`[transcript] upload network error on attempt ${attempt}/${maxRetries}: ${err.message}`);
+      }
+
+      if (attempt < maxRetries) {
+        const delay = Math.pow(2, attempt - 1) * 1000;
+        await new Promise((r) => setTimeout(r, delay));
+      }
+    }
+
+    alert("Failed to upload meeting transcript after multiple attempts. Your audio recording may be lost.");
   }
 
   async function endMeeting() {
@@ -391,14 +409,12 @@ export default function useMeetingLifecycle({
 
     persistHistorySnapshot().catch(() => { });
 
+    if (TRANSCRIPTS_ENABLED && hostData?.hostSecret && TRANSCRIPT_ENDPOINT) {
+      await uploadTranscriptWithRetry(code, hostData.hostSecret, recordersSnapshot, participantsSnapshot);
+    }
+
     await cleanupAll();
     navigate("/home", { state: { meetingEnded: true, meetingCode: code } });
-
-    if (TRANSCRIPTS_ENABLED && hostData?.hostSecret && TRANSCRIPT_ENDPOINT) {
-      setTimeout(() => {
-        runBackgroundTranscript(code, hostData.hostSecret, recordersSnapshot, participantsSnapshot);
-      }, 0);
-    }
   }
 
   useEffect(() => {
