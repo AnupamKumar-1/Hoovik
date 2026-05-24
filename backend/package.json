@@ -10,7 +10,8 @@
     "prod": "pm2 start ecosystem.config.cjs",
     "restart": "pm2 restart ecosystem.config.cjs",
     "stop": "pm2 delete all",
-    "deploy": "pm2 delete all || true && pm2 start ecosystem.config.cjs --update-env && pm2 save && pm2 list"
+    "deploy": "pm2 delete all || true && pm2 start ecosystem.config.cjs --update-env && pm2 save && pm2 list",
+    "test:redis": "node tests/redis.test.js"
   },
   "author": "Anupam Kumar",
   "license": "ISC",
