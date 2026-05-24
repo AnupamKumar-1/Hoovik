@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useContext, useEffect, useRef, useState } from 'react';
 import { AuthContext } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import '../styles/history.css';
@@ -137,7 +137,8 @@ export default function History() {
         const code = item?.meetingCode || item?.meeting_code || item?.code || item?.room;
         if (code) return String(code).trim().toUpperCase();
         if (item?.id) return `ID:${String(item.id).trim()}`;
-        return `RAW:${JSON.stringify(item).slice(0, 100)}`;
+        const stableJson = (obj) => JSON.stringify(obj, Object.keys(obj).sort());
+        return `RAW:${stableJson(item).slice(0, 100)}`;
       };
       (serverArr || []).forEach((s) => { const k = keyFor(s); if (!seen.has(k)) { out.push(s); seen.add(k); } });
       (localArr || []).forEach((l) => { const k = keyFor(l); if (!seen.has(k)) { out.push(l); seen.add(k); } });
@@ -187,7 +188,7 @@ export default function History() {
       window.removeEventListener('storage', onStorage);
       window.removeEventListener('meeting_history_updated', onCustomUpdate);
     };
-  }, [getHistoryOfUser, userData, authLoading]);
+  }, [getHistoryOfUser, userData?._id, authLoading]);
 
   const buildLink = (m) =>
     m?.link || (m?.meetingCode
@@ -214,7 +215,8 @@ export default function History() {
         document.body.removeChild(ta);
       }
       showSnack('Link copied to clipboard', 'success');
-    } catch {
+    } catch (err) {
+      console.error('[copyLink] clipboard error:', err);
       showSnack('Failed to copy link', 'error');
     }
   };
