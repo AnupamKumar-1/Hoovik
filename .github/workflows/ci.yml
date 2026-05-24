@@ -38,12 +38,23 @@ jobs:
           REACT_APP_SERVER_URL: http://localhost:8000
 
   backend:
-    name: Backend — syntax check
+    name: Backend — syntax check + redis tests
     runs-on: ubuntu-latest
 
     defaults:
       run:
         working-directory: backend
+
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
 
     steps:
       - uses: actions/checkout@v5
@@ -60,6 +71,11 @@ jobs:
 
       - name: Syntax check
         run: node --check src/app.js
+
+      - name: Redis tests
+        run: npm run test:redis:ci
+        env:
+          REDIS_URL: redis://localhost:6379
 
   emotion_service:
     name: Emotion Service — validation
@@ -94,8 +110,7 @@ jobs:
         run: ruff check . --ignore E402,F401,F403,F405,F541,F841
 
       - name: Python compile check
-        run: |
-          python -m py_compile app.py
+        run: python -m py_compile app.py
 
   transcript_service:
     name: Transcript Service — validation
@@ -130,5 +145,4 @@ jobs:
         run: ruff check . --ignore E402,F401,F403,F405,F541,F841
 
       - name: Python compile check
-        run: |
-          python -m py_compile app.py
+        run: python -m py_compile app.py
