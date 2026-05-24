@@ -136,6 +136,7 @@ These are the non-trivial engineering decisions made across the stack, grounded 
 | **Chat with client-side ACK timeout** | Backend appends sanitised messages to MongoDB (capped at 500), broadcasts, and emits `chat-ack`; client marks message failed after 5 000 ms with no acknowledgement; `ts` is always server-assigned to prevent stale timestamps on retried messages |
 | **Host secret verification** | `declare-host` socket event now verified server-side against `hostSecretHash` (SHA-256); unverified clients are rejected with a reason code; secret generated once on meeting creation and never rotated on subsequent upserts |
 | **Load testing** | Locust-based WebSocket stress tests in `emotion_service/load_testing/locustfile.py`; participant face images placed in `emotion_service/load_testing/src/*.jpg`; run against the emotion service at `http://localhost:5002` |
+| **Redis test suite** | `backend/tests/redis.test.js` — 25 tests covering distributed cache, distributed locks, rate limiting, pub/sub, batch operations, and reconnection recovery; CI runs 20 tests via `npm run test:redis:ci` (recovery tests skipped); full suite including Redis restart/reconnect tests run locally via `npm run test:redis` |
 
 ---
 
@@ -534,6 +535,28 @@ PORT=8000 node src/app.js
 ```
 
 See [`docs/backend.md`](docs/backend.md) for full pm2 lifecycle commands and configuration.
+
+#### Redis tests
+
+Run the full test suite locally (requires a running Redis instance):
+
+```bash
+cd backend
+npm run test:redis
+```
+
+Run without destructive recovery tests (used in CI):
+
+```bash
+npm run test:redis:ci
+```
+
+| Script | What runs | Recovery tests |
+|---|---|---|
+| `test:redis` | All 25 tests | ✅ included (kills and restarts Redis) |
+| `test:redis:ci` | 20 tests | ⏭ skipped |
+
+Recovery tests (`test:redis`) require `redis-cli` and `redis-server` in `PATH`. They stop and restart the local Redis process to verify reconnection behaviour — do not run against a shared or production Redis instance.
 
 ### 3. Emotion Service
 
