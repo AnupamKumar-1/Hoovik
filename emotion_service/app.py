@@ -700,10 +700,12 @@ async def _pump(pid: str) -> None:
             video_only_mode = cam_on and not mic_on
 
             if not video_only_mode and audio_pcm is None:
-                return
+                await asyncio.sleep(0.005)
+                continue
 
             if video_only_mode and frame_bytes is None:
-                return
+                await asyncio.sleep(0.005)
+                continue
 
             _LAST_SEEN[pid] = time.time()
 
