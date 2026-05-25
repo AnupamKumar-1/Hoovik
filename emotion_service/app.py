@@ -58,7 +58,12 @@ import soundfile as sf
 import socketio
 import torch
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from fastapi import FastAPI , HTTPException
+from fastapi import FastAPI, HTTPException
+from observability.stats import (
+    stats_router,
+    set_active_participant_provider,
+    set_tracker,
+)
 
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
@@ -1215,13 +1220,6 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan, title="Emotion WS Server")
-
-from observability.stats import (
-    stats_router,
-    set_active_participant_provider,
-    set_tracker,
-)
-
 
 def _count_active_participants() -> int:
     """Participants with at least one connected socket (excludes stale-only state)."""
