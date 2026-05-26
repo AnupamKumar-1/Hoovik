@@ -25,8 +25,7 @@ const server = createServer(app);
 
 const allowedOrigins = [
   "http://localhost:3000",
-  "https://hoovik.onrender.com",
-
+  ...(process.env.CLIENT_ORIGIN ? [process.env.CLIENT_ORIGIN] : []),
 ];
 
 app.use(cors({
@@ -102,11 +101,8 @@ const start = async () => {
         server,
         {
           origin: [
-
             "http://localhost:3000",
-
-            "https://hoovik.onrender.com",
-
+            ...(process.env.CLIENT_ORIGIN ? [process.env.CLIENT_ORIGIN] : []),
           ],
           credentials: true,
         },
