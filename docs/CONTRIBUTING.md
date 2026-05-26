@@ -138,6 +138,11 @@ TRANSCRIPT_CACHE_TTL_SEC=300
 TRANSCRIPT_RATE_LIMIT_MAX=30
 TRANSCRIPT_RATE_LIMIT_WIN_SEC=60
 
+# AI Summary (Groq)
+GROQ_API_KEY=<your-groq-api-key>
+AI_SUMMARY_RATE_LIMIT_MAX=2
+AI_SUMMARY_RATE_LIMIT_WIN_SEC=7200
+
 # Cache TTLs
 HISTORY_CACHE_TTL_SEC=120
 MEETINGS_CACHE_TTL_SEC=60
@@ -345,14 +350,14 @@ See [docs/realTimeEmotionService.md](docs/realTimeEmotionService.md) for the ful
 
 ## Starting all services
 
-Once all `.env` files are configured and MongoDB + Redis are running, you can start everything from the repository root:
+Once all `.env` files are configured and MongoDB + Redis are running, start everything from the repository root:
 
 ```bash
-npm install        # installs `concurrently` (one-time)
-npm run dev
+chmod +x dev.sh   # one-time
+./dev.sh
 ```
 
-This starts all four services in parallel with colour-coded output:
+This starts all four services in parallel with colour-coded prefixed output:
 
 | Prefix | Service | Port |
 |---|---|---|
@@ -361,13 +366,15 @@ This starts all four services in parallel with colour-coded output:
 | `EMOTION` | FastAPI emotion inference | 5002 |
 | `TRANSCRIPT` | FastAPI transcription | 5001 |
 
-> Python virtual environments must already be activated and present at `emotion_service/venv` and `transcript_service/venv` before running this command — the root script invokes them directly via `./emotion_service/venv/bin/python` and `./transcript_service/venv/bin/python`.
+Ctrl+C cleanly shuts down all four services at once.
+
+> Python virtual environments must already be set up at `emotion_service/venv` and `transcript_service/venv` before running this command — the script invokes them directly via `./emotion_service/venv/bin/python` and `./transcript_service/venv/bin/python`.
 
 **Start order:**
 
 ```
 1. MongoDB + Redis  ← start manually before anything else
-2. npm run dev      ← starts Backend, Emotion Service, Transcript Service, and Frontend together
+2. ./dev.sh         ← starts Backend, Emotion Service, Transcript Service, and Frontend together
 ```
 
 ---
