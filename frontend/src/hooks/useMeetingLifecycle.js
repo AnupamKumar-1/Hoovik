@@ -430,7 +430,7 @@ export default function useMeetingLifecycle({
     }
 
     try {
-      if (socketRef.current?.connected) socketRef.current.emit("end-meeting", roomId);
+      if (socketRef.current?.connected) socketRef.current.emit("leave-call", roomId);
     } catch { }
 
     persistHistorySnapshot().catch(() => { });

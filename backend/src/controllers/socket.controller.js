@@ -238,8 +238,13 @@ export function connectToSocket(
           return;
         }
 
+        // Host leaving — clean up emotion state and treat as a normal leave.
+        // Do NOT broadcast end-meeting to participants; their meeting continues.
         await deleteEmotionState(code);
-        io.in(`meeting:${code}`).emit("end-meeting");
+        const { userId } = socket.data || {};
+        await handleLeave(socket, code, io, userId);
+        broadcastParticipants(code, io);
+        log.info("host left meeting (end-meeting)", { socketId: socket.id, code });
       } catch (err) {
         log.error("end-meeting error", { err: err.message });
       }
