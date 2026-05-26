@@ -1,4 +1,3 @@
-
 import { createClient } from "redis";
 
 const REDIS_URL = process.env.REDIS_URL || "redis://localhost:6379";
@@ -7,9 +6,10 @@ function makeClient(name) {
     const c = createClient({
         url: REDIS_URL,
         socket: {
-            tls: true,
+            tls: REDIS_URL.startsWith("rediss://"),
             reconnectStrategy: (r) =>
-                Math.min(r * 100 + Math.random() * 100, 3000), },
+                Math.min(r * 100 + Math.random() * 100, 3000),
+        },
     });
     c.on("error", (err) => console.error(`[redis:${name}]`, err.message));
     c.on("reconnecting", () => console.warn(`[redis:${name}] reconnecting...`));

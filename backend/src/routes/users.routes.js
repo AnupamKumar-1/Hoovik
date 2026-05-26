@@ -6,6 +6,7 @@ import {
   getUserHistory,
   login,
   register,
+  refreshToken,
   addParticipant,
   logout,
   upsertMeeting,
@@ -18,6 +19,7 @@ const jwtAuth = passport.authenticate("jwt", { session: false });
 
 router.post("/login", login);
 router.post("/register", register);
+router.post("/refresh", refreshToken);
 
 router.post("/logout", jwtAuth, logout);
 
@@ -28,4 +30,5 @@ router.post("/meetings/:code/participants", jwtAuth, addParticipant);
 router.post("/add_participant", jwtAuth, addParticipant);
 router.post("/meetings", jwtAuth, upsertMeeting);
 router.get("/me", jwtAuth, getMe);
+
 export default router;

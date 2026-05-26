@@ -1,6 +1,3 @@
-
-
-
 import { redisClient } from "../infra/redis.js";
 
 export function makeLogger(service) {
@@ -48,7 +45,8 @@ export async function safeRedisGetResult(key) {
     }
 }
 export async function safeRedisSet(key, value, opts = {}) {
-    try { return await redisClient.set(key, value, opts);
+    try {
+        return await redisClient.set(key, value, opts);
 
     } catch (e) {
         log.warn("redis set failed",
@@ -56,11 +54,12 @@ export async function safeRedisSet(key, value, opts = {}) {
                 key,
                 err: e.message
             });
-            return null;
+        return null;
     }
 }
 export async function safeRedisDel(key) {
-    try { return await redisClient.del(key);
+    try {
+        return await redisClient.del(key);
 
     }
     catch (e) {
@@ -68,12 +67,13 @@ export async function safeRedisDel(key) {
             {
                 key, err: e.message
             });
-            return null;
-        }
+        return null;
+    }
 }
 export async function safeRedisIncr(key) {
 
-    try { return await redisClient.incr(key);
+    try {
+        return await redisClient.incr(key);
 
     } catch (e) {
         log.warn("redis incr failed", {
@@ -82,12 +82,41 @@ export async function safeRedisIncr(key) {
     }
 }
 export async function safeRedisExpire(key, ttl) {
-    try { return await redisClient.expire(key, ttl);
+    try {
+        return await redisClient.expire(key, ttl);
 
     } catch (e) {
         log.warn("redis expire failed", {
             key, err: e.message
         });
+        return null;
+    }
+}
+
+/** @returns {{ ok: true, value: Record<string,string> } | { ok: false, value: null }} */
+export async function safeRedisHGetAllResult(key) {
+    try {
+        return { ok: true, value: await redisClient.hGetAll(key) };
+    } catch (e) {
+        log.warn("redis hgetall failed", { key, err: e.message });
+        return { ok: false, value: null };
+    }
+}
+
+export async function safeRedisHSet(key, field, value) {
+    try {
+        return await redisClient.hSet(key, field, value);
+    } catch (e) {
+        log.warn("redis hset failed", { key, field, err: e.message });
+        return null;
+    }
+}
+
+export async function safeRedisHDel(key, field) {
+    try {
+        return await redisClient.hDel(key, field);
+    } catch (e) {
+        log.warn("redis hdel failed", { key, field, err: e.message });
         return null;
     }
 }

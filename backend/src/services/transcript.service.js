@@ -46,8 +46,11 @@ export const RKEYS = {
 
 const log = makeLogger("transcript");
 
+const METRIC_TTL_SEC = parseInt(process.env.METRIC_TTL_SEC || `${30 * 24 * 3600}`, 10);
+
 async function incr(key) {
-    await safeRedisIncr(key);
+    const count = await safeRedisIncr(key);
+    if (count === 1) await safeRedisExpire(key, METRIC_TTL_SEC);
 }
 
 export function getHostSecret(req) {

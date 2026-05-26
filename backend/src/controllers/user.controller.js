@@ -11,24 +11,43 @@ import {
   getMeService,
   ensureMeetingIndexes,
   logoutService,
+  refreshTokenService,
 } from "../services/user.service.js";
 
 const log = makeLogger("user");
 
+const cookieOpts = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "Strict",
+  path: "/",
+};
+
 const logout = async (req, res) => {
-  const cookieOpts = {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "Strict",
-    path: "/",
-  };
   const { status, body } = await logoutService(req);
   res.clearCookie("refreshToken", cookieOpts);
   return res.status(status).json(body);
 };
 
 const login = async (req, res) => {
-  const { status, body } = await loginService(req);
+  const { status, body, cookies } = await loginService(req);
+  if (cookies?.refreshToken) {
+    res.cookie("refreshToken", cookies.refreshToken.value, {
+      ...cookieOpts,
+      maxAge: cookies.refreshToken.ttlSec * 1000,
+    });
+  }
+  return res.status(status).json(body);
+};
+
+const refreshToken = async (req, res) => {
+  const { status, body, cookies } = await refreshTokenService(req);
+  if (cookies?.refreshToken) {
+    res.cookie("refreshToken", cookies.refreshToken.value, {
+      ...cookieOpts,
+      maxAge: cookies.refreshToken.ttlSec * 1000,
+    });
+  }
   return res.status(status).json(body);
 };
 
@@ -70,6 +89,7 @@ const getMe = async (req, res) => {
 export {
   login,
   register,
+  refreshToken,
   getUserHistory,
   addToHistory,
   addParticipant,

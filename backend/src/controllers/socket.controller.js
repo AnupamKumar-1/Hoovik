@@ -1,7 +1,6 @@
 import { Server } from "socket.io";
 import { createAdapter } from "@socket.io/redis-adapter";
-import { io as Client } from "socket.io-client";
-import { makeLogger } from "../utils/redis.utils.js";
+import { makeLogger, safeRedisGet, safeRedisSet, safeRedisDel } from "../utils/redis.utils.js";
 
 import { getState, mkdirp, UPLOAD_BASE } from "../services/socket.service.js";
 
@@ -33,34 +32,31 @@ const log = makeLogger("socket");
 
 let broadcastDebounceTimers = new Map();
 
-const roomEmotionState = new Map();
+const EMOTION_KEY = (code) => `emotion:active:${code}`;
 
-function toNodeBuffer(raw) {
+async function getEmotionState(code) {
+  const val = await safeRedisGet(EMOTION_KEY(code));
+  return val === "1";
+}
 
-  if (Buffer.isBuffer(raw)) return raw;
-
-  if (raw instanceof Uint8Array) return Buffer.from(raw);
-
-  if (raw instanceof ArrayBuffer) return Buffer.from(raw);
-
-  if (typeof raw === "string") return Buffer.from(raw, "base64");
-
-  if (raw && typeof raw === "object" && raw.type === "Buffer" && Array.isArray(raw.data)) {
-
-    return Buffer.from(raw.data);
+async function setEmotionState(code, active) {
+  if (active) {
+    await safeRedisSet(EMOTION_KEY(code), "1");
+  } else {
+    await safeRedisDel(EMOTION_KEY(code));
   }
-  throw new Error("Cannot convert to Buffer: unsupported type " + typeof raw);
+}
+
+async function deleteEmotionState(code) {
+  await safeRedisDel(EMOTION_KEY(code));
 }
 
 function broadcastParticipants(code, io) {
-
   if (broadcastDebounceTimers.has(code)) clearTimeout(broadcastDebounceTimers.get(code));
 
   broadcastDebounceTimers.set(code, setTimeout(async () => {
-
     broadcastDebounceTimers.delete(code);
     try {
-
       const participants_map = await getParticipants(code);
       if (participants_map === REDIS_READ_FAILED) {
         log.warn("broadcastParticipants skipped: redis unavailable", { code });
@@ -69,17 +65,11 @@ function broadcastParticipants(code, io) {
       if (!participants_map.size) return;
 
       const participants = Array.from(participants_map.values())
-        .map((p) => ({
-          id: p.socketId, meta: p.meta || {}
-        }));
+        .map((p) => ({ id: p.socketId, meta: p.meta || {} }));
 
       io.in(`meeting:${code}`).emit("participants-updated", participants);
-
     } catch (e) {
-
-      log.error("broadcastParticipants error", {
-        code, err: e.message
-      });
+      log.error("broadcastParticipants error", { code, err: e.message });
     }
   }, 150));
 }
@@ -88,15 +78,11 @@ async function getHostSocketId(io, meetingCode) {
   try {
     const roomName = `meeting:${meetingCode}`;
     const socketsInRoom = await io.in(roomName).fetchSockets();
-
     const hostSocket = socketsInRoom.find((s) => s.data?.isHost === true);
-
     if (hostSocket) return hostSocket.id;
     const stateArr = await getState(meetingCode);
     if (stateArr === REDIS_READ_FAILED) return null;
-
     return stateArr?.[0] ?? null;
-
   } catch {
     const stateArr = await getState(meetingCode);
     if (stateArr === REDIS_READ_FAILED) return null;
@@ -108,7 +94,8 @@ export function connectToSocket(
   server,
   corsOptions = {
     origin: "http://localhost:3000",
-    methods: ["GET", "POST"], credentials: true
+    methods: ["GET", "POST"],
+    credentials: true,
   },
   pubClient,
   subClient
@@ -116,10 +103,8 @@ export function connectToSocket(
   const io = new Server(server, {
     cors: corsOptions,
     maxHttpBufferSize: SOCKET_MAX_HTTP_BUFFER,
-
     transports: cfg.socket?.transports ?? ["websocket", "polling"],
     allowEIO3: cfg.socket?.allowEIO3 ?? true,
-
   });
 
   io.adapter(createAdapter(pubClient, subClient));
@@ -189,12 +174,9 @@ export function connectToSocket(
         }
 
         io.to(targetId).emit("signal", socket.id, message);
-
       } catch (err) {
         log.error("signal error", { err: err.message });
-
       } finally {
-
         endTimer(LATENCY_LABELS.SOCKET_SIGNAL, start, { from: socket.id, to: targetId });
       }
     });
@@ -226,7 +208,7 @@ export function connectToSocket(
       }
     });
 
-    socket.on("emotion-status", ({ active } = {}) => {
+    socket.on("emotion-status", async ({ active } = {}) => {
       const code = socket.data?.meetingCode;
       if (!code) return;
       if (!socket.data?.isHost) {
@@ -234,25 +216,30 @@ export function connectToSocket(
         return;
       }
       const isActive = Boolean(active);
-      roomEmotionState.set(code, isActive);
+      await setEmotionState(code, isActive);
       socket.to(`meeting:${code}`).emit("emotion-status", { active: isActive });
       log.info("emotion-status broadcast", { code, active: isActive });
     });
 
-    socket.on("get-emotion-status", () => {
+    socket.on("get-emotion-status", async () => {
       const code = socket.data?.meetingCode;
       if (!code) return;
-      const active = roomEmotionState.get(code) ?? false;
+      const active = await getEmotionState(code);
       socket.emit("emotion-status", { active });
     });
 
     socket.on("end-meeting", async (meetingCodeRaw) => {
       try {
         const code = String(meetingCodeRaw || "").trim().toUpperCase();
-        if (code) {
-          roomEmotionState.delete(code);
-          io.in(`meeting:${code}`).emit("end-meeting");
+        if (!code) return;
+
+        if (!socket.data?.isHost) {
+          log.warn("end-meeting ignored: not host", { socketId: socket.id, code });
+          return;
         }
+
+        await deleteEmotionState(code);
+        io.in(`meeting:${code}`).emit("end-meeting");
       } catch (err) {
         log.error("end-meeting error", { err: err.message });
       }

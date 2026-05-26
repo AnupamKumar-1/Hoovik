@@ -4,7 +4,7 @@ import path from "path";
 import os from "os";
 import crypto from "crypto";
 import { withRoomLock } from "../infra/redisLock.js";
-import { makeLogger, safeRedisGetResult, safeRedisSet, safeRedisDel, safeRedisIncr, safeRedisExpire } from "../utils/redis.utils.js";
+import { makeLogger, safeRedisGetResult, safeRedisSet, safeRedisDel, safeRedisIncr, safeRedisExpire, safeRedisHGetAllResult, safeRedisHSet, safeRedisHDel } from "../utils/redis.utils.js";
 import { toBuffer } from "../utils/helpers.utils.js";
 
 import {
@@ -90,21 +90,28 @@ export async function deleteState(code) {
 }
 
 export async function getParticipants(code) {
-    const result = await safeRedisGetResult(KEYS.participants(code));
+    const result = await safeRedisHGetAllResult(KEYS.participants(code));
     if (!result.ok) return REDIS_READ_FAILED;
-    if (result.value === null) return new Map();
-    return new Map(Object.entries(JSON.parse(result.value)));
+    const raw = result.value;
+    if (!raw || Object.keys(raw).length === 0) return new Map();
+    const map = new Map();
+    for (const [userId, json] of Object.entries(raw)) {
+        try { map.set(userId, JSON.parse(json)); } catch { }
+    }
+    return map;
 }
 
 export async function setParticipants(code, map) {
-    await safeRedisSet(
-        KEYS.participants(code),
-        JSON.stringify(Object.fromEntries(map))
-    );
+    for (const [userId, participant] of map.entries()) {
+        await safeRedisHSet(KEYS.participants(code), userId, JSON.stringify(participant));
+    }
+}
+
+export async function deleteParticipantField(code, userId) {
+    await safeRedisHDel(KEYS.participants(code), userId);
 }
 
 export async function deleteParticipants(code) {
-
     await safeRedisDel(KEYS.participants(code));
 }
 
@@ -191,7 +198,7 @@ export async function handleLeave(socket, code, io, userId) {
         if (participants_map.size === 0) {
             await deleteParticipants(code);
         } else {
-            await setParticipants(code, participants_map);
+            await deleteParticipantField(code, userId);
         }
     }
 
@@ -290,7 +297,11 @@ export async function handleJoinCall(socket, io, meetingCodeRaw, meta = {}) {
         }
 
         await setState(code, stateArr);
-        await setParticipants(code, participants_map);
+        await safeRedisHSet(
+            KEYS.participants(code),
+            userId,
+            JSON.stringify(participants_map.get(userId))
+        );
 
         socket.data = { meetingCode: code, name, meta: cleanMeta, userId };
         meeting.active = true;
@@ -341,14 +352,17 @@ export async function handleUpdateParticipantState(socket, io, data = {}) {
 
     await updateMeetingParticipantMeta(code, socket.id, socket.data.meta);
 
-    const participants_map = await getParticipants(code);
-    if (participants_map === REDIS_READ_FAILED) {
-        log.warn("update-participant-state skipped: redis unavailable", { code });
-        return;
-    }
-    if (participants_map.has(socket.data.userId)) {
-        participants_map.get(socket.data.userId).meta = socket.data.meta;
-        await setParticipants(code, participants_map);
+    const userId = socket.data.userId;
+    if (userId) {
+        const result = await safeRedisHGetAllResult(KEYS.participants(code));
+        if (result.ok && result.value?.[userId]) {
+            let entry;
+            try { entry = JSON.parse(result.value[userId]); } catch { entry = {}; }
+            entry.meta = socket.data.meta;
+            await safeRedisHSet(KEYS.participants(code), userId, JSON.stringify(entry));
+        } else if (!result.ok) {
+            log.warn("update-participant-state skipped: redis unavailable", { code });
+        }
     }
 
     io.in(`meeting:${code}`).emit("update-participant-state", { peerId: socket.id, muted: socket.data.meta.muted === true });
@@ -377,14 +391,17 @@ export async function handleUpdateMeta(socket, io, metaUpdate = {}) {
 
     await meeting.updateParticipantMeta(socket.id, socket.data.meta);
 
-    const participants_map = await getParticipants(code);
-    if (participants_map === REDIS_READ_FAILED) {
-        log.warn("update-meta skipped: redis unavailable", { code });
-        return;
-    }
-    if (participants_map.has(socket.data.userId)) {
-        participants_map.get(socket.data.userId).meta = socket.data.meta;
-        await setParticipants(code, participants_map);
+    const userId = socket.data.userId;
+    if (userId) {
+        const result = await safeRedisHGetAllResult(KEYS.participants(code));
+        if (result.ok && result.value?.[userId]) {
+            let entry;
+            try { entry = JSON.parse(result.value[userId]); } catch { entry = {}; }
+            entry.meta = socket.data.meta;
+            await safeRedisHSet(KEYS.participants(code), userId, JSON.stringify(entry));
+        } else if (!result.ok) {
+            log.warn("update-meta skipped: redis unavailable", { code });
+        }
     }
 
     io.in(`meeting:${code}`).emit("participant-meta-updated", { id: socket.id, meta: socket.data.meta });
