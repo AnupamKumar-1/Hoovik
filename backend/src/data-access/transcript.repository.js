@@ -1,4 +1,3 @@
-
 import Transcript from "../models/transcript.model.js";
 import { Meeting } from "../models/meeting.model.js";
 
@@ -61,6 +60,7 @@ export async function listTranscriptDocs({ query, meetingCode, limit }) {
             metadata: 1,
             createdAt: 1,
             ownerId: 1,
+            aiSummary: 1,  
         }
     )
         .sort({ createdAt: -1 })

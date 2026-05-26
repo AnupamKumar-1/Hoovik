@@ -24,6 +24,8 @@ export default function useSocket({
   notifyPcsChanged,
   makingOfferRef,
   socketReady,
+  isHost,
+  setEmotionLive,
 }) {
   const h = useRef({});
 
@@ -48,6 +50,8 @@ export default function useSocket({
     handleAck,
     notifyPcsChanged,
     makingOfferRef,
+    isHost,
+    setEmotionLive,
   };
 
   useEffect(() => {
@@ -71,6 +75,9 @@ export default function useSocket({
       try {
         window.myId = socket.id;
       } catch { }
+      if (!h.current.isHost) {
+        socket.emit("get-emotion-status");
+      }
     };
 
     socket.on("connect", onConnect);
@@ -200,7 +207,7 @@ export default function useSocket({
         return copy;
       });
 
-      
+
     };
 
     socket.on("user-left", onUserLeft);
@@ -243,6 +250,14 @@ export default function useSocket({
 
     socket.on("end-meeting", onEndMeeting);
 
+    // Participant side - receive host's emotion-status broadcasts
+    const onEmotionStatus = ({ active } = {}) => {
+      if (!h.current.isHost && typeof h.current.setEmotionLive === "function") {
+        h.current.setEmotionLive(Boolean(active));
+      }
+    };
+    socket.on("emotion-status", onEmotionStatus);
+
     const onDisconnect = () => {
       if (disconnectTimer) return;
 
@@ -284,6 +299,7 @@ export default function useSocket({
       socket.off("end-meeting", onEndMeeting);
       socket.off("disconnect", onDisconnect);
       socket.off("update-participant-state", onParticipantStateUpdate);
+      socket.off("emotion-status", onEmotionStatus);
     };
   }, [socketReady]);
 }

@@ -108,6 +108,7 @@ function normalizeTranscript(t) {
     fileName: t.fileName || null,
     metadata: t.metadata || {},
     createdAt: t.createdAt ? new Date(t.createdAt) : null,
+    aiSummary: t.aiSummary || null,
   };
 }
 
@@ -241,6 +242,34 @@ function TranscriptItem({ t, onOpen }) {
   );
 }
 
+function ProcessingTranscriptCard({ meetingCode }) {
+  return (
+    <div className="hm-tx-item hm-tx-item-v2 hm-tx-processing" aria-live="polite" aria-label="Transcript processing">
+      <div className="hm-tx-v2-bar hm-tx-processing-bar" />
+      <div className="hm-tx-v2-content">
+        <div className="hm-tx-v2-top">
+          <div className="hm-tx-v2-code">{meetingCode}</div>
+          <div className="hm-tx-v2-meta">
+            <span className="hm-tx-v2-chip hm-tx-processing-chip">
+              <span className="hm-tx-processing-dot" /><span className="hm-tx-processing-dot" /><span className="hm-tx-processing-dot" />
+              Processing
+            </span>
+          </div>
+        </div>
+        <div className="hm-tx-processing-message">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+          </svg>
+          Transcript is being uploaded and processed — it'll appear here in a moment…
+        </div>
+        <div className="hm-tx-processing-bar-track">
+          <div className="hm-tx-processing-bar-fill" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -255,6 +284,9 @@ export default function Home() {
   const [snackMsg, setSnackMsg] = useState("");
   const [snackSeverity, setSnackSeverity] = useState("success");
   const [viewingTranscript, setViewingTranscript] = useState(null);
+  const [pendingTranscriptCode, setPendingTranscriptCode] = useState(() =>
+    localStorage.getItem(PENDING_TRANSCRIPT_KEY) || null
+  );
 
   const isFetchingRef = useRef(false);
   const prevCountRef = useRef(0);
@@ -324,6 +356,7 @@ export default function Home() {
     }
     pollAttemptsRef.current = 0;
     localStorage.removeItem(PENDING_TRANSCRIPT_KEY);
+    setPendingTranscriptCode(null);
   }, []);
 
   const startPollingForTranscript = useCallback((meetingCode) => {
@@ -331,6 +364,7 @@ export default function Home() {
     stopPolling();
     pollAttemptsRef.current = 0;
     localStorage.setItem(PENDING_TRANSCRIPT_KEY, meetingCode);
+    setPendingTranscriptCode(meetingCode?.toUpperCase());
 
     const BACKOFFS = [5000, 10000, 20000, 40000];
     const MAX_TOTAL_MS = 10 * 60 * 1000;
@@ -638,6 +672,10 @@ export default function Home() {
           )}
 
           <div className="hm-tx-list" ref={txListRef}>
+            {/* [ADDED] Show processing card at top when transcript is being generated */}
+            {pendingTranscriptCode && TRANSCRIPTS_ENABLED && (
+              <ProcessingTranscriptCard meetingCode={pendingTranscriptCode} />
+            )}
             {visibleTranscripts.map((t, i) => {
               const key = getTranscriptKey(t, i);
               return (
@@ -686,6 +724,16 @@ export default function Home() {
         <TranscriptViewer
           t={viewingTranscript}
           onClose={() => setViewingTranscript(null)}
+          onSummaryGenerated={(updated) => {
+
+            setTranscripts((prev) =>
+              prev.map((t) => t._id === updated._id ? { ...t, aiSummary: updated.aiSummary } : t)
+            );
+
+            setViewingTranscript((prev) => ({ ...prev, aiSummary: updated.aiSummary }));
+
+            sessionStorage.removeItem(TRANSCRIPT_CACHE_KEY);
+          }}
         />
       )}
     </div>

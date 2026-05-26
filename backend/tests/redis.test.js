@@ -88,7 +88,6 @@ async function sleep(ms) {
 
 async function waitForReady(client, timeoutMs = 15000) {
     const deadline = Date.now() + timeoutMs;
-    // If already open and ready, return immediately
     if (client.isReady) return;
     return new Promise((resolve, reject) => {
         const check = setInterval(() => {
@@ -101,7 +100,6 @@ async function waitForReady(client, timeoutMs = 15000) {
                 reject(new Error("Redis ready timeout"));
             }
         }, 100);
-        // Also resolve immediately if the "ready" event fires before our interval catches it
         const timer = setTimeout(() => {
             clearInterval(check);
             reject(new Error("Redis ready timeout"));
@@ -141,7 +139,7 @@ function stopRedis() {
 }
 
 function startRedis() {
-    // Spawn redis-server in background without daemonize flag for portability
+
     const proc = spawn("redis-server", [], {
         stdio: "ignore",
         detached: true,

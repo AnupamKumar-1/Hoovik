@@ -171,6 +171,26 @@
   font-family: 'DM Mono', monospace;
 }
 
+.tv-tab-pill--groq {
+  background: rgba(245, 80, 54, 0.12);
+  color: #F55036;
+  border-color: rgba(245, 80, 54, 0.3);
+  padding: 3px 6px;
+  display: inline-flex;
+  align-items: center;
+  letter-spacing: 0;
+}
+
+.tv-tab--active .tv-tab-pill--groq {
+  background: rgba(245, 80, 54, 0.18);
+  border-color: rgba(245, 80, 54, 0.45);
+}
+
+@keyframes tv-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
 .tv-stats-bar {
   display: flex;
   align-items: center;

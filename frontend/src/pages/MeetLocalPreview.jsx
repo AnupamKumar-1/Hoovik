@@ -8,7 +8,7 @@ import s from "../styles/videoComponent.module.css";
 
 export default function MeetLocalPreview({
     localVideoRef, displayName, isHost, isSpeaking,
-    muted, videoOff, shareEmotion, chatOpen,
+    muted, videoOff, shareEmotion, emotionLive, chatOpen,
     onToggleMute, onToggleVideo, onToggleEmotion,
 }) {
     const [showControls, setShowControls] = useState(false);
@@ -39,6 +39,12 @@ export default function MeetLocalPreview({
                 className={s.localVideo}
                 aria-label="Your local video"
             />
+            {emotionLive && (
+                <div className={s.emotionLiveBadge} aria-label="AI emotion analysis is active">
+                    <span className={s.emotionLiveDot} />
+                    AI Analysis
+                </div>
+            )}
 
             <AnimatePresence>
                 {showControls && (

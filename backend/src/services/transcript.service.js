@@ -18,6 +18,9 @@ const TRANSCRIPT_CACHE_TTL_SEC = parseInt(process.env.TRANSCRIPT_CACHE_TTL_SEC |
 const TRANSCRIPT_RATE_LIMIT_MAX = parseInt(process.env.TRANSCRIPT_RATE_LIMIT_MAX || "30", 10);
 const TRANSCRIPT_RATE_LIMIT_WIN_SEC = parseInt(process.env.TRANSCRIPT_RATE_LIMIT_WIN_SEC || "60", 10);
 
+const AI_SUMMARY_RATE_LIMIT_MAX = parseInt(process.env.AI_SUMMARY_RATE_LIMIT_MAX || "2", 10);
+const AI_SUMMARY_RATE_LIMIT_WIN_SEC = parseInt(process.env.AI_SUMMARY_RATE_LIMIT_WIN_SEC || "7200", 10);
+
 const NOISE_MIN_WORDS = parseInt(process.env.TRANSCRIPT_NOISE_MIN_WORDS || "4", 10);
 const NOISE_MIN_UNIQUE_RATIO = parseFloat(process.env.TRANSCRIPT_NOISE_MIN_UNIQUE_RATIO || "0.4");
 const NOISE_MAX_CHAR_REPEAT = parseInt(process.env.TRANSCRIPT_NOISE_MAX_CHAR_REPEAT || "4", 10);
@@ -38,6 +41,7 @@ export const RKEYS = {
     metricTotal: () => "transcript:requests:total",
     metricCached: () => "transcript:requests:cached",
     metricFailed: () => "transcript:requests:failed",
+    aiSummaryRate: (uid) => `transcript:aisummary:rate:${uid}`,
 };
 
 const log = makeLogger("transcript");
@@ -89,6 +93,14 @@ export async function isRateLimited(userId) {
     return count > TRANSCRIPT_RATE_LIMIT_MAX;
 }
 
+async function isAiSummaryRateLimited(userId) {
+    if (!userId) return false;
+    const key = RKEYS.aiSummaryRate(userId);
+    const count = await safeRedisIncr(key);
+    if (count === 1) await safeRedisExpire(key, AI_SUMMARY_RATE_LIMIT_WIN_SEC);
+    return count > AI_SUMMARY_RATE_LIMIT_MAX;
+}
+
 function hasExcessiveCharRepeat(word) {
     let maxRun = 1, cur = 1;
     for (let i = 1; i < word.length; i++) {
@@ -125,6 +137,170 @@ export function isNoiseLine(line) {
     if (noiseWordCount / words.length > 0.3) return true;
 
     return false;
+}
+
+const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
+const GROQ_API_KEY = process.env.GROQ_API_KEY;
+
+function buildGroqPrompt(segments) {
+    const transcriptText = segments
+        .map((s) => `[${s.speaker || "Unknown"}] t=${Math.round(s.start)}s nlp_emotion=${s.emotion || "neutral"} | ${s.text}`)
+        .join("\n");
+
+    return `You are an expert meeting analyst. Analyze this meeting transcript and return a JSON object only — no markdown, no backticks, just raw JSON.
+
+Transcript:
+${transcriptText}
+
+Return this exact JSON structure:
+{
+  "summary": "2-3 sentence overview of what the meeting was about",
+  "key_points": ["point 1", "point 2", "point 3"],
+  "insights": {
+    "dominant_emotion": "one of: happy, sad, anger, fear, surprise, disgust, neutral",
+    "emotion_distribution": { "neutral": 60, "happy": 25, "sad": 15 },
+    "top_topics": ["topic1", "topic2", "topic3", "topic4", "topic5"],
+    "speaker_stats": {
+      "SpeakerName": {
+        "turns": 3,
+        "word_count": 45,
+        "dominant_emotion": "neutral"
+      }
+    },
+    "emotional_moments": [
+      { "emotion": "happy", "text": "short quote from transcript", "start": 0 }
+    ],
+    "total_words": 100,
+    "speaking_pace_wpm": 120,
+    "total_duration_sec": 60
+  }
+}`;
+}
+
+export async function generateAiSummaryService(req) {
+    const idOrCode = String(req.params.id || "").trim();
+    if (!idOrCode) return { status: 400, body: { success: false, message: "id or meetingCode required" } };
+
+    const { secret, userId, secretHash } = resolveAuth(req);
+    if (!secret && !userId) return { status: 403, body: { success: false, message: "Not authorized" } };
+
+    if (await isAiSummaryRateLimited(userId)) {
+        return { status: 429, body: { success: false, message: "AI summary rate limit reached. Max 2 per 2 hours." } };
+    }
+
+    if (!GROQ_API_KEY) {
+        log.error("generateAiSummary: GROQ_API_KEY not configured");
+        return { status: 500, body: { success: false, message: "AI summary service not configured" } };
+    }
+
+    const isMongoId = /^[a-f\d]{24}$/i.test(idOrCode);
+    let doc = null;
+    if (isMongoId) doc = await findTranscriptById(idOrCode);
+    if (!doc) doc = await findTranscriptByCode(idOrCode.toUpperCase());
+    if (!doc) return { status: 404, body: { success: false, message: "Transcript not found" } };
+
+    if (!isAuthorized(doc, userId, secretHash)) {
+        return { status: 403, body: { success: false, message: "Not authorized" } };
+    }
+
+    const segments = doc.metadata?.segments;
+    if (!Array.isArray(segments) || segments.length === 0) {
+        return { status: 400, body: { success: false, message: "Transcript has no segments to analyze" } };
+    }
+
+    try {
+        const groqRes = await fetch(GROQ_URL, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${GROQ_API_KEY}`,
+            },
+            body: JSON.stringify({
+                model: "llama-3.1-8b-instant",
+                messages: [{ role: "user", content: buildGroqPrompt(segments) }],
+                temperature: 0.3,
+                max_tokens: 3000,
+                response_format: { type: "json_object" },
+            }),
+        });
+
+        if (!groqRes.ok) {
+            const errBody = await groqRes.json().catch(() => ({}));
+            const errMsg = errBody?.error?.message || groqRes.statusText || "Unknown error";
+            log.error("Groq API error", { status: groqRes.status, errMsg });
+            return { status: 502, body: { success: false, message: `AI provider error: ${groqRes.status}` } };
+        }
+
+        const groqData = await groqRes.json();
+        const raw = groqData.choices?.[0]?.message?.content ?? "";
+        const aiSummary = JSON.parse(raw);
+
+        const { default: Transcript } = await import("../models/transcript.model.js");
+        const updated = await Transcript.findByIdAndUpdate(
+            doc._id,
+            { $set: { aiSummary } },
+            { new: true }
+        ).lean();
+
+        await Promise.all([
+            safeRedisDel(RKEYS.cacheById(String(doc._id))),
+            safeRedisDel(RKEYS.cacheByCode(String(doc.meetingCode))),
+        ]);
+
+        log.info("aiSummary generated and saved", { code: doc.meetingCode });
+        return { status: 200, body: { success: true, aiSummary, transcript: updated } };
+    } catch (err) {
+        log.error("generateAiSummary error", { err: err.message });
+        return { status: 500, body: { success: false, message: "Failed to generate AI summary" } };
+    }
+}
+
+export async function updateAiSummaryService(req) {
+    const idOrCode = String(req.params.id || "").trim();
+    if (!idOrCode) return { status: 400, body: { success: false, message: "id or meetingCode required" } };
+
+    const { secret, userId, secretHash } = resolveAuth(req);
+    if (!secret && !userId) return { status: 403, body: { success: false, message: "Not authorized" } };
+
+    const aiSummary = req.body?.aiSummary;
+    if (!aiSummary || typeof aiSummary !== "object") {
+        return { status: 400, body: { success: false, message: "aiSummary object required" } };
+    }
+
+    if (await isAiSummaryRateLimited(userId)) {
+        return { status: 429, body: { success: false, message: "AI summary rate limit reached. Max 2 per 2 hours." } };
+    }
+
+    try {
+        const isMongoId = /^[a-f\d]{24}$/i.test(idOrCode);
+        let doc = null;
+        if (isMongoId) doc = await findTranscriptById(idOrCode);
+        if (!doc) doc = await findTranscriptByCode(idOrCode.toUpperCase());
+        if (!doc) return { status: 404, body: { success: false, message: "Transcript not found" } };
+
+        if (!isAuthorized(doc, userId, secretHash)) {
+            return { status: 403, body: { success: false, message: "Not authorized" } };
+        }
+
+        const { default: Transcript } = await import("../models/transcript.model.js");
+        const updated = await Transcript.findByIdAndUpdate(
+            doc._id,
+            { $set: { aiSummary } },
+            { new: true }
+        ).lean();
+
+        // Invalidate cache
+        await Promise.all([
+            safeRedisDel(RKEYS.cacheById(String(doc._id))),
+            safeRedisDel(RKEYS.cacheByCode(String(doc.meetingCode))),
+        ]);
+
+        log.info("aiSummary saved", { code: doc.meetingCode });
+        return { status: 200, body: { success: true, transcript: updated } };
+    } catch (err) {
+        log.error("updateAiSummary error", { err: err.message });
+        return { status: 500, body: { success: false, message: "Server error" } };
+    }
 }
 
 export async function createTranscriptService(req) {
@@ -245,11 +421,13 @@ export async function getTranscriptService(req) {
     };
 
     if (await isRateLimited(userId)) {
-        return { status: 429,
+        return {
+            status: 429,
             body: {
                 success: false,
                 message: "Too many requests, slow down"
-            } };
+            }
+        };
     }
 
     const isMongoId = /^[a-f\d]{24}$/i.test(idOrCode);
@@ -295,7 +473,8 @@ export async function getTranscriptService(req) {
                 body: {
                     success: false,
                     message: "Transcript not found"
-                } };
+                }
+            };
         }
 
         if (!isAuthorized(doc, userId, secretHash)) {
@@ -303,7 +482,9 @@ export async function getTranscriptService(req) {
                 status: 403,
                 body: {
                     success: false,
-                    message: "Not authorized" } };
+                    message: "Not authorized"
+                }
+            };
         }
 
         const payload = JSON.stringify(doc);
@@ -348,7 +529,8 @@ export async function listTranscriptsService(req) {
     if (meeting_code) {
         const cleanCode = String(meeting_code).toUpperCase().trim();
         if (!validateMeetingCode(cleanCode)) {
-            return { status: 400,
+            return {
+                status: 400,
                 body: {
                     success: false, message: "Invalid meeting_code format"
                 }
@@ -384,7 +566,8 @@ export async function listTranscriptsService(req) {
     } catch (err) {
         await incr(RKEYS.metricFailed());
         log.error("listTranscripts error", { err: err.message });
-        return { status: 500,
+        return {
+            status: 500,
             body: {
                 success: false, message: "Server error"
             }

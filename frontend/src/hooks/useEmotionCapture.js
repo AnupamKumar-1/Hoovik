@@ -221,7 +221,7 @@ export default function useEmotionCapture({
       const workletNode = new AudioWorkletNode(ctx, "emotion-chunk-processor", {
         processorOptions: { chunkSize: AUDIO_CHUNK_SAMPLES },
         numberOfInputs: 1,
-        numberOfOutputs: 0, // no audio output needed — analysis only
+        numberOfOutputs: 0,
       });
 
       workletNode.port.onmessage = (event) => {
@@ -330,8 +330,6 @@ export default function useEmotionCapture({
           releaseParticipantAudio(participantId);
         }
       }
-
-      // Only send video frames if the participant's camera is on.
       if (camEnabled) {
         sendBurst({ stream, participantId, burstCount }).catch((e) =>
           console.warn("[EmotionCapture] burst error pid=%s", participantId, e)

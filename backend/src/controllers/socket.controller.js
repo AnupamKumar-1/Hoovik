@@ -33,6 +33,8 @@ const log = makeLogger("socket");
 
 let broadcastDebounceTimers = new Map();
 
+const roomEmotionState = new Map();
+
 function toNodeBuffer(raw) {
 
   if (Buffer.isBuffer(raw)) return raw;
@@ -214,6 +216,38 @@ export function connectToSocket(
         await handleKeywordsUpdate(socket, io, keywords);
       } catch (err) {
         log.error("keywords-update error", { err: err.message });
+      }
+    });
+
+    socket.on("emotion-status", ({ active } = {}) => {
+      const code = socket.data?.meetingCode;
+      if (!code) return;
+      if (!socket.data?.isHost) {
+        log.warn("emotion-status ignored: not host", { socketId: socket.id, code });
+        return;
+      }
+      const isActive = Boolean(active);
+      roomEmotionState.set(code, isActive);
+      socket.to(`meeting:${code}`).emit("emotion-status", { active: isActive });
+      log.info("emotion-status broadcast", { code, active: isActive });
+    });
+
+    socket.on("get-emotion-status", () => {
+      const code = socket.data?.meetingCode;
+      if (!code) return;
+      const active = roomEmotionState.get(code) ?? false;
+      socket.emit("emotion-status", { active });
+    });
+
+    socket.on("end-meeting", async (meetingCodeRaw) => {
+      try {
+        const code = String(meetingCodeRaw || "").trim().toUpperCase();
+        if (code) {
+          roomEmotionState.delete(code);
+          io.in(`meeting:${code}`).emit("end-meeting");
+        }
+      } catch (err) {
+        log.error("end-meeting error", { err: err.message });
       }
     });
 

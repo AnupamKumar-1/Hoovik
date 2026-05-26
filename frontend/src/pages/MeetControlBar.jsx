@@ -54,6 +54,7 @@ export default function MeetControlBar({
     chatOpen,
     shareEmotion,
     isHost,
+    emotionLive,
     endingMeeting,
     unreadCount = 0,
     onToggleMute,

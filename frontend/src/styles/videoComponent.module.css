@@ -89,7 +89,7 @@
 }
 
 .topBarLeft { display: flex; align-items: center; gap: 16px; }
-.topBarCenter { position: absolute; left: 50%; transform: translateX(-50%); }
+.topBarCenter { position: absolute; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; }
 .topBarRight { display: flex; align-items: center; gap: 12px; }
 
 .logo { display: flex; align-items: center; gap: 8px; }
@@ -1538,4 +1538,78 @@
   .localOverlay {
     opacity: 1;
   }
+}
+
+@keyframes emotionPulse {
+  0%, 100% { opacity: 1;    transform: scale(1);    }
+  50%       { opacity: 0.3; transform: scale(0.65); }
+}
+
+.emotionLiveDot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ef4444;
+  flex-shrink: 0;
+  animation: emotionPulse 1.2s ease-in-out infinite;
+}
+
+.emotionLiveBadge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(0, 0, 0, 0.58);
+  border-radius: 20px;
+  padding: 3px 9px 3px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: 0.02em;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  pointer-events: none;
+  z-index: 10;
+  user-select: none;
+}
+
+.emotionLiveCtrlBadge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 20px;
+  padding: 4px 10px 4px 7px;
+  cursor: default;
+  user-select: none;
+  align-self: center;
+}
+
+.emotionLiveCtrlLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: #fca5a5;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.emotionLiveTopPill {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(239, 68, 68, 0.13);
+  border: 1px solid rgba(239, 68, 68, 0.32);
+  border-radius: 20px;
+  padding: 3px 10px 3px 7px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fca5a5;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  user-select: none;
+  pointer-events: none;
 }

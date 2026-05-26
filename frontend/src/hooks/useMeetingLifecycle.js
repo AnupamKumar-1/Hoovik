@@ -385,7 +385,7 @@ export default function useMeetingLifecycle({
     alert("Failed to upload meeting transcript after multiple attempts. Your audio recording may be lost.");
   }
 
-  async function endMeeting() {
+  async function endMeeting(emotionsMap = {}) {
     if (!isHostRef.current) {
       await leaveCall();
       return;
@@ -394,6 +394,28 @@ export default function useMeetingLifecycle({
     const code = (roomId || "").toUpperCase();
     const hostDataRaw = localStorage.getItem(`host:${code}`);
     const hostData = hostDataRaw ? JSON.parse(hostDataRaw) : null;
+
+    try {
+      if (emotionsMap && Object.keys(emotionsMap).length > 0) {
+        const emotionSnapshot = {};
+        for (const [pid, history] of Object.entries(emotionsMap)) {
+          if (Array.isArray(history) && history.length > 0) {
+            emotionSnapshot[pid] = history;
+          }
+        }
+        if (Object.keys(emotionSnapshot).length > 0) {
+          localStorage.setItem(`emotions:${code}`, JSON.stringify(emotionSnapshot));
+        }
+      }
+      const participantNames = {};
+      (participantsMetaRef.current || []).forEach((p) => {
+        const userId = p.meta?.userId || p.id;
+        const name = p.meta?.name || p.meta?.displayName || p.meta?.username || userId;
+        if (userId) participantNames[userId] = name;
+      });
+      participantNames["local"] = localStorage.getItem("displayName") || "Host";
+      localStorage.setItem(`emotionNames:${code}`, JSON.stringify(participantNames));
+    } catch { }
 
     const participantsSnapshot = JSON.parse(JSON.stringify(participantsMetaRef.current || []));
 

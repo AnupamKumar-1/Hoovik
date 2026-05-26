@@ -83,8 +83,12 @@ function speakerList(segments = []) {
 function SummaryPanel({ analysis }) {
     if (!analysis || !analysis.summary) return (
         <div className="tv-empty">
-            <div className="tv-empty-icon">✦</div>
-            <p className="tv-empty-text">No AI summary available for this transcript.</p>
+            <div className="tv-empty-icon">
+                <svg width="40" height="40" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="24" cy="24" r="24" fill="rgba(245,80,54,0.1)" />
+                    <path d="M32 25.5v5.5H21.5C17.36 31 14 27.64 14 23.5v-5C14 14.36 17.36 11 21.5 11H34v4.5H22c-1.1 0-1.8.7-1.8 1.8v5.4c0 1.1.7 1.8 1.8 1.8h2.5v-1.5H22V19.5H32v6z" fill="#F55036" />
+                </svg>
+            </div>
         </div>
     );
 
@@ -99,6 +103,12 @@ function SummaryPanel({ analysis }) {
         speaking_pace_wpm,
         total_duration_sec,
     } = insights;
+
+    const normalizedDist = Object.entries(emotion_distribution).reduce((acc, [k, v]) => {
+        const key = k.toLowerCase();
+        acc[key] = (acc[key] || 0) + v;
+        return acc;
+    }, {});
 
     const dominantMeta = emotionMeta(dominant_emotion);
     const speakerEntries = Object.entries(speaker_stats);
@@ -164,7 +174,7 @@ function SummaryPanel({ analysis }) {
                         <div className="tv-card">
                             <div className="tv-card-label">EMOTIONAL BREAKDOWN</div>
                             <div className="tv-emo-bar-list">
-                                {Object.entries(emotion_distribution)
+                                {Object.entries(normalizedDist)
                                     .sort((a, b) => b[1] - a[1])
                                     .map(([emo, pct]) => {
                                         const m = emotionMeta(emo);
@@ -253,9 +263,8 @@ function SummaryPanel({ analysis }) {
     );
 }
 
-export default function TranscriptViewer({ t, onClose }) {
+export default function TranscriptViewer({ t, onClose, onSummaryGenerated }) {
     const segments = t?.metadata?.segments ?? [];
-    const analysis = t?.metadata?.analysis ?? null;
     const groups = groupSegments(segments);
     const emoSummary = emotionSummary(segments);
     const speakers = speakerList(segments);
@@ -267,6 +276,62 @@ export default function TranscriptViewer({ t, onClose }) {
     const [copied, setCopied] = useState(false);
     const [activeGroup, setActiveGroup] = useState(null);
     const bodyRef = useRef(null);
+
+    const [aiAnalysis, setAiAnalysis] = useState(t?.aiSummary || null);
+    const [aiLoading, setAiLoading] = useState(false);
+    const [aiError, setAiError] = useState(null);
+
+    useEffect(() => {
+        setAiAnalysis(t?.aiSummary || null);
+    }, [t?._id, t?.aiSummary]);
+
+    async function handleGenerateSummary() {
+        if (!segments.length) return;
+        setAiLoading(true);
+        setAiError(null);
+        try {
+            const token = localStorage.getItem("token");
+            const idOrCode = t._id || t.meetingCode;
+            const hostDataRaw = t.meetingCode
+                ? localStorage.getItem(`host:${t.meetingCode.toUpperCase()}`)
+                : null;
+            const hostSecret = hostDataRaw ? JSON.parse(hostDataRaw)?.hostSecret : null;
+
+            const SERVER_BASE = process.env.REACT_APP_SERVER_URL || "http://localhost:8000";
+            const res = await fetch(`${SERVER_BASE}/api/v1/transcripts/${idOrCode}/summary`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                    ...(hostSecret ? { "x-host-secret": hostSecret } : {}),
+                },
+            });
+
+            if (res.status === 429) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data?.message || "Rate limit reached. Max 2 AI summaries per 2 hours.");
+            }
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data?.message || `Failed to generate summary (${res.status})`);
+            }
+
+            const data = await res.json();
+            const result = data.aiSummary;
+            setAiAnalysis(result);
+            setActiveTab("summary");
+            if (data.transcript) {
+                onSummaryGenerated?.(data.transcript);
+            } else {
+                if (t) t.aiSummary = result;
+            }
+        } catch (err) {
+            setAiError(err.message || "Failed to generate summary.");
+            console.error("[AI Summary]", err);
+        } finally {
+            setAiLoading(false);
+        }
+    }
 
     useEffect(() => {
         if (!search) return;
@@ -388,20 +453,29 @@ export default function TranscriptViewer({ t, onClose }) {
                         </svg>
                         Transcript
                     </button>
-                    {analysis?.summary && (
-                        <button
-                            className={`tv-tab ${activeTab === "summary" ? "tv-tab--active" : ""}`}
-                            onClick={() => setActiveTab("summary")}
-                        >
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                                <circle cx="12" cy="12" r="10" />
-                                <line x1="12" y1="8" x2="12" y2="12" />
-                                <line x1="12" y1="16" x2="12.01" y2="16" />
+                    <button
+                        className={`tv-tab ${activeTab === "summary" ? "tv-tab--active" : ""}`}
+                        onClick={() => setActiveTab("summary")}
+                    >
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                            <circle cx="12" cy="12" r="10" />
+                            <line x1="12" y1="8" x2="12" y2="12" />
+                            <line x1="12" y1="16" x2="12.01" y2="16" />
+                        </svg>
+                        AI Summary
+                        <span className="tv-tab-pill tv-tab-pill--groq">
+                            <svg width="28" height="10" viewBox="0 0 80 28" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ display: "block" }}>
+                                {/* G */}
+                                <path d="M13.6 14.2v3.6H9.2c-2.6 0-4.4-1.8-4.4-4.4V10c0-2.6 1.8-4.4 4.4-4.4h8v3.2H9.4c-.8 0-1.2.4-1.2 1.2v4c0 .8.4 1.2 1.2 1.2h1.8v-1h-1.4v-3.2h5.6v3.2z" fill="currentColor" />
+                                {/* R */}
+                                <path d="M17 5.6h7.2c2.4 0 4 1.6 4 3.8 0 1.6-.8 2.8-2 3.4l2.4 5H25l-2.2-4.6H20.2V17.8H17V5.6zm3.2 5.4h3.6c.8 0 1.2-.4 1.2-1.2s-.4-1.2-1.2-1.2h-3.6v2.4z" fill="currentColor" />
+                                {/* O */}
+                                <path d="M30.8 10c0-2.6 1.8-4.4 4.4-4.4h4c2.6 0 4.4 1.8 4.4 4.4v3.4c0 2.6-1.8 4.4-4.4 4.4h-4c-2.6 0-4.4-1.8-4.4-4.4V10zm3.2.2v3c0 .8.4 1.2 1.2 1.2h3.6c.8 0 1.2-.4 1.2-1.2v-3c0-.8-.4-1.2-1.2-1.2h-3.6c-.8 0-1.2.4-1.2 1.2z" fill="currentColor" />
+                                {/* Q */}
+                                <path d="M46.4 10c0-2.6 1.8-4.4 4.4-4.4h4c2.6 0 4.4 1.8 4.4 4.4v3.4c0 1.8-.8 3.2-2 3.9l2 2.7h-3.8l-1.4-1.8c-.4.1-.8.1-1.2.1h-4c-2.6 0-4.4-1.8-4.4-4.4V10zm3.2.2v3c0 .8.4 1.2 1.2 1.2h3.6c.8 0 1.2-.4 1.2-1.2v-3c0-.8-.4-1.2-1.2-1.2h-3.6c-.8 0-1.2.4-1.2 1.2z" fill="currentColor" />
                             </svg>
-                            AI Summary
-                            <span className="tv-tab-pill">AI</span>
-                        </button>
-                    )}
+                        </span>
+                    </button>
                 </div>
 
                 {activeTab === "transcript" && (
@@ -554,7 +628,70 @@ export default function TranscriptViewer({ t, onClose }) {
 
                 {activeTab === "summary" && (
                     <div className="tv-body">
-                        <SummaryPanel analysis={analysis} />
+                        {!aiAnalysis && !aiLoading && (
+                            <div className="tv-empty">
+                                <div className="tv-empty-icon">
+                                    <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <circle cx="24" cy="24" r="24" fill="rgba(245,80,54,0.1)" />
+                                        {/* Groq "G" lettermark */}
+                                        <path d="M32 25.5v5.5H21.5C17.36 31 14 27.64 14 23.5v-5C14 14.36 17.36 11 21.5 11H34v4.5H22c-1.1 0-1.8.7-1.8 1.8v5.4c0 1.1.7 1.8 1.8 1.8h2.5v-1.5H22V19.5H32v6z" fill="#F55036" />
+                                    </svg>
+                                </div>
+                                <p className="tv-empty-text">Generate an AI summary of this meeting.</p>
+                                {aiError && (
+                                    <p style={{ color: "#f87171", fontSize: 12, marginTop: 8 }}>{aiError}</p>
+                                )}
+                                <button
+                                    onClick={handleGenerateSummary}
+                                    disabled={!segments.length}
+                                    style={{
+                                        marginTop: 16,
+                                        padding: "8px 20px",
+                                        background: "linear-gradient(135deg,#38bdf8,#7c3aed)",
+                                        border: "none",
+                                        borderRadius: 8,
+                                        color: "#fff",
+                                        fontSize: 13,
+                                        fontWeight: 600,
+                                        cursor: "pointer",
+                                        opacity: segments.length ? 1 : 0.5,
+                                    }}
+                                >
+                                    Generate AI Summary
+                                </button>
+                            </div>
+                        )}
+                        {aiLoading && (
+                            <div className="tv-empty">
+                                <div style={{ position: "relative", width: 48, height: 48, marginBottom: 8 }}>
+                                    <svg width="48" height="48" viewBox="0 0 48 48" fill="none" style={{ position: "absolute", inset: 0 }}>
+                                        <circle cx="24" cy="24" r="20" stroke="rgba(245,80,54,0.15)" strokeWidth="3" />
+                                        <circle cx="24" cy="24" r="20" stroke="#F55036" strokeWidth="3" strokeLinecap="round"
+                                            strokeDasharray="30 96" style={{ transformOrigin: "center", animation: "tv-spin 0.9s linear infinite" }} />
+                                    </svg>
+                                    <svg width="48" height="48" viewBox="0 0 48 48" fill="none" style={{ position: "absolute", inset: 0 }}>
+                                        <path d="M32 25.5v5.5H21.5C17.36 31 14 27.64 14 23.5v-5C14 14.36 17.36 11 21.5 11H34v4.5H22c-1.1 0-1.8.7-1.8 1.8v5.4c0 1.1.7 1.8 1.8 1.8h2.5v-1.5H22V19.5H32v6z" fill="#F55036" />
+                                    </svg>
+                                </div>
+                                <p className="tv-empty-text" style={{ color: "#F55036", fontWeight: 500 }}>Groq is analyzing…</p>
+                            </div>
+                        )}
+                        {aiAnalysis && !aiLoading && (
+                            <>
+                                <SummaryPanel analysis={aiAnalysis} />
+                                {aiError && (
+                                    <p style={{ color: "#f87171", fontSize: 12, margin: "4px 0 0", textAlign: "right" }}>{aiError}</p>
+                                )}
+                                <div style={{ textAlign: "right", padding: "8px 0" }}>
+                                    <button
+                                        onClick={handleGenerateSummary}
+                                        style={{ fontSize: 11, color: "#64748b", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}
+                                    >
+                                        Regenerate
+                                    </button>
+                                </div>
+                            </>
+                        )}
                     </div>
                 )}
 

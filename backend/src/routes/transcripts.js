@@ -25,6 +25,8 @@ router.use(transcriptLimiter);
 
 router.post("/", aAuth, ctrl.createTranscript);
 router.get("/", aAuth, ctrl.listTranscripts);
+router.post("/:id/summary", aAuth, ctrl.generateAiSummary);
+router.patch("/:id/summary", aAuth, ctrl.updateAiSummary);
 router.get("/:id", aAuth, ctrl.getTranscript);
 
 export default router;

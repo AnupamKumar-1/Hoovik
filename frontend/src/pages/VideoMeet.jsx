@@ -118,6 +118,7 @@ export default function VideoMeet() {
   const myIdRef = useRef(null);
 
   const [shareEmotion, setShareEmotion] = useState(false);
+  const [emotionLive, setEmotionLive] = useState(false);
   const [emotionsMap, setEmotionsMap] = useState({});
   const [stableSpeakerId, setStableSpeakerId] = useState(null);
   const [meetDuration, setMeetDuration] = useState(0);
@@ -288,13 +289,11 @@ export default function VideoMeet() {
       next[userId] = nowMuted;
 
       if (prev[userId] === nowMuted) continue;
-
-      // Mute state changed — notify immediately
       const micEnabled = !nowMuted;
 
       try {
         notifyMediaState(userId, { micEnabled, cameraEnabled: true });
-      } catch {  }
+      } catch { }
     }
 
     prevParticipantMuteStateRef.current = next;
@@ -437,7 +436,27 @@ export default function VideoMeet() {
     if (!isHost) return;
     if (shareEmotion) startPeriodicEmotionCapture({});
     else stopPeriodicEmotionCapture();
+    if (socketRef.current?.connected) {
+      socketRef.current.emit("emotion-status", { active: shareEmotion });
+    }
   }, [shareEmotion, isHost, startPeriodicEmotionCapture, stopPeriodicEmotionCapture]);
+
+  useEffect(() => {
+    if (isHost) return;
+    const socket = socketRef.current;
+    if (!socket) return;
+
+    const onEmotionStatus = ({ active }) => {
+      setEmotionLive(Boolean(active));
+    };
+
+    socket.on("emotion-status", onEmotionStatus);
+    socket.emit("get-emotion-status");
+
+    return () => {
+      socket.off("emotion-status", onEmotionStatus);
+    };
+  }, [socketReady, isHost]);
 
   useEffect(() => {
     const onKeyDown = (e) => {
@@ -484,6 +503,8 @@ export default function VideoMeet() {
     notifyPcsChanged,
     makingOfferRef,
     socketReady,
+    isHost,
+    setEmotionLive,
   });
 
   const remoteEntries = useMemo(
@@ -544,7 +565,7 @@ export default function VideoMeet() {
     if (endingMeeting) return;
     setEndingMeeting(true);
     try {
-      if (isHost) await endMeeting();
+      if (isHost) await endMeeting(emotionsMap);
       else await leaveCall();
     } finally {
       setEndingMeeting(false);
@@ -579,6 +600,7 @@ export default function VideoMeet() {
       <MeetTopBar
         roomId={roomId} isHost={isHost} duration={meetDuration}
         participantCount={participantsMeta.length + 1} connecting={connecting}
+        emotionLive={!isHost && emotionLive}
       />
 
       <div className={s.body}>
@@ -679,6 +701,7 @@ export default function VideoMeet() {
         displayName={localStorage.getItem("displayName") || "You"}
         isHost={isHost} isSpeaking={stableSpeakerId === "local"}
         muted={muted} videoOff={videoOff} shareEmotion={shareEmotion}
+        emotionLive={!isHost && emotionLive}
         chatOpen={chatOpen && !isMobile}
         onToggleMute={() => toggleMute(muted, setMuted, mutedRef, TRANSCRIPTS_ENABLED, recordersRef)}
         onToggleVideo={() => toggleVideo(videoOff, setVideoOff)}
@@ -689,6 +712,7 @@ export default function VideoMeet() {
         muted={muted} videoOff={videoOff}
         chatOpen={isMobile ? mobileSheet === "chat" : chatOpen}
         shareEmotion={shareEmotion} isHost={isHost}
+        emotionLive={!isHost && emotionLive}
         endingMeeting={endingMeeting} unreadCount={unreadCount}
         onToggleMute={() => toggleMute(muted, setMuted, mutedRef, TRANSCRIPTS_ENABLED, recordersRef)}
         onToggleVideo={() => toggleVideo(videoOff, setVideoOff)}
