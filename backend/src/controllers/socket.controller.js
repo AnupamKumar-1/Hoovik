@@ -176,11 +176,18 @@ export function connectToSocket(
       }
     });
 
-    socket.on("signal", (targetId, message) => {
+    socket.on("signal", async (targetId, message) => {
       const start = startTimer();
       try {
         const code = socket.data?.meetingCode;
         if (!code) return;
+
+        const sockets = await io.in(`meeting:${code}`).fetchSockets();
+        if (!sockets.some((s) => s.id === targetId)) {
+          log.warn("signal rejected: target not in room", { from: socket.id, targetId, code });
+          return;
+        }
+
         io.to(targetId).emit("signal", socket.id, message);
 
       } catch (err) {
