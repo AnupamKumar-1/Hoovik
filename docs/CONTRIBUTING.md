@@ -80,21 +80,13 @@ Windows — Use [Upstash](https://upstash.com) (recommended) — free tier, no i
 REDIS_URL=rediss://<your-upstash-url>
 ```
 
-If the backend throws a Redis connection error, add `tls: true` to `backend/src/infra/redis.js`:
-
-```javascript
-function makeClient(name) {
-    const c = createClient({
-        url: REDIS_URL,
-        socket: {
-            tls: true,  // add this
-```
+> TLS is enabled automatically when the URL starts with `rediss://` — no code changes needed.
 
 **Start both services (macOS / Linux):**
 
 ```bash
-mongod --dbpath /data/db   # local MongoDB
-redis-server               # local Redis (default port 6379)
+mongod        # local MongoDB
+redis-server  # local Redis (default port 6379)
 ```
 
 **Verify Redis is running** (macOS / Linux, should return `PONG`):
@@ -198,9 +190,9 @@ This starts three processes on ports 8000, 8001, and 8002 as defined in `ecosyst
 
 | Name | Port | Memory limit |
 |---|---|---|
-| `hoovik-8000` | 8000 | 512 MiB |
-| `hoovik-8001` | 8001 | 512 MiB |
-| `hoovik-8002` | 8002 | 512 MiB |
+| `hoovik-backend-8000` | 8000 | 512 MiB |
+| `hoovik-backend-8001` | 8001 | 512 MiB |
+| `hoovik-backend-8002` | 8002 | 512 MiB |
 
 Each process reads `.env` via `env_file` and restarts automatically with exponential backoff on failure.
 
@@ -268,7 +260,7 @@ emotion_service/
 **Run:**
 
 ```bash
-uvicorn app:app --host 0.0.0.0 --port 5002
+uvicorn app:app --host 0.0.0.0 --port 5002 --reload
 ```
 
 ---
@@ -370,6 +362,26 @@ Ctrl+C cleanly shuts down all four services at once.
 
 > Python virtual environments must already be set up at `emotion_service/venv` and `transcript_service/venv` before running this command — the script invokes them directly via `./emotion_service/venv/bin/python` and `./transcript_service/venv/bin/python`.
 
+**Windows users:** `dev.sh` is a bash script and does not run in Command Prompt or PowerShell. Choose one of the following approaches:
+
+- **WSL2 (recommended):** Run the entire project inside WSL2 — `./dev.sh` works as-is in the WSL2 terminal.
+- **Git Bash:** Open Git Bash from the repo root and run `./dev.sh` directly. Git Bash ships with most Git for Windows installations.
+- **Manual start (no bash):** Open four separate terminals from the repo root and start each service individually:
+
+```powershell
+# Terminal 1 — Frontend
+cd frontend; npm start
+
+# Terminal 2 — Backend
+cd backend; npm run dev
+
+# Terminal 3 — Emotion Service
+.\emotion_service\venv\Scripts\python.exe -m uvicorn app:app --app-dir emotion_service --host 0.0.0.0 --port 5002 --reload
+
+# Terminal 4 — Transcript Service
+.\transcript_service\venv\Scripts\python.exe -m uvicorn app:app --app-dir transcript_service --host 0.0.0.0 --port 5001 --reload
+```
+
 **Start order:**
 
 ```
@@ -384,9 +396,10 @@ Ctrl+C cleanly shuts down all four services at once.
 Once all services are running:
 
 ```bash
-curl http://localhost:5002/health     # → {"status": "ok"}
-curl http://localhost:5002/ready      # → {"status": "ready"} (only after models load)
-curl http://localhost:5002/stats/json # → latency snapshot
+curl http://localhost:8000/api/v1/rooms/TEST  # → 401 Unauthorized (backend is up)
+curl http://localhost:5002/health             # → {"status": "ok"}
+curl http://localhost:5002/ready             # → {"status": "ready"} (only after models load)
+curl http://localhost:5002/stats/json        # → latency snapshot
 ```
 
 Open the observability dashboard in your browser:
