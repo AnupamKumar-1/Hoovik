@@ -438,12 +438,12 @@ export default function useMeetingLifecycle({
 
     persistHistorySnapshot().catch(() => { });
 
-    if (TRANSCRIPTS_ENABLED && hostData?.hostSecret && TRANSCRIPT_ENDPOINT) {
-      await uploadTranscriptWithRetry(code, hostData.hostSecret, recordersSnapshot, participantsSnapshot);
-    }
-
     await cleanupAll();
     navigate("/home", { state: { meetingEnded: true, meetingCode: code } });
+
+    if (TRANSCRIPTS_ENABLED && hostData?.hostSecret && TRANSCRIPT_ENDPOINT) {
+      uploadTranscriptWithRetry(code, hostData.hostSecret, recordersSnapshot, participantsSnapshot).catch(() => { });
+    }
   }
 
   useEffect(() => {
