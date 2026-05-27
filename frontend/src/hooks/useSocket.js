@@ -241,6 +241,7 @@ export default function useSocket({
     socket.on("chat-ack", onChatAck);
 
     const onEndMeeting = async () => {
+      if (h.current.isHost) return;
       try {
         await h.current.persistHistorySnapshot();
       } catch { }

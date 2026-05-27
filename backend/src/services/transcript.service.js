@@ -145,17 +145,118 @@ export function isNoiseLine(line) {
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 
-function buildGroqPrompt(segments) {
-    const transcriptText = segments
-        .map((s) => `[${s.speaker || "Unknown"}] t=${Math.round(s.start)}s nlp_emotion=${s.emotion || "neutral"} | ${s.text}`)
-        .join("\n");
+function normalizeName(n) {
+    return String(n || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+}
 
-    return `You are an expert meeting analyst. Analyze this meeting transcript and return a JSON object only — no markdown, no backticks, just raw JSON.
+function buildSpeakerLiveMap(segments, emotionData, emotionNames) {
+    // Collect display names from emotionNames
+    const pidToName = {};
+    for (const [pid, name] of Object.entries(emotionNames)) {
+        pidToName[pid] = String(name || pid);
+    }
+
+    // Collect unique Whisper speaker labels from segments
+    const whisperLabels = [...new Set(segments.map((s) => s.speaker).filter(Boolean))];
+
+    // Build per-pid live timeline
+    const pidTimelines = {};
+    for (const [pid, history] of Object.entries(emotionData)) {
+        if (!Array.isArray(history)) continue;
+        pidTimelines[pid] = history
+            .map((e) => ({
+                label: e.label,
+                score: e.score,
+                modality: e.modality || "unknown",
+                anomaly: Boolean(e.anomaly),
+                tSec: (e.ts || 0) / 1000,
+            }))
+            .sort((a, b) => a.tSec - b.tSec);
+    }
+
+    // Attempt name-based matching: Whisper label → pid
+    // Whisper may use actual display names if the diarization was name-aware,
+    // or generic SPEAKER_00 labels. We try both exact and prefix match.
+    const whisperToPid = {};
+    for (const wLabel of whisperLabels) {
+        const wNorm = normalizeName(wLabel);
+        let matched = null;
+        // Exact normalized match
+        for (const [pid, name] of Object.entries(pidToName)) {
+            if (normalizeName(name) === wNorm) { matched = pid; break; }
+        }
+        // Prefix match (e.g. whisper "daf" matches "dafname")
+        if (!matched) {
+            for (const [pid, name] of Object.entries(pidToName)) {
+                const nNorm = normalizeName(name);
+                if (nNorm.startsWith(wNorm) || wNorm.startsWith(nNorm)) { matched = pid; break; }
+            }
+        }
+        if (matched) whisperToPid[wLabel] = matched;
+    }
+
+    return { pidToName, pidTimelines, whisperToPid };
+}
+
+function buildGroqPrompt(segments, emotionData = {}, emotionNames = {}) {
+    const { pidToName, pidTimelines, whisperToPid } = buildSpeakerLiveMap(segments, emotionData, emotionNames);
+
+    const hasLiveData = Object.keys(pidTimelines).length > 0;
+
+    const transcriptText = segments.map((s) => {
+        const segStart = s.start ?? 0;
+        const segEnd = s.end ?? (segStart + 5);
+        const whisperLabel = s.speaker || "Unknown";
+
+        // Find matched pid for this whisper speaker
+        const matchedPid = whisperToPid[whisperLabel] ?? null;
+
+        let liveTag = "";
+        if (matchedPid && pidTimelines[matchedPid]) {
+            // Only show live emotions from THIS speaker's timeline in this window
+            const events = pidTimelines[matchedPid].filter((e) => e.tSec >= segStart && e.tSec <= segEnd);
+            if (events.length) {
+                liveTag = ` | live=[${events.map((e) =>
+                    `${e.label}(${Math.round(e.score * 100)}%,${e.modality}${e.anomaly ? ",anomaly" : ""})`
+                ).join("; ")}]`;
+            }
+        } else if (!matchedPid && hasLiveData) {
+            // No name match — show all participants' live emotions with names so Groq can reason
+            const allEvents = Object.entries(pidTimelines).flatMap(([pid, events]) =>
+                events
+                    .filter((e) => e.tSec >= segStart && e.tSec <= segEnd)
+                    .map((e) => `${pidToName[pid] || pid}:${e.label}(${Math.round(e.score * 100)}%,${e.modality})`)
+            );
+            if (allEvents.length) liveTag = ` | live_unmatched=[${allEvents.join("; ")}]`;
+        }
+
+        return `[${whisperLabel}] t=${Math.round(segStart)}s nlp_emotion=${s.emotion || "neutral"}${liveTag} | ${s.text}`;
+    }).join("\n");
+
+    const liveOverview = Object.entries(pidTimelines).map(([pid, events]) => {
+        if (!events.length) return null;
+        const name = pidToName[pid] || pid;
+        const counts = {};
+        events.forEach((e) => { counts[e.label] = (counts[e.label] || 0) + 1; });
+        const top = Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([l, n]) => `${l}(${n}x)`).join(", ");
+        const matchedLabel = Object.entries(whisperToPid).find(([, p]) => p === pid)?.[0];
+        const matchNote = matchedLabel ? ` [matched to whisper speaker: ${matchedLabel}]` : " [unmatched — no whisper speaker found by name]";
+        return `  ${name}${matchNote}: ${top}`;
+    }).filter(Boolean).join("\n");
+
+    return `You are an expert meeting analyst with access to two independent emotion signals:
+1. nlp_emotion — inferred from speech content by Whisper NLP, one label per transcript segment.
+2. live=[] — real-time facial and audio emotion captured per participant during that time window.
+
+Speaker identity note: Whisper diarization labels (e.g. SPEAKER_00) have been name-matched to live emotion participants where possible. "live_unmatched" means the whisper speaker label could not be resolved to a specific participant by name — use context to reason about who is speaking.
+
+${hasLiveData ? `Live emotion overview per participant (full meeting):\n${liveOverview}\n` : "No live emotion data was captured for this meeting.\n"}
+Identify DISCREPANCIES where a participant's live captured emotion contradicts their spoken words or nlp_emotion — for example, agreeing verbally while showing anger or fear on camera.
 
 Transcript:
 ${transcriptText}
 
-Return this exact JSON structure:
+Return ONLY a raw JSON object. No markdown, no backticks, no explanation:
 {
   "summary": "2-3 sentence overview of what the meeting was about",
   "key_points": ["point 1", "point 2", "point 3"],
@@ -167,11 +268,23 @@ Return this exact JSON structure:
       "SpeakerName": {
         "turns": 3,
         "word_count": 45,
-        "dominant_emotion": "neutral"
+        "dominant_emotion": "neutral",
+        "live_dominant_emotion": "fear"
       }
     },
     "emotional_moments": [
       { "emotion": "happy", "text": "short quote from transcript", "start": 0 }
+    ],
+    "discrepancies": [
+      {
+        "participant": "Name",
+        "at_sec": 42,
+        "said": "short quote",
+        "nlp_emotion": "happy",
+        "live_emotion": "fear",
+        "modality": "face",
+        "note": "one sentence explaining the mismatch"
+      }
     ],
     "total_words": 100,
     "speaking_pace_wpm": 120,
@@ -211,6 +324,9 @@ export async function generateAiSummaryService(req) {
         return { status: 400, body: { success: false, message: "Transcript has no segments to analyze" } };
     }
 
+    const emotionData = (req.body?.emotionData && typeof req.body.emotionData === "object" && !Array.isArray(req.body.emotionData)) ? req.body.emotionData : {};
+    const emotionNames = (req.body?.emotionNames && typeof req.body.emotionNames === "object" && !Array.isArray(req.body.emotionNames)) ? req.body.emotionNames : {};
+
     try {
         const groqRes = await fetch(GROQ_URL, {
             method: "POST",
@@ -220,7 +336,7 @@ export async function generateAiSummaryService(req) {
             },
             body: JSON.stringify({
                 model: "llama-3.1-8b-instant",
-                messages: [{ role: "user", content: buildGroqPrompt(segments) }],
+                messages: [{ role: "user", content: buildGroqPrompt(segments, emotionData, emotionNames) }],
                 temperature: 0.3,
                 max_tokens: 3000,
                 response_format: { type: "json_object" },

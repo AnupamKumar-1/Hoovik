@@ -131,10 +131,8 @@ export default function VideoMeet() {
 
   const { addToUserHistory } = useContext(AuthContext);
 
-  const isHost = useMemo(
-    () => !!localStorage.getItem(`host:${(roomId || "").toUpperCase()}`),
-    [roomId]
-  );
+  const [isHost, setIsHost] = useState(false);
+  const onHostConfirmed = useCallback(() => setIsHost(true), []);
   const myUserId = useMemo(
     () => localStorage.getItem("userId") || "",
     []
@@ -347,6 +345,7 @@ export default function VideoMeet() {
     isSettingRemoteAnswerPending,
     SOCKET_SERVER_URL,
     onSocketReady: () => setSocketReady((n) => n + 1),
+    onHostConfirmed,
   });
 
 

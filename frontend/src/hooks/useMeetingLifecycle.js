@@ -40,18 +40,15 @@ export default function useMeetingLifecycle({
   isSettingRemoteAnswerPending,
   SOCKET_SERVER_URL,
   onSocketReady,
+  onHostConfirmed,
 }) {
   const participantsMetaRef = useRef(participantsMeta);
-  const isHostRef = useRef(isHost);
+  const isHostRef = useRef(false);
   const instanceKey = useRef(`${roomId}:${Date.now()}:${Math.random()}`);
 
   useEffect(() => {
     participantsMetaRef.current = participantsMeta;
   }, [participantsMeta]);
-
-  useEffect(() => {
-    isHostRef.current = isHost;
-  }, [isHost]);
 
   const persistHistorySnapshot = useCallback(async () => {
     if (!isHostRef.current || typeof addToUserHistory !== "function") return;
@@ -260,13 +257,19 @@ export default function useMeetingLifecycle({
 
       socketRef.current.emit("join-call", roomId, { name: displayName, userId: uid });
 
-      if (isHostRef.current) {
+      const hostDataRaw = localStorage.getItem(`host:${code}`);
+      const hostData = hostDataRaw ? JSON.parse(hostDataRaw) : null;
+
+      if (hostData?.hostSecret) {
         socketRef.current.once("assigned-role", () => {
           if (socketRef.current?.connected) {
-            const hostDataRaw = localStorage.getItem(`host:${code}`);
-            const hostData = hostDataRaw ? JSON.parse(hostDataRaw) : null;
-            socketRef.current.emit("declare-host", code, hostData?.hostSecret, (ack) => {
-              if (!ack?.ok) console.error("[declare-host] rejected by server:", ack?.reason);
+            socketRef.current.emit("declare-host", code, hostData.hostSecret, (ack) => {
+              if (ack?.ok) {
+                isHostRef.current = true;
+                onHostConfirmed?.();
+              } else {
+                console.error("[declare-host] rejected by server:", ack?.reason);
+              }
             });
           }
         });

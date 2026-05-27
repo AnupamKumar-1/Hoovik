@@ -99,6 +99,7 @@ function SummaryPanel({ analysis }) {
         emotional_moments = [],
         top_topics = [],
         speaker_stats = {},
+        discrepancies = [],
         total_words,
         speaking_pace_wpm,
         total_duration_sec,
@@ -118,6 +119,26 @@ function SummaryPanel({ analysis }) {
             <div className="tv-summary-block">
                 <div className="tv-section-label">OVERVIEW</div>
                 <p className="tv-summary-text">{summary}</p>
+                {discrepancies.length > 0 && (
+                    <p className="tv-summary-text" style={{ marginTop: "0.75rem" }}>
+                        {discrepancies.map((d, i) => {
+                            const liveM = emotionMeta(d.live_emotion);
+                            const nlpM = emotionMeta(d.nlp_emotion);
+                            return (
+                                <span key={i} style={{ display: "block", marginBottom: i < discrepancies.length - 1 ? "0.5rem" : 0 }}>
+                                    <span style={{ color: liveM.color, fontWeight: 600 }}>{liveM.icon} {d.participant}</span>
+                                    {" "}at {fmt(d.at_sec)} said{" "}
+                                    <em>"{d.said}"</em>
+                                    {" "}— speech read as{" "}
+                                    <span style={{ color: nlpM.color }}>{nlpM.icon} {d.nlp_emotion}</span>
+                                    {" "}but live capture showed{" "}
+                                    <span style={{ color: liveM.color }}>{liveM.icon} {d.live_emotion}</span>
+                                    {d.note ? `. ${d.note}` : "."}
+                                </span>
+                            );
+                        })}
+                    </p>
+                )}
             </div>
 
             <div className="tv-meta-strip">
@@ -297,6 +318,10 @@ export default function TranscriptViewer({ t, onClose, onSummaryGenerated }) {
                 : null;
             const hostSecret = hostDataRaw ? JSON.parse(hostDataRaw)?.hostSecret : null;
 
+            const code = t.meetingCode?.toUpperCase();
+            const emotionData = (() => { try { return JSON.parse(localStorage.getItem(`emotions:${code}`) || "{}"); } catch { return {}; } })();
+            const emotionNames = (() => { try { return JSON.parse(localStorage.getItem(`emotionNames:${code}`) || "{}"); } catch { return {}; } })();
+
             const SERVER_BASE = process.env.REACT_APP_SERVER_URL || "http://localhost:8000";
             const res = await fetch(`${SERVER_BASE}/api/v1/transcripts/${idOrCode}/summary`, {
                 method: "POST",
@@ -305,6 +330,7 @@ export default function TranscriptViewer({ t, onClose, onSummaryGenerated }) {
                     ...(token ? { Authorization: `Bearer ${token}` } : {}),
                     ...(hostSecret ? { "x-host-secret": hostSecret } : {}),
                 },
+                body: JSON.stringify({ emotionData, emotionNames }),
             });
 
             if (res.status === 429) {
