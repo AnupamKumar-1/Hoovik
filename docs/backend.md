@@ -1,4 +1,4 @@
-# Hoovik Backend
+# Hoovik Backend (Node.js)
 
 A Node.js/Express HTTP and WebSocket server that manages real-time video-meeting rooms, chat, transcription storage, and user authentication. The implementation uses MongoDB for persistence, Redis for ephemeral state and distributed locking, and Socket.IO with a Redis adapter for multi-process event fan-out.
 
@@ -271,7 +271,7 @@ Partial upload state is tracked via:
 - **Max text length**: `TRANSCRIPT_MAX_TEXT_LENGTH` (default `500,000` characters).
 - **Cache**: Redis TTL `TRANSCRIPT_CACHE_TTL_SEC` (default `300` seconds); separate keys for by-`_id` (`transcript:cache:<id>`) and by-`meetingCode` (`transcript:cache:code:<code>`) lookups.
 - **Rate limiting**: `TRANSCRIPT_RATE_LIMIT_MAX` (default `30`) requests per `TRANSCRIPT_RATE_LIMIT_WIN_SEC` (default `60`) seconds per `userId`. Implemented via `safeRedisIncr` + `safeRedisExpire` (two commands, not a Lua script). Redis key: `transcript:rate:<uid>`.
-- **AI summary generation** (`generateAiSummaryService`): calls Groq (`https://api.groq.com/openai/v1/chat/completions`) with model `llama-3.1-8b-instant`; prompt is built from `metadata.segments` with speaker, timestamp, and per-segment emotion. Response is parsed as JSON and saved to `Transcript.aiSummary` via `findByIdAndUpdate($set)`; both by-`_id` and by-`meetingCode` Redis cache keys are invalidated on save.
+- **AI summary generation** (`generateAiSummaryService`): calls Groq (`https://api.groq.com/openai/v1/chat/completions`) with model `llama-3.1-8b-instant`. The prompt is built by `buildGroqPrompt` from two sources: (1) `metadata.segments` — Whisper NLP output with speaker label, timestamp, and `nlp_emotion` per segment; and (2) optional live emotion data (`emotionData`, `emotionNames`) sent in the request body by the client from `localStorage`. Speaker identity resolution is performed by `buildSpeakerLiveMap`, which normalises display names and matches Whisper diarization labels to participant user IDs via exact then prefix name comparison. Each segment is annotated with the matched participant's live facial/audio emotion events captured within that segment's time window; unresolved speakers include all participants' events as `live_unmatched=[]` so the model can reason from context. The prompt instructs the model to identify discrepancies where `nlp_emotion` contradicts live capture. The response JSON includes `discrepancies` (array of `{ participant, at_sec, said, nlp_emotion, live_emotion, modality, note }`), `live_dominant_emotion` per speaker in `speaker_stats`, and the standard `summary`, `key_points`, `insights`, and `emotional_moments` fields. Response is parsed as JSON and saved to `Transcript.aiSummary` via `findByIdAndUpdate($set)`; both by-`_id` and by-`meetingCode` Redis cache keys are invalidated on save.
 - **AI summary rate limiting**: `AI_SUMMARY_RATE_LIMIT_MAX` (default `2`) requests per `AI_SUMMARY_RATE_LIMIT_WIN_SEC` (default `7,200`) seconds per `userId`; Redis key `transcript:aisummary:rate:<uid>`. Applied to both `generateAiSummaryService` and `updateAiSummaryService`. Implemented via `safeRedisIncr` + `safeRedisExpire`.
 
 ### `src/services/user.service.js`
@@ -542,7 +542,7 @@ Service-level rate limit: 30 requests per 60 seconds per `userId` (tracked in Re
 | `POST` | `/` | Optional JWT (`aAuth`) | Body: `{ meetingCode, transcriptText, fileName?, metadata? }`. Requires `x-host-secret` header or valid JWT. |
 | `GET` | `/` | Optional JWT (`aAuth`) | Query: `meeting_code?`, `limit?`. Returns `{ transcripts }`. List query uses `{ ownerId: userId }` if JWT present, else `{ hostSecretHash: secretHash }`. |
 | `GET` | `/:id` | Optional JWT (`aAuth`) | `id` may be a MongoDB ObjectId or `meetingCode`. Returns `{ transcript }` |
-| `POST` | `/:id/summary` | Optional JWT (`aAuth`) | Generates AI summary via Groq (`llama-3.1-8b-instant`) from `metadata.segments`; saves to `aiSummary` field. Rate limited: 2 per 2 hours per user. |
+| `POST` | `/:id/summary` | Optional JWT (`aAuth`) | Body: `{ emotionData?, emotionNames? }` — live emotion snapshot from `localStorage` keyed by participant user ID. Generates AI summary via Groq (`llama-3.1-8b-instant`) from `metadata.segments` annotated with live emotion events per segment; identifies NLP-vs-live discrepancies; saves full result (including `discrepancies` array) to `aiSummary` field. Rate limited: 2 per 2 hours per user. |
 | `PATCH` | `/:id/summary` | Optional JWT (`aAuth`) | Saves a pre-built `aiSummary` object to the transcript; invalidates Redis cache. Rate limited: 2 per 2 hours per user. |
 
 ### Transcript Proxy — `/api/v1/transcripts/proxy`
@@ -570,7 +570,7 @@ All events are handled in `socket.controller.js`, which delegates to `socket.ser
 | `transcription-update` | `(chunk: string)` | Relays sanitised chunk to room; persists to `meeting.analytics.transcription`. |
 | `keywords-update` | `(keywords: string[])` | Relays sanitised keywords to room; persists to `meeting.analytics.keywords`. |
 | `leave-call` | `(meetingCode: string)` | Marks participant left; emits `user-left` to room. |
-| `end-meeting` | `(meetingCode: string)` | Host only (`socket.data.isHost` checked); broadcasts `end-meeting` to all sockets in room and deletes the `emotion:active:<code>` Redis key. Non-host sockets receive a warning and the event is dropped. |
+| `end-meeting` | `(meetingCode: string)` | Host only (`socket.data.isHost` checked); deletes the `emotion:active:<code>` Redis key and calls `handleLeave` for the host — participants are NOT notified, their meeting continues. Non-host sockets receive a warning and the event is dropped. |
 | `emotion-status` | `{ active: boolean }` | Host only (`socket.data.isHost` checked); writes `active` to `emotion:active:<code>` in Redis via `setEmotionState` and broadcasts `emotion-status` to all non-host sockets in the room. |
 | `get-emotion-status` | _(no payload)_ | Returns current emotion AI state for the room to the requesting socket via `emotion-status` emit. Reads from Redis (`getEmotionState`); defaults to `false` if no entry exists. |
 
@@ -591,7 +591,6 @@ All events are handled in `socket.controller.js`, which delegates to `socket.ser
 | `transcription-update` | `{ from, text }` | Broadcast to room excluding sender. |
 | `keywords-update` | `{ from, keywords }` | Broadcast to room excluding sender. |
 | `signal` | `(fromSocketId, message)` | Forwarded to target socket after verifying `targetId` is in the same room via `fetchSockets()`. |
-| `end-meeting` | _(no payload)_ | Broadcast to all sockets in the room when `end-meeting` is received. |
 | `emotion-status` | `{ active: boolean }` | Broadcast to non-host sockets when host toggles emotion AI; also emitted to a single socket in response to `get-emotion-status`. |
 | `error` | `string` | Emitted on validation failure or unhandled error. |
 
@@ -679,7 +678,7 @@ The following mitigations are implemented in source:
 - **Per-IP registration rate limiting** via the same Lua script.
 - **Input sanitisation**: `sanitize-html` is applied to chat messages, participant names, transcription chunks, and keywords.
 - **Meeting code validation**: regex `^[A-Z0-9\-]{3,32}$` enforced at both socket and transcript service layers.
-- **Host secret**: stored as `sha256` hash only; raw secret returned once at room creation (`POST /rooms`) and never persisted. On subsequent `upsertMeeting` calls the secret is not regenerated. The `declare-host` socket event verifies the provided raw secret against the stored hash via `Meeting.verifyHostSecret` before granting host status; unverified claims are rejected with a reason code.
+- **Host secret**: stored as `sha256` hash only; raw secret returned once at room creation (`POST /rooms`) and never persisted. On subsequent `upsertMeeting` calls the secret is not regenerated. The `declare-host` socket event verifies the provided raw secret against the stored hash via `Meeting.verifyHostSecret` before granting host status; unverified claims are rejected with a reason code. The frontend sets `isHost` state only after receiving a successful ACK from `declare-host`, so host UI and host actions are both gated on server verification.
 - **Username enumeration prevention**: `loginService` returns uniform `401 Unauthorized` with `"Invalid username or password."` for both unknown-username and wrong-password cases.
 - **Redis lock CAS release**: the release Lua script compares the stored token to the caller's token before deleting, preventing accidental release of another process's lock.
 - **CORS**: `http://localhost:3000` is always allowed and one production origin can be supplied via `CLIENT_ORIGIN`. Supporting multiple production origins currently requires code changes.
@@ -718,6 +717,7 @@ The following are grounded in implementation constraints visible in the source:
 > - ~~Refresh token body fallback in `refreshTokenService` and `logoutService`~~ — both functions now read exclusively from `req.cookies.refreshToken`
 > - ~~Redis metric counters accumulate indefinitely~~ — `incr()` in `transcript.service.js` now applies `METRIC_TTL_SEC` (default 30 days) on first increment; counters reset each period
 > - ~~Participant map serialisation: full map read/write on every event~~ — `meeting:participants:<code>` migrated from a JSON String key to a Redis Hash; join/reconnect/leave/meta updates now use targeted `HSET`/`HDEL` on individual fields; `HGETALL` is used only for full-room participant broadcasts
+> - ~~AI summary prompt uses only Whisper NLP emotion; live emotion data unused~~ — `generateAiSummaryService` now accepts `{ emotionData, emotionNames }` from the request body; `buildGroqPrompt` annotates each Whisper segment with the matched participant's live facial/audio emotion events via `buildSpeakerLiveMap` (exact + prefix name matching); prompt instructs the model to detect NLP-vs-live discrepancies; response schema extended with `discrepancies` array and `live_dominant_emotion` per speaker
 
 ---
 
