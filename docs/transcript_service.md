@@ -178,7 +178,7 @@ Cross-speaker segment operations and transcript formatting.
 
 ### `utils/audio.py`
 
-Wraps `ffmpeg` for audio conversion. Calls `ffmpeg -y -i <src> -ac 1 -ar 16000 -vn <dst>` as a subprocess with `check=True`. Raises `subprocess.CalledProcessError` on non-zero exit. A startup check (`shutil.which("ffmpeg")`) is performed at module import time; if `ffmpeg` is not found in `PATH` the service raises an error and refuses to start ([#7](https://github.com/AnupamKumar-1/Hoovik/issues/7)).
+Wraps `ffmpeg` for audio conversion. Calls `ffmpeg -y -i <src> -ac 1 -ar 16000 -vn <dst>` as a subprocess with `check=True`. Raises `subprocess.CalledProcessError` on non-zero exit. `ensure_ffmpeg_available()` uses `shutil.which("ffmpeg")` to verify `ffmpeg` is on `PATH` and raises `RuntimeError` if it is not. This function is called explicitly in `app.py` at application startup (before the ASR service is imported) and is not triggered automatically by importing `audio.py` ([#7](https://github.com/AnupamKumar-1/Hoovik/issues/7)).
 
 ### `utils/emotion.py`
 
@@ -298,8 +298,8 @@ If `merge_segments` returns an empty list, `run_processing` returns early and th
 | `_get_emotion` | Any exception from `emotion_pipeline` | Logs to stdout; returns `"neutral"` |
 | `run_processing` — `convert_to_wav` | Any exception | Falls back to original file path; logs nothing (bare `except Exception`) |
 | `run_processing` — `json.loads(speaker_map)` | Any exception | Falls back to `{}` |
-| `run_processing` — `requests.post` to NODE_API | Network error or HTTP 5xx | Retries up to 3 times with backoff (5 s → 15 s → 30 s); logs each attempt. After all retries exhausted logs `"Node API callback failed after retries: {e}"`. Does not retry on 4xx. |
-| `run_processing` — `requests.post` to NODE_API (4xx) | HTTP 4xx response | No retry; logs `"Node API callback failed: {status}"` and exits |
+| `run_processing` — `requests.post` to NODE_API | Network error or HTTP 5xx | Retries up to 3 times with backoff (5 s → 15 s → 30 s); logs each attempt. After all retries exhausted logs `"Node API callback permanent failure after {N} retries: {e}"`. Does not retry on 4xx. |
+| `run_processing` — `requests.post` to NODE_API (4xx) | HTTP 4xx response | No retry; the 4xx does not trigger the `RequestException` branch, so the response is logged via the standard `"Node API response: {status} {text[:200]}"` line and the retry loop exits normally (`break`) |
 | `schedule_file_cleanup` | `OSError` / any exception per file | Logs `"helpers: file cleanup failed for {p} — {e}"`; continues to next file |
 
 No exceptions bubble up to the HTTP layer from `run_processing` (it is a background task). Client-visible errors are limited to request validation failures handled by FastAPI.
@@ -328,7 +328,7 @@ No exceptions bubble up to the HTTP layer from `run_processing` (it is a backgro
 ---
 
 > **Resolved in recent PRs** — the following items from earlier versions of this list have been fixed:
-> - ~~`ffmpeg` not validated at startup — failures only surfaced during audio conversion~~ — `utils/audio.py` now checks `ffmpeg` availability at module import and raises immediately if missing ([#7](https://github.com/AnupamKumar-1/Hoovik/issues/7) / [#8](https://github.com/AnupamKumar-1/Hoovik/pull/8))
+> - ~~`ffmpeg` not validated at startup — failures only surfaced during audio conversion~~ — `app.py` now calls `ensure_ffmpeg_available()` from `utils/audio.py` at startup (before importing the ASR service) and raises immediately if `ffmpeg` is missing ([#7](https://github.com/AnupamKumar-1/Hoovik/issues/7) / [#8](https://github.com/AnupamKumar-1/Hoovik/pull/8))
 > - ~~No retry on `NODE_API` callback failure — single `requests.post` with silent loss~~ — up to 3 retries added for network errors and 5xx responses ([#4](https://github.com/AnupamKumar-1/Hoovik/issues/4))
 
 ---
