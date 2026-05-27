@@ -1,4 +1,4 @@
-# Emotion Service - Hoovik
+# Hoovik - Emotion Service 
 
 
 Real-time multimodal emotion recognition for video meetings. The service ingests live audio and video streams via WebSocket, extracts face and speech embeddings, and runs ensemble inference (Transformer + XGBoost) with modality-stratified anomaly detection — emitting per-participant emotion results at sub-second latency.
@@ -83,13 +83,16 @@ sequenceDiagram
     participant C2 as Client
 
     C->>WS: audio_chunk (WAV/PCM bytes)
-    WS->>AB: decode PCM → Wav2Vec2 → append embedding
+    WS->>AB: decode PCM → store in _LATEST_AUDIO[pid]
     WS->>P: _ensure_pump(pid)
 
     C->>WS: emotion.frame (JPEG/PNG bytes)
-    WS->>FB: decode → MediaPipe → append embedding (opportunistic)
+    WS->>FB: gate by frame-rate → store in _LATEST_FRAME[pid]
 
+    P->>P: drain _LATEST_AUDIO / _LATEST_FRAME (single-slot)
     P->>P: rate-limit gate (MIN_INFERENCE_INTERVAL=300ms)
+    P->>AB: Wav2Vec2 embedding → append to _AUDIO_BUFFER[pid]
+    P->>FB: OpenCV decode → MediaPipe embedding → append to _FACE_BUFFER[pid]
     P->>I: _run_inference(pid)
     I->>I: build arrays (SEQ_LEN=10) + z-score norm
     I->>I: EmotionTransformer forward pass
@@ -328,9 +331,8 @@ The module imports nothing from `app.py` — it holds only a module-level `_trac
 2. load_extractor_models()  →  Wav2Vec2 + MediaPipe loaded (blocking executor call)
 3. _load_norm_stats()       →  norm_stats.npz loaded
 4. EmotionPredictor()       →  EmotionTransformer, XGBoost, IsolationForests, weights.json loaded
-5. EmotionEnsemble warmup   →  one dummy forward pass to JIT model paths
-6. Server ready
-7. APScheduler starts       →  _gc_stale_participants scheduled every 30 s
+5. Server ready
+6. APScheduler starts       →  _gc_stale_participants scheduled every 30 s
 ```
 
 ### Per-Participant Lifecycle
@@ -341,15 +343,18 @@ The flow below reflects code paths in `app.py`. The step labels match log patter
 connect             → pid from auth.participantId (or sid fallback)
                     → server.status emitted: targetFps=5, modalityStaleSec=0.4
 
-audio_chunk         → soundfile decode → Wav2Vec2 embedding → _AUDIO_BUFFER[pid]
+audio_chunk         → soundfile decode → PCM stored in _LATEST_AUDIO[pid]
                     → _ensure_pump(pid) spawns pump coroutine
+                    → pump: Wav2Vec2 embedding → _AUDIO_BUFFER[pid]
 
-emotion.frame       → OpenCV decode → MediaPipe embedding → _FACE_BUFFER[pid]
-                    → if video_only mode: also _ensure_pump(pid)
+emotion.frame       → frame-rate gate → raw bytes stored in _LATEST_FRAME[pid]
+                    → if video_only mode: _ensure_pump(pid) called on accepted frame;
+                      pump then waits until _FACE_BUFFER[pid] is non-empty before inferring
+                    → pump: OpenCV decode → MediaPipe embedding → _FACE_BUFFER[pid]
 
 _pump loop          → pulls _LATEST_AUDIO / _LATEST_FRAME (single-slot, coalesces bursts)
                     → 300 ms rate-limit gate
-                    → concurrent Wav2Vec2 + MediaPipe in thread pools
+                    → Wav2Vec2 embedding (audio_executor), then MediaPipe embedding (face_executor) — sequential awaits
                     → _run_inference → ensemble + anomaly scoring
                     → EMA smooth
                     → emit emotion.result
@@ -385,7 +390,7 @@ During that session the server:
 |---|---|---|
 | `audio_chunk` | `bytes \| base64 \| {participantId, buffer}` | WAV / FLAC / OGG / raw float32 PCM |
 | `frame` | `bytes \| base64 \| {participantId, buffer}` | JPEG or PNG video frame |
-| `emotion.frame` | same as `frame` | Backwards-compatible alias |
+| `emotion.frame` | same as `frame` | Backwards-compatible alias; both names are registered on the same handler via stacked `@sio.on` decorators |
 | `av_chunk` | `{participantId, video?, audio?}` | Combined AV; routes each to its pipeline |
 | `participant.media_state` | `{participantId?, micEnabled, cameraEnabled}` | Immediate modality toggle |
 | `ping` | any | Keepalive |
@@ -693,8 +698,8 @@ Feature version `v2.0-iqr-ratio-jitter` — 9,452 dims per sample. Anomaly detec
 ## Performance Considerations
 
 - **Serialised inference**: single `_inference_executor` thread reduces GPU memory contention for most workloads; bottleneck beyond ~20 concurrent active participants
-- **Parallel embedding**: face and audio run in separate 2-worker thread pools, overlapping with the rate-limit sleep
-- **Latest-slot design**: `_LATEST_AUDIO` and `_LATEST_FRAME` are single-value slots — rapid bursts coalesce to the newest payload, preventing queue buildup
+- **Parallel embedding**: face and audio run in separate 2-worker thread pools; within a single pump iteration they are awaited sequentially (audio first, then face), but they do overlap with the rate-limit sleep of the *next* iteration across different participants
+- **Latest-slot design**: `_LATEST_AUDIO` and `_LATEST_FRAME` are single-value slots — rapid bursts coalesce to the newest payload, preventing queue buildup. Note: for audio, the slot is written after PCM decode completes, so concurrent decode tasks for back-to-back chunks may race; the last writer wins but ordering is not guaranteed under burst conditions.
 - **Frame-rate gate**: monotonic-clock `_FRAME_ACCEPT_AFTER[pid]` drops frames before any decode work; enforces `TARGET_CLIENT_FPS=5` server-side
 - **Back-pressure**: dynamic `backpressure` event to clients when face queue depth ≥ 3
 - **EMA TTL**: 2 s idle resets EMA to prevent stale emotional context bleeding across speech segments
