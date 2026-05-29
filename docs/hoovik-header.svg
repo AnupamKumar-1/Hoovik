@@ -1,293 +1,441 @@
-<svg width="900" height="260" viewBox="0 0 900 260" xmlns="http://www.w3.org/2000/svg">
+<svg width="3840" height="1100" viewBox="0 0 3840 1100" xmlns="http://www.w3.org/2000/svg">
   <title>Hoovik — Video meetings that think. In real time.</title>
-
   <defs>
-    <!-- Premium light background gradient: warm white to cool blue-lavender -->
-    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#f8f7ff"/>
-      <stop offset="40%" stop-color="#f0effe"/>
-      <stop offset="80%" stop-color="#eaf4fb"/>
-      <stop offset="100%" stop-color="#f3f8ff"/>
+
+    <!-- ── BACKGROUND GRADIENTS ── -->
+    <linearGradient id="bgBase" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#f5f3ff"/>
+      <stop offset="35%"  stop-color="#ede9fe"/>
+      <stop offset="70%"  stop-color="#e0f2fe"/>
+      <stop offset="100%" stop-color="#f0fdf4"/>
     </linearGradient>
 
-    <!-- Radial glow behind owl -->
+    <!-- Animated aurora blobs -->
+    <radialGradient id="aurora1" cx="20%" cy="30%" r="45%">
+      <stop offset="0%"   stop-color="#c4b5fd" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#c4b5fd" stop-opacity="0"/>
+      <animate attributeName="cx" values="20%;35%;18%;28%;20%" dur="18s" repeatCount="indefinite"/>
+      <animate attributeName="cy" values="30%;20%;45%;25%;30%" dur="18s" repeatCount="indefinite"/>
+    </radialGradient>
+    <radialGradient id="aurora2" cx="80%" cy="60%" r="40%">
+      <stop offset="0%"   stop-color="#6ee7b7" stop-opacity="0.40"/>
+      <stop offset="100%" stop-color="#6ee7b7" stop-opacity="0"/>
+      <animate attributeName="cx" values="80%;65%;82%;72%;80%" dur="22s" repeatCount="indefinite"/>
+      <animate attributeName="cy" values="60%;75%;50%;65%;60%" dur="22s" repeatCount="indefinite"/>
+    </radialGradient>
+    <radialGradient id="aurora3" cx="55%" cy="80%" r="35%">
+      <stop offset="0%"   stop-color="#7dd3fc" stop-opacity="0.38"/>
+      <stop offset="100%" stop-color="#7dd3fc" stop-opacity="0"/>
+      <animate attributeName="cx" values="55%;40%;60%;50%;55%" dur="16s" repeatCount="indefinite"/>
+      <animate attributeName="cy" values="80%;65%;85%;70%;80%" dur="16s" repeatCount="indefinite"/>
+    </radialGradient>
+    <radialGradient id="aurora4" cx="70%" cy="20%" r="30%">
+      <stop offset="0%"   stop-color="#fda4af" stop-opacity="0.28"/>
+      <stop offset="100%" stop-color="#fda4af" stop-opacity="0"/>
+      <animate attributeName="cx" values="70%;80%;62%;75%;70%" dur="20s" repeatCount="indefinite"/>
+      <animate attributeName="cy" values="20%;35%;18%;28%;20%" dur="20s" repeatCount="indefinite"/>
+    </radialGradient>
+    <radialGradient id="aurora5" cx="10%" cy="75%" r="28%">
+      <stop offset="0%"   stop-color="#818cf8" stop-opacity="0.30"/>
+      <stop offset="100%" stop-color="#818cf8" stop-opacity="0"/>
+      <animate attributeName="cx" values="10%;22%;8%;16%;10%" dur="25s" repeatCount="indefinite"/>
+      <animate attributeName="cy" values="75%;60%;80%;68%;75%" dur="25s" repeatCount="indefinite"/>
+    </radialGradient>
+
+    <!-- Shimmer gradient for title -->
+    <linearGradient id="titleGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#1e1b4b">
+        <animate attributeName="stop-color" values="#1e1b4b;#4338ca;#1e1b4b" dur="7s" repeatCount="indefinite"/>
+      </stop>
+      <stop offset="45%" stop-color="#7c3aed">
+        <animate attributeName="stop-color" values="#7c3aed;#a78bfa;#7c3aed" dur="7s" repeatCount="indefinite"/>
+      </stop>
+      <stop offset="78%" stop-color="#059669">
+        <animate attributeName="stop-color" values="#059669;#34d399;#059669" dur="7s" repeatCount="indefinite"/>
+      </stop>
+      <stop offset="100%" stop-color="#1e1b4b">
+        <animate attributeName="stop-color" values="#1e1b4b;#4338ca;#1e1b4b" dur="7s" repeatCount="indefinite"/>
+      </stop>
+    </linearGradient>
+
+    <!-- Owl glow -->
     <radialGradient id="owlGlow" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="#7F77DD" stop-opacity="0.18"/>
+      <stop offset="0%"   stop-color="#7F77DD" stop-opacity="0.22"/>
       <stop offset="100%" stop-color="#7F77DD" stop-opacity="0"/>
     </radialGradient>
 
-    <!-- Title shimmer gradient -->
-    <linearGradient id="titleGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#2d2060">
-        <animate attributeName="stop-color" values="#2d2060;#4a3ab8;#2d2060" dur="6s" repeatCount="indefinite"/>
-      </stop>
-      <stop offset="50%" stop-color="#7F77DD">
-        <animate attributeName="stop-color" values="#7F77DD;#a89ef5;#7F77DD" dur="6s" repeatCount="indefinite"/>
-      </stop>
-      <stop offset="100%" stop-color="#1D9E75">
-        <animate attributeName="stop-color" values="#1D9E75;#2dcc97;#1D9E75" dur="6s" repeatCount="indefinite"/>
-      </stop>
-    </linearGradient>
-
     <!-- Pill gradients -->
     <linearGradient id="p1g" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#7F77DD" stop-opacity="0.15"/>
-      <stop offset="100%" stop-color="#534AB7" stop-opacity="0.04"/>
+      <stop offset="0%" stop-color="#7c3aed" stop-opacity="0.14"/>
+      <stop offset="100%" stop-color="#7c3aed" stop-opacity="0.03"/>
     </linearGradient>
     <linearGradient id="p2g" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#1D9E75" stop-opacity="0.15"/>
-      <stop offset="100%" stop-color="#0F6E56" stop-opacity="0.04"/>
+      <stop offset="0%" stop-color="#059669" stop-opacity="0.14"/>
+      <stop offset="100%" stop-color="#059669" stop-opacity="0.03"/>
     </linearGradient>
     <linearGradient id="p3g" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#0EA5E9" stop-opacity="0.15"/>
-      <stop offset="100%" stop-color="#0284C7" stop-opacity="0.04"/>
+      <stop offset="0%" stop-color="#0284c7" stop-opacity="0.14"/>
+      <stop offset="100%" stop-color="#0284c7" stop-opacity="0.03"/>
     </linearGradient>
     <linearGradient id="p4g" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#D85A30" stop-opacity="0.15"/>
-      <stop offset="100%" stop-color="#993C1D" stop-opacity="0.04"/>
+      <stop offset="0%" stop-color="#dc2626" stop-opacity="0.14"/>
+      <stop offset="100%" stop-color="#dc2626" stop-opacity="0.03"/>
     </linearGradient>
 
-    <!-- Subtle noise/grain filter for premium feel -->
-    <filter id="grain" x="0%" y="0%" width="100%" height="100%">
-      <feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch" result="noiseOut"/>
-      <feColorMatrix type="saturate" values="0" in="noiseOut" result="grayNoise"/>
-      <feBlend in="SourceGraphic" in2="grayNoise" mode="overlay" result="blended"/>
-      <feComposite in="blended" in2="SourceGraphic" operator="in"/>
+    <!-- Card shadow -->
+    <filter id="cardShadow" x="-2%" y="-4%" width="104%" height="114%">
+      <feDropShadow dx="0" dy="16" stdDeviation="48" flood-color="#6d28d9" flood-opacity="0.10"/>
     </filter>
 
-    <!-- Drop shadow for the card -->
-    <filter id="shadow" x="-3%" y="-3%" width="106%" height="112%">
-      <feDropShadow dx="0" dy="4" stdDeviation="12" flood-color="#7F77DD" flood-opacity="0.10"/>
+    <!-- Soft glow filter for particles -->
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
 
-    <!-- Clip for rounded card -->
-    <clipPath id="cardClip">
-      <rect width="900" height="260" rx="20"/>
+    <!-- Clip -->
+    <clipPath id="card">
+      <rect width="3840" height="1100" rx="60"/>
     </clipPath>
+
   </defs>
 
-  <!-- Card background with shadow -->
-  <g filter="url(#shadow)">
-    <rect width="900" height="260" rx="20" fill="url(#bg)"/>
+  <!-- ══════════════════════════════════════════════
+       BACKGROUND LAYERS
+  ══════════════════════════════════════════════ -->
+  <g filter="url(#cardShadow)">
+    <rect width="3840" height="1100" rx="60" fill="url(#bgBase)"/>
   </g>
 
-  <!-- Grain overlay for premium texture -->
-  <rect width="900" height="260" rx="20" fill="url(#bg)" filter="url(#grain)" opacity="0.035"/>
+  <g clip-path="url(#card)">
 
-  <!-- Decorative mesh blobs -->
-  <ellipse cx="820" cy="60" rx="130" ry="100" fill="#7F77DD" opacity="0.06"/>
-  <ellipse cx="760" cy="200" rx="100" ry="70" fill="#0EA5E9" opacity="0.05"/>
-  <ellipse cx="80" cy="200" rx="100" ry="80" fill="#1D9E75" opacity="0.05"/>
-  <ellipse cx="130" cy="50" rx="90" ry="70" fill="#7F77DD" opacity="0.05"/>
+    <!-- Animated aurora mesh -->
+    <rect width="3840" height="1100" fill="url(#aurora1)"/>
+    <rect width="3840" height="1100" fill="url(#aurora2)"/>
+    <rect width="3840" height="1100" fill="url(#aurora3)"/>
+    <rect width="3840" height="1100" fill="url(#aurora4)"/>
+    <rect width="3840" height="1100" fill="url(#aurora5)"/>
 
-  <!-- Subtle dot grid pattern (top-right area) -->
-  <g opacity="0.08">
-    <circle cx="720" cy="24" r="1.2" fill="#7F77DD"/>
-    <circle cx="740" cy="24" r="1.2" fill="#7F77DD"/>
-    <circle cx="760" cy="24" r="1.2" fill="#7F77DD"/>
-    <circle cx="780" cy="24" r="1.2" fill="#7F77DD"/>
-    <circle cx="800" cy="24" r="1.2" fill="#7F77DD"/>
-    <circle cx="820" cy="24" r="1.2" fill="#7F77DD"/>
-    <circle cx="840" cy="24" r="1.2" fill="#7F77DD"/>
-    <circle cx="860" cy="24" r="1.2" fill="#7F77DD"/>
-    <circle cx="880" cy="24" r="1.2" fill="#7F77DD"/>
-    <circle cx="720" cy="44" r="1.2" fill="#7F77DD"/>
-    <circle cx="740" cy="44" r="1.2" fill="#7F77DD"/>
-    <circle cx="760" cy="44" r="1.2" fill="#7F77DD"/>
-    <circle cx="780" cy="44" r="1.2" fill="#7F77DD"/>
-    <circle cx="800" cy="44" r="1.2" fill="#7F77DD"/>
-    <circle cx="820" cy="44" r="1.2" fill="#7F77DD"/>
-    <circle cx="840" cy="44" r="1.2" fill="#7F77DD"/>
-    <circle cx="860" cy="44" r="1.2" fill="#7F77DD"/>
-    <circle cx="880" cy="44" r="1.2" fill="#7F77DD"/>
-    <circle cx="720" cy="64" r="1.2" fill="#7F77DD"/>
-    <circle cx="740" cy="64" r="1.2" fill="#7F77DD"/>
-    <circle cx="760" cy="64" r="1.2" fill="#7F77DD"/>
-    <circle cx="780" cy="64" r="1.2" fill="#7F77DD"/>
-    <circle cx="800" cy="64" r="1.2" fill="#7F77DD"/>
-    <circle cx="820" cy="64" r="1.2" fill="#7F77DD"/>
-    <circle cx="840" cy="64" r="1.2" fill="#7F77DD"/>
-    <circle cx="860" cy="64" r="1.2" fill="#7F77DD"/>
-    <circle cx="880" cy="64" r="1.2" fill="#7F77DD"/>
-  </g>
+    <!-- ── ANIMATED FLOWING LINES ── -->
+    <!-- Long diagonal sweep lines -->
+    <g opacity="0.10" stroke="#6d28d9" stroke-width="1.5" fill="none">
+      <path d="M-200,200 Q600,100 1200,400 T2600,300 T3900,500">
+        <animate attributeName="d"
+          values="M-200,200 Q600,100 1200,400 T2600,300 T3900,500;
+                  M-200,350 Q700,150 1400,300 T2800,500 T4000,350;
+                  M-200,200 Q600,100 1200,400 T2600,300 T3900,500"
+          dur="14s" repeatCount="indefinite"/>
+      </path>
+      <path d="M-200,500 Q800,350 1600,600 T3000,450 T4000,700">
+        <animate attributeName="d"
+          values="M-200,500 Q800,350 1600,600 T3000,450 T4000,700;
+                  M-200,600 Q900,400 1800,500 T3200,650 T4000,550;
+                  M-200,500 Q800,350 1600,600 T3000,450 T4000,700"
+          dur="18s" repeatCount="indefinite"/>
+      </path>
+      <path d="M-200,800 Q1000,650 1800,850 T3200,700 T4000,900">
+        <animate attributeName="d"
+          values="M-200,800 Q1000,650 1800,850 T3200,700 T4000,900;
+                  M-200,700 Q1100,750 1900,650 T3100,800 T4000,800;
+                  M-200,800 Q1000,650 1800,850 T3200,700 T4000,900"
+          dur="20s" repeatCount="indefinite"/>
+      </path>
+    </g>
+    <!-- Teal accent lines -->
+    <g opacity="0.08" stroke="#059669" stroke-width="1" fill="none">
+      <path d="M0,900 Q1000,750 2000,900 T4000,800">
+        <animate attributeName="d"
+          values="M0,900 Q1000,750 2000,900 T4000,800;
+                  M0,850 Q1200,950 2200,800 T4000,900;
+                  M0,900 Q1000,750 2000,900 T4000,800"
+          dur="22s" repeatCount="indefinite"/>
+      </path>
+    </g>
 
-  <!-- Glow circle behind owl -->
-  <ellipse cx="95" cy="128" rx="70" ry="70" fill="url(#owlGlow)"/>
+    <!-- ── ANIMATED DOT GRID ── -->
+    <!-- A repeating subtle dot grid that breathes -->
+    <g opacity="0.12" fill="#7c3aed">
+      <!-- Row 1 -->
+      <circle cx="200" cy="80" r="3"><animate attributeName="opacity" values="0.6;0.15;0.6" dur="4s" begin="0s" repeatCount="indefinite"/></circle>
+      <circle cx="400" cy="80" r="3"><animate attributeName="opacity" values="0.6;0.15;0.6" dur="4s" begin="0.3s" repeatCount="indefinite"/></circle>
+      <circle cx="600" cy="80" r="3"><animate attributeName="opacity" values="0.6;0.15;0.6" dur="4s" begin="0.6s" repeatCount="indefinite"/></circle>
+      <circle cx="800" cy="80" r="3"><animate attributeName="opacity" values="0.6;0.15;0.6" dur="4s" begin="0.9s" repeatCount="indefinite"/></circle>
+      <circle cx="3040" cy="80" r="3"><animate attributeName="opacity" values="0.6;0.15;0.6" dur="4s" begin="0.4s" repeatCount="indefinite"/></circle>
+      <circle cx="3240" cy="80" r="3"><animate attributeName="opacity" values="0.6;0.15;0.6" dur="4s" begin="0.7s" repeatCount="indefinite"/></circle>
+      <circle cx="3440" cy="80" r="3"><animate attributeName="opacity" values="0.6;0.15;0.6" dur="4s" begin="1.0s" repeatCount="indefinite"/></circle>
+      <circle cx="3640" cy="80" r="3"><animate attributeName="opacity" values="0.6;0.15;0.6" dur="4s" begin="1.3s" repeatCount="indefinite"/></circle>
+      <circle cx="3840" cy="80" r="3"><animate attributeName="opacity" values="0.6;0.15;0.6" dur="4s" begin="0.1s" repeatCount="indefinite"/></circle>
+      <!-- Row 2 -->
+      <circle cx="200" cy="200" r="3"><animate attributeName="opacity" values="0.6;0.15;0.6" dur="5s" begin="0.5s" repeatCount="indefinite"/></circle>
+      <circle cx="400" cy="200" r="3"><animate attributeName="opacity" values="0.6;0.15;0.6" dur="5s" begin="0.8s" repeatCount="indefinite"/></circle>
+      <circle cx="600" cy="200" r="3"><animate attributeName="opacity" values="0.6;0.15;0.6" dur="5s" begin="1.1s" repeatCount="indefinite"/></circle>
+      <circle cx="3040" cy="200" r="3"><animate attributeName="opacity" values="0.6;0.15;0.6" dur="5s" begin="0.2s" repeatCount="indefinite"/></circle>
+      <circle cx="3240" cy="200" r="3"><animate attributeName="opacity" values="0.6;0.15;0.6" dur="5s" begin="0.5s" repeatCount="indefinite"/></circle>
+      <circle cx="3440" cy="200" r="3"><animate attributeName="opacity" values="0.6;0.15;0.6" dur="5s" begin="0.8s" repeatCount="indefinite"/></circle>
+      <circle cx="3640" cy="200" r="3"><animate attributeName="opacity" values="0.6;0.15;0.6" dur="5s" begin="1.1s" repeatCount="indefinite"/></circle>
+      <circle cx="3840" cy="200" r="3"><animate attributeName="opacity" values="0.6;0.15;0.6" dur="5s" begin="0.4s" repeatCount="indefinite"/></circle>
+      <!-- Row bottom -->
+      <circle cx="200" cy="1020" r="3"><animate attributeName="opacity" values="0.6;0.15;0.6" dur="4.5s" begin="1.2s" repeatCount="indefinite"/></circle>
+      <circle cx="400" cy="1020" r="3"><animate attributeName="opacity" values="0.6;0.15;0.6" dur="4.5s" begin="0.9s" repeatCount="indefinite"/></circle>
+      <circle cx="600" cy="1020" r="3"><animate attributeName="opacity" values="0.6;0.15;0.6" dur="4.5s" begin="0.6s" repeatCount="indefinite"/></circle>
+      <circle cx="3040" cy="1020" r="3"><animate attributeName="opacity" values="0.6;0.15;0.6" dur="4.5s" begin="0.3s" repeatCount="indefinite"/></circle>
+      <circle cx="3240" cy="1020" r="3"><animate attributeName="opacity" values="0.6;0.15;0.6" dur="4.5s" begin="0.6s" repeatCount="indefinite"/></circle>
+      <circle cx="3440" cy="1020" r="3"><animate attributeName="opacity" values="0.6;0.15;0.6" dur="4.5s" begin="0.9s" repeatCount="indefinite"/></circle>
+      <circle cx="3640" cy="1020" r="3"><animate attributeName="opacity" values="0.6;0.15;0.6" dur="4.5s" begin="1.2s" repeatCount="indefinite"/></circle>
+    </g>
 
-  <!-- ======= OWL LOGO embedded, scaled & repositioned ======= -->
-  <!-- Original viewBox 680x680, scaled to ~130px tall, placed left -->
-  <g transform="translate(28, 63) scale(0.192)">
-    <!-- wings -->
-    <path d="M240 320 L130 250 L100 340 L120 420 L190 460 L240 420 Z" fill="#4f6ef7"/>
-    <path d="M240 320 L145 260 L120 330 L140 400 L195 440 L240 400 Z" fill="#6b84f8"/>
-    <line x1="235" y1="325" x2="155" y2="280" stroke="#a0b4ff" stroke-width="1.8" opacity=".7"/>
-    <line x1="235" y1="350" x2="140" y2="330" stroke="#a0b4ff" stroke-width="1.8" opacity=".7"/>
-    <line x1="235" y1="375" x2="148" y2="385" stroke="#a0b4ff" stroke-width="1.8" opacity=".7"/>
-    <line x1="235" y1="400" x2="165" y2="425" stroke="#a0b4ff" stroke-width="1.8" opacity=".7"/>
+    <!-- ── ORBITING LARGE BLOBS ── -->
+    <g filter="url(#glow)">
+      <circle r="90" fill="#a78bfa" opacity="0.18">
+        <animateMotion dur="28s" repeatCount="indefinite" path="M3600,120 Q3750,300 3700,500 Q3650,700 3750,900 Q3800,1000 3700,1050 Q3500,1080 3400,1000 Q3300,900 3400,700 Q3500,500 3350,200 Q3400,50 3600,120"/>
+      </circle>
+      <circle r="70" fill="#6ee7b7" opacity="0.15">
+        <animateMotion dur="24s" repeatCount="indefinite" path="M120,900 Q50,750 100,550 Q150,350 80,150 Q160,60 300,100 Q400,140 350,300 Q300,500 400,750 Q420,900 300,1000 Q200,1050 120,900"/>
+      </circle>
+      <circle r="55" fill="#7dd3fc" opacity="0.14">
+        <animateMotion dur="32s" repeatCount="indefinite" path="M1800,80 Q2200,160 2400,80 Q2600,20 2800,100 Q2900,200 2700,350 Q2500,480 2300,380 Q2100,280 1900,350 Q1700,420 1600,300 Q1500,180 1800,80"/>
+      </circle>
+    </g>
 
-    <path d="M440 320 L550 250 L580 340 L560 420 L490 460 L440 420 Z" fill="#3a5af5"/>
-    <path d="M440 320 L535 260 L560 330 L540 400 L485 440 L440 400 Z" fill="#4f6ef7"/>
-    <line x1="445" y1="325" x2="525" y2="280" stroke="#a0b4ff" stroke-width="1.8" opacity=".7"/>
-    <line x1="445" y1="350" x2="540" y2="330" stroke="#a0b4ff" stroke-width="1.8" opacity=".7"/>
-    <line x1="445" y1="375" x2="532" y2="385" stroke="#a0b4ff" stroke-width="1.8" opacity=".7"/>
-    <line x1="445" y1="400" x2="515" y2="425" stroke="#a0b4ff" stroke-width="1.8" opacity=".7"/>
+    <!-- ── FLOATING SPARKLE PARTICLES ── -->
+    <g filter="url(#glow)">
+      <!-- Purple family -->
+      <circle cx="350" cy="900" r="8" fill="#7c3aed" opacity="0.45">
+        <animate attributeName="cy" values="900;840;900" dur="6s" begin="0s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0.45;0.10;0.45" dur="6s" begin="0s" repeatCount="indefinite"/>
+      </circle>
+      <circle cx="520" cy="200" r="5" fill="#a78bfa" opacity="0.35">
+        <animate attributeName="cy" values="200;160;200" dur="7s" begin="1s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0.35;0.08;0.35" dur="7s" begin="1s" repeatCount="indefinite"/>
+      </circle>
+      <circle cx="700" cy="980" r="6" fill="#7c3aed" opacity="0.30">
+        <animate attributeName="cy" values="980;920;980" dur="8s" begin="0.5s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0.30;0.07;0.30" dur="8s" begin="0.5s" repeatCount="indefinite"/>
+      </circle>
+      <!-- Teal family -->
+      <circle cx="3200" cy="150" r="8" fill="#059669" opacity="0.40">
+        <animate attributeName="cy" values="150;100;150" dur="5s" begin="0.8s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0.40;0.10;0.40" dur="5s" begin="0.8s" repeatCount="indefinite"/>
+      </circle>
+      <circle cx="3550" cy="950" r="6" fill="#34d399" opacity="0.35">
+        <animate attributeName="cy" values="950;890;950" dur="6.5s" begin="1.5s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0.35;0.08;0.35" dur="6.5s" begin="1.5s" repeatCount="indefinite"/>
+      </circle>
+      <circle cx="3700" cy="400" r="5" fill="#6ee7b7" opacity="0.30">
+        <animate attributeName="cy" values="400;350;400" dur="9s" begin="2s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0.30;0.07;0.30" dur="9s" begin="2s" repeatCount="indefinite"/>
+      </circle>
+      <!-- Blue family -->
+      <circle cx="3400" cy="700" r="7" fill="#0284c7" opacity="0.38">
+        <animate attributeName="cy" values="700;640;700" dur="7.5s" begin="0.3s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0.38;0.09;0.38" dur="7.5s" begin="0.3s" repeatCount="indefinite"/>
+      </circle>
+      <circle cx="450" cy="500" r="5" fill="#7dd3fc" opacity="0.28">
+        <animate attributeName="cy" values="500;450;500" dur="10s" begin="2.5s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0.28;0.06;0.28" dur="10s" begin="2.5s" repeatCount="indefinite"/>
+      </circle>
+      <!-- Rose accent -->
+      <circle cx="3100" cy="300" r="6" fill="#e879f9" opacity="0.25">
+        <animate attributeName="cy" values="300;250;300" dur="8.5s" begin="1.2s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0.25;0.06;0.25" dur="8.5s" begin="1.2s" repeatCount="indefinite"/>
+      </circle>
+      <!-- Mid-canvas -->
+      <circle cx="1700" cy="120" r="5" fill="#7c3aed" opacity="0.22">
+        <animate attributeName="cy" values="120;80;120" dur="11s" begin="3s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0.22;0.05;0.22" dur="11s" begin="3s" repeatCount="indefinite"/>
+      </circle>
+      <circle cx="2100" cy="990" r="6" fill="#059669" opacity="0.22">
+        <animate attributeName="cy" values="990;940;990" dur="9.5s" begin="2s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0.22;0.05;0.22" dur="9.5s" begin="2s" repeatCount="indefinite"/>
+      </circle>
+    </g>
 
-    <!-- body -->
-    <ellipse cx="340" cy="390" rx="120" ry="155" fill="#2d3a8c"/>
+    <!-- ── SPINNING RING DECORATION (top-right) ── -->
+    <g transform="translate(3620, 160)">
+      <circle cx="0" cy="0" r="120" fill="none" stroke="#7c3aed" stroke-width="1.5"
+              stroke-dasharray="12 8" stroke-opacity="0.20">
+        <animateTransform attributeName="transform" type="rotate"
+          from="0 0 0" to="360 0 0" dur="18s" repeatCount="indefinite"/>
+      </circle>
+      <circle cx="0" cy="0" r="85" fill="none" stroke="#059669" stroke-width="1"
+              stroke-dasharray="6 12" stroke-opacity="0.18">
+        <animateTransform attributeName="transform" type="rotate"
+          from="360 0 0" to="0 0 0" dur="12s" repeatCount="indefinite"/>
+      </circle>
+      <circle cx="0" cy="0" r="50" fill="none" stroke="#0284c7" stroke-width="1"
+              stroke-dasharray="4 8" stroke-opacity="0.16">
+        <animateTransform attributeName="transform" type="rotate"
+          from="0 0 0" to="360 0 0" dur="8s" repeatCount="indefinite"/>
+      </circle>
+    </g>
 
-    <!-- chest -->
-    <ellipse cx="340" cy="420" rx="72" ry="100" fill="#e8eeff"/>
-    <ellipse cx="340" cy="395" rx="50" ry="16" fill="#b8c4ff" opacity=".6"/>
-    <ellipse cx="340" cy="418" rx="58" ry="16" fill="#b8c4ff" opacity=".5"/>
-    <ellipse cx="340" cy="442" rx="63" ry="16" fill="#b8c4ff" opacity=".4"/>
-    <ellipse cx="340" cy="468" rx="62" ry="14" fill="#b8c4ff" opacity=".3"/>
-    <ellipse cx="340" cy="492" rx="55" ry="12" fill="#b8c4ff" opacity=".2"/>
+    <!-- Spinning ring (bottom-left) -->
+    <g transform="translate(220, 940)">
+      <circle cx="0" cy="0" r="90" fill="none" stroke="#a78bfa" stroke-width="1.2"
+              stroke-dasharray="10 8" stroke-opacity="0.18">
+        <animateTransform attributeName="transform" type="rotate"
+          from="0 0 0" to="360 0 0" dur="22s" repeatCount="indefinite"/>
+      </circle>
+      <circle cx="0" cy="0" r="55" fill="none" stroke="#34d399" stroke-width="1"
+              stroke-dasharray="5 10" stroke-opacity="0.15">
+        <animateTransform attributeName="transform" type="rotate"
+          from="360 0 0" to="0 0 0" dur="15s" repeatCount="indefinite"/>
+      </circle>
+    </g>
 
-    <!-- head -->
-    <ellipse cx="340" cy="300" rx="110" ry="100" fill="#2d3a8c"/>
+    <!-- ══════════════════════════════════════════════
+         OWL LOGO — centered-left, large
+    ══════════════════════════════════════════════ -->
+    <!-- Glow behind owl -->
+    <ellipse cx="560" cy="540" rx="360" ry="330" fill="url(#owlGlow)"/>
 
-    <!-- ear tufts -->
-    <polygon points="270,220 248,155 295,200" fill="#7c8fff"/>
-    <polygon points="295,200 248,155 305,172" fill="#9aaaf8"/>
-    <polygon points="410,220 432,155 385,200" fill="#6b7ef7"/>
-    <polygon points="385,200 432,155 375,172" fill="#8899f8"/>
+    <!-- Owl scaled up: original 680x680 → scale 0.88 → ~598px, positioned at x=260,y=170 -->
+    <g transform="translate(262, 172) scale(0.878)" opacity="0">
+      <animate attributeName="opacity" from="0" to="1" dur="0.8s" begin="0.2s" fill="freeze"/>
 
-    <!-- face disc -->
-    <ellipse cx="340" cy="305" rx="88" ry="80" fill="#3d4fa8"/>
+      <!-- wings -->
+      <path d="M240 320 L130 250 L100 340 L120 420 L190 460 L240 420 Z" fill="#4f6ef7"/>
+      <path d="M240 320 L145 260 L120 330 L140 400 L195 440 L240 400 Z" fill="#6b84f8"/>
+      <line x1="235" y1="325" x2="155" y2="280" stroke="#a0b4ff" stroke-width="1.8" opacity=".7"/>
+      <line x1="235" y1="350" x2="140" y2="330" stroke="#a0b4ff" stroke-width="1.8" opacity=".7"/>
+      <line x1="235" y1="375" x2="148" y2="385" stroke="#a0b4ff" stroke-width="1.8" opacity=".7"/>
+      <line x1="235" y1="400" x2="165" y2="425" stroke="#a0b4ff" stroke-width="1.8" opacity=".7"/>
+      <path d="M440 320 L550 250 L580 340 L560 420 L490 460 L440 420 Z" fill="#3a5af5"/>
+      <path d="M440 320 L535 260 L560 330 L540 400 L485 440 L440 400 Z" fill="#4f6ef7"/>
+      <line x1="445" y1="325" x2="525" y2="280" stroke="#a0b4ff" stroke-width="1.8" opacity=".7"/>
+      <line x1="445" y1="350" x2="540" y2="330" stroke="#a0b4ff" stroke-width="1.8" opacity=".7"/>
+      <line x1="445" y1="375" x2="532" y2="385" stroke="#a0b4ff" stroke-width="1.8" opacity=".7"/>
+      <line x1="445" y1="400" x2="515" y2="425" stroke="#a0b4ff" stroke-width="1.8" opacity=".7"/>
+      <!-- body -->
+      <ellipse cx="340" cy="390" rx="120" ry="155" fill="#2d3a8c"/>
+      <!-- chest -->
+      <ellipse cx="340" cy="420" rx="72" ry="100" fill="#e8eeff"/>
+      <ellipse cx="340" cy="395" rx="50" ry="16" fill="#b8c4ff" opacity=".6"/>
+      <ellipse cx="340" cy="418" rx="58" ry="16" fill="#b8c4ff" opacity=".5"/>
+      <ellipse cx="340" cy="442" rx="63" ry="16" fill="#b8c4ff" opacity=".4"/>
+      <ellipse cx="340" cy="468" rx="62" ry="14" fill="#b8c4ff" opacity=".3"/>
+      <ellipse cx="340" cy="492" rx="55" ry="12" fill="#b8c4ff" opacity=".2"/>
+      <!-- head -->
+      <ellipse cx="340" cy="300" rx="110" ry="100" fill="#2d3a8c"/>
+      <!-- ear tufts -->
+      <polygon points="270,220 248,155 295,200" fill="#7c8fff"/>
+      <polygon points="295,200 248,155 305,172" fill="#9aaaf8"/>
+      <polygon points="410,220 432,155 385,200" fill="#6b7ef7"/>
+      <polygon points="385,200 432,155 375,172" fill="#8899f8"/>
+      <!-- face disc -->
+      <ellipse cx="340" cy="305" rx="88" ry="80" fill="#3d4fa8"/>
+      <!-- eye rings -->
+      <polygon points="287,275 275,290 275,310 287,325 313,325 325,310 325,290 313,275" fill="#7c8fff"/>
+      <polygon points="367,275 355,290 355,310 367,325 393,325 405,310 405,290 393,275" fill="#9aaaf8"/>
+      <!-- eyes -->
+      <circle cx="300" cy="300" r="20" fill="#1a2060"/>
+      <circle cx="380" cy="300" r="20" fill="#1a2060"/>
+      <circle cx="300" cy="300" r="14" fill="#c8d4ff"/>
+      <circle cx="380" cy="300" r="14" fill="#c8d4ff"/>
+      <circle cx="300" cy="300" r="7" fill="#0a0f3a"/>
+      <circle cx="380" cy="300" r="7" fill="#0a0f3a"/>
+      <circle cx="304" cy="296" r="3" fill="#fff"/>
+      <circle cx="384" cy="296" r="3" fill="#fff"/>
+      <!-- beak -->
+      <polygon points="330,318 340,345 350,318 340,325" fill="#fbbf24"/>
+      <!-- forehead lines -->
+      <line x1="300" y1="250" x2="310" y2="270" stroke="#a0b4ff" stroke-width="1.5" opacity=".7"/>
+      <line x1="315" y1="245" x2="320" y2="268" stroke="#a0b4ff" stroke-width="1.5" opacity=".6"/>
+      <line x1="340" y1="242" x2="340" y2="268" stroke="#a0b4ff" stroke-width="1.5" opacity=".5"/>
+      <line x1="365" y1="245" x2="360" y2="268" stroke="#a0b4ff" stroke-width="1.5" opacity=".6"/>
+      <line x1="380" y1="250" x2="370" y2="270" stroke="#a0b4ff" stroke-width="1.5" opacity=".7"/>
+      <!-- talons -->
+      <polygon points="290,520 278,548 292,542 296,560 304,540 308,558 316,538 310,520" fill="#fbbf24"/>
+      <polygon points="390,520 378,548 392,542 396,560 404,540 408,558 416,538 410,520" fill="#fbbf24"/>
+      <!-- branch -->
+      <rect x="220" y="518" width="240" height="12" rx="6" fill="#4f6ef7" opacity=".5"/>
+      <!-- accent dot -->
+      <circle cx="340" cy="285" r="4" fill="#c8d4ff" opacity=".8"/>
+    </g>
 
-    <!-- eye rings -->
-    <polygon points="287,275 275,290 275,310 287,325 313,325 325,310 325,290 313,275" fill="#7c8fff"/>
-    <polygon points="367,275 355,290 355,310 367,325 393,325 405,310 405,290 393,275" fill="#9aaaf8"/>
+    <!-- ══════════════════════════════════════════════
+         TEXT BLOCK — right of owl
+    ══════════════════════════════════════════════ -->
 
-    <!-- eyes -->
-    <circle cx="300" cy="300" r="20" fill="#1a2060"/>
-    <circle cx="380" cy="300" r="20" fill="#1a2060"/>
-    <circle cx="300" cy="300" r="14" fill="#c8d4ff"/>
-    <circle cx="380" cy="300" r="14" fill="#c8d4ff"/>
-    <circle cx="300" cy="300" r="7" fill="#0a0f3a"/>
-    <circle cx="380" cy="300" r="7" fill="#0a0f3a"/>
-    <circle cx="304" cy="296" r="3" fill="#fff"/>
-    <circle cx="384" cy="296" r="3" fill="#fff"/>
+    <!-- "Hoovik" -->
+    <text x="1060" y="490"
+          font-family="Georgia, 'Palatino Linotype', Palatino, serif"
+          font-size="360" font-weight="700"
+          letter-spacing="-12"
+          fill="url(#titleGrad)"
+          opacity="0">
+      Hoovik
+      <animate attributeName="opacity" from="0" to="1" dur="0.9s" begin="0.3s" fill="freeze"/>
+    </text>
 
-    <!-- beak -->
-    <polygon points="330,318 340,345 350,318 340,325" fill="#fbbf24"/>
+    <!-- Tagline -->
+    <text x="1072" y="580"
+          font-family="Georgia, serif"
+          font-size="58" font-style="italic"
+          letter-spacing="2"
+          fill="#6b7280"
+          opacity="0">
+      Video meetings that think. In real time.
+      <animate attributeName="opacity" from="0" to="1" dur="0.7s" begin="0.7s" fill="freeze"/>
+    </text>
 
-    <!-- forehead lines -->
-    <line x1="300" y1="250" x2="310" y2="270" stroke="#a0b4ff" stroke-width="1.5" opacity=".7"/>
-    <line x1="315" y1="245" x2="320" y2="268" stroke="#a0b4ff" stroke-width="1.5" opacity=".6"/>
-    <line x1="340" y1="242" x2="340" y2="268" stroke="#a0b4ff" stroke-width="1.5" opacity=".5"/>
-    <line x1="365" y1="245" x2="360" y2="268" stroke="#a0b4ff" stroke-width="1.5" opacity=".6"/>
-    <line x1="380" y1="250" x2="370" y2="270" stroke="#a0b4ff" stroke-width="1.5" opacity=".7"/>
+    <!-- Thin divider rule -->
+    <line x1="1060" y1="632" x2="3300" y2="632"
+          stroke="#c4b5fd" stroke-width="2"
+          stroke-dasharray="2240" stroke-dashoffset="2240">
+      <animate attributeName="stroke-dashoffset" from="2240" to="0" dur="1.1s" begin="0.9s" fill="freeze"/>
+    </line>
 
-    <!-- talons -->
-    <polygon points="290,520 278,548 292,542 296,560 304,540 308,558 316,538 310,520" fill="#fbbf24"/>
-    <polygon points="390,520 378,548 392,542 396,560 404,540 408,558 416,538 410,520" fill="#fbbf24"/>
+    <!-- ── FEATURE PILLS ── -->
+    <!-- Pill 1: WebRTC P2P -->
+    <g opacity="0">
+      <animate attributeName="opacity" from="0" to="1" dur="0.5s" begin="1.0s" fill="freeze"/>
+      <rect x="1060" y="680" width="490" height="100" rx="50"
+            fill="url(#p1g)" stroke="#7c3aed" stroke-width="2" stroke-opacity="0.40"/>
+      <circle cx="1118" cy="730" r="16" fill="#7c3aed"/>
+      <text x="1150" y="740"
+            font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+            font-size="44" font-weight="600" fill="#4c1d95">WebRTC P2P</text>
+    </g>
 
-    <!-- branch -->
-    <rect x="220" y="518" width="240" height="12" rx="6" fill="#4f6ef7" opacity=".5"/>
+    <!-- Pill 2: Emotion AI -->
+    <g opacity="0">
+      <animate attributeName="opacity" from="0" to="1" dur="0.5s" begin="1.2s" fill="freeze"/>
+      <rect x="1580" y="680" width="450" height="100" rx="50"
+            fill="url(#p2g)" stroke="#059669" stroke-width="2" stroke-opacity="0.40"/>
+      <circle cx="1638" cy="730" r="16" fill="#059669"/>
+      <text x="1670" y="740"
+            font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+            font-size="44" font-weight="600" fill="#064e3b">Emotion AI</text>
+    </g>
 
-    <!-- accent dot -->
-    <circle cx="340" cy="285" r="4" fill="#c8d4ff" opacity=".8"/>
-  </g>
+    <!-- Pill 3: Whisper ASR -->
+    <g opacity="0">
+      <animate attributeName="opacity" from="0" to="1" dur="0.5s" begin="1.4s" fill="freeze"/>
+      <rect x="2060" y="680" width="470" height="100" rx="50"
+            fill="url(#p3g)" stroke="#0284c7" stroke-width="2" stroke-opacity="0.40"/>
+      <circle cx="2118" cy="730" r="16" fill="#0284c7"/>
+      <text x="2150" y="740"
+            font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+            font-size="44" font-weight="600" fill="#0c4a6e">Whisper ASR</text>
+    </g>
 
-  <!-- ======= MAIN TEXT BLOCK ======= -->
-  <!-- "Hoovik" wordmark -->
-  <text
-    x="200" y="122"
-    font-family="Georgia, 'Palatino Linotype', Palatino, serif"
-    font-size="88" font-weight="700"
-    letter-spacing="-3"
-    fill="url(#titleGrad)"
-    opacity="0">
-    Hoovik
-    <animate attributeName="opacity" from="0" to="1" dur="0.7s" begin="0.1s" fill="freeze"/>
-  </text>
+    <!-- Pill 4: Groq LLM -->
+    <g opacity="0">
+      <animate attributeName="opacity" from="0" to="1" dur="0.5s" begin="1.6s" fill="freeze"/>
+      <rect x="2560" y="680" width="390" height="100" rx="50"
+            fill="url(#p4g)" stroke="#dc2626" stroke-width="2" stroke-opacity="0.40"/>
+      <circle cx="2618" cy="730" r="16" fill="#dc2626">
+        <animate attributeName="opacity" values="1;0.3;1" dur="2s" repeatCount="indefinite"/>
+      </circle>
+      <text x="2650" y="740"
+            font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+            font-size="44" font-weight="600" fill="#7f1d1d">Groq LLM</text>
+    </g>
 
-  <!-- Tagline -->
-  <text
-    x="200" y="148"
-    font-family="Georgia, serif"
-    font-size="14.5" font-style="italic"
-    letter-spacing="0.5"
-    fill="#7a789e"
-    opacity="0">
-    Video meetings that think. In real time.
-    <animate attributeName="opacity" from="0" to="1" dur="0.6s" begin="0.5s" fill="freeze"/>
-  </text>
+  </g><!-- end clip -->
 
-  <!-- Thin rule under tagline -->
-  <line x1="200" y1="161" x2="700" y2="161"
-        stroke="#c5c0f0" stroke-width="0.7"
-        stroke-dasharray="500" stroke-dashoffset="500">
-    <animate attributeName="stroke-dashoffset" from="500" to="0" dur="0.9s" begin="0.7s" fill="freeze"/>
-  </line>
-
-  <!-- ======= FEATURE PILLS ======= -->
-  <!-- Pill 1: WebRTC P2P -->
-  <g opacity="0">
-    <animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="0.8s" fill="freeze"/>
-    <rect x="200" y="172" width="130" height="28" rx="14"
-          fill="url(#p1g)" stroke="#7F77DD" stroke-width="0.8" stroke-opacity="0.45"/>
-    <circle cx="218" cy="186" r="4" fill="#7F77DD"/>
-    <text x="228" y="191"
-          font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
-          font-size="11.5" font-weight="600" fill="#4a3ab8">WebRTC P2P</text>
-  </g>
-
-  <!-- Pill 2: Emotion AI -->
-  <g opacity="0">
-    <animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="0.95s" fill="freeze"/>
-    <rect x="342" y="172" width="118" height="28" rx="14"
-          fill="url(#p2g)" stroke="#1D9E75" stroke-width="0.8" stroke-opacity="0.45"/>
-    <circle cx="360" cy="186" r="4" fill="#1D9E75"/>
-    <text x="370" y="191"
-          font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
-          font-size="11.5" font-weight="600" fill="#0e7a5a">Emotion AI</text>
-  </g>
-
-  <!-- Pill 3: Whisper ASR -->
-  <g opacity="0">
-    <animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="1.1s" fill="freeze"/>
-    <rect x="472" y="172" width="122" height="28" rx="14"
-          fill="url(#p3g)" stroke="#0EA5E9" stroke-width="0.8" stroke-opacity="0.45"/>
-    <circle cx="490" cy="186" r="4" fill="#0EA5E9"/>
-    <text x="500" y="191"
-          font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
-          font-size="11.5" font-weight="600" fill="#0369a1">Whisper ASR</text>
-  </g>
-
-  <!-- Pill 4: Groq LLM -->
-  <g opacity="0">
-    <animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="1.25s" fill="freeze"/>
-    <rect x="606" y="172" width="104" height="28" rx="14"
-          fill="url(#p4g)" stroke="#D85A30" stroke-width="0.8" stroke-opacity="0.45"/>
-    <circle cx="623" cy="186" r="4" fill="#D85A30">
-      <animate attributeName="opacity" values="1;0.3;1" dur="2s" repeatCount="indefinite"/>
-    </circle>
-    <text x="633" y="191"
-          font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
-          font-size="11.5" font-weight="600" fill="#b84220">Groq LLM</text>
-  </g>
-
-  <!-- Floating accent particles -->
-  <circle cx="164" cy="42" r="2.5" fill="#7F77DD" opacity="0.22">
-    <animate attributeName="cy" values="42;32;42" dur="5s" begin="0.3s" repeatCount="indefinite"/>
-    <animate attributeName="opacity" values="0.22;0.06;0.22" dur="5s" begin="0.3s" repeatCount="indefinite"/>
-  </circle>
-  <circle cx="840" cy="196" r="2" fill="#1D9E75" opacity="0.20">
-    <animate attributeName="cy" values="196;180;196" dur="6.5s" begin="1s" repeatCount="indefinite"/>
-    <animate attributeName="opacity" values="0.20;0.05;0.20" dur="6.5s" begin="1s" repeatCount="indefinite"/>
-  </circle>
-  <circle cx="870" cy="90" r="3" fill="#D85A30" opacity="0.18">
-    <animate attributeName="cy" values="90;76;90" dur="4.5s" begin="0.8s" repeatCount="indefinite"/>
-    <animate attributeName="opacity" values="0.18;0.05;0.18" dur="4.5s" begin="0.8s" repeatCount="indefinite"/>
-  </circle>
-  <circle cx="44" cy="220" r="2" fill="#0EA5E9" opacity="0.20">
-    <animate attributeName="cy" values="220;206;220" dur="7s" begin="1.8s" repeatCount="indefinite"/>
-    <animate attributeName="opacity" values="0.20;0.06;0.20" dur="7s" begin="1.8s" repeatCount="indefinite"/>
-  </circle>
-
-  <!-- Outer border (very subtle) -->
-  <rect width="900" height="260" rx="20" fill="none"
-        stroke="#7F77DD" stroke-width="1" stroke-opacity="0.14"/>
+  <!-- Card border -->
+  <rect width="3840" height="1100" rx="60" fill="none"
+        stroke="#7c3aed" stroke-width="2" stroke-opacity="0.12"/>
 </svg>
