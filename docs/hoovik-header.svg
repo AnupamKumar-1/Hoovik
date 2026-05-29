@@ -387,50 +387,50 @@
     </line>
 
     <!-- ── FEATURE PILLS ── -->
-    <!-- Pill 1: WebRTC P2P -->
+    <!-- Pill 1: WebRTC P2P  (x=1060, w=430) -->
     <g opacity="0">
       <animate attributeName="opacity" from="0" to="1" dur="0.5s" begin="1.0s" fill="freeze"/>
-      <rect x="1060" y="680" width="490" height="100" rx="50"
+      <rect x="1060" y="680" width="430" height="100" rx="50"
             fill="url(#p1g)" stroke="#7c3aed" stroke-width="2" stroke-opacity="0.40"/>
-      <circle cx="1118" cy="730" r="16" fill="#7c3aed"/>
-      <text x="1150" y="740"
+      <circle cx="1116" cy="730" r="16" fill="#7c3aed"/>
+      <text x="1148" y="742"
             font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
             font-size="44" font-weight="600" fill="#4c1d95">WebRTC P2P</text>
     </g>
 
-    <!-- Pill 2: Emotion AI -->
+    <!-- Pill 2: Custom Multimodal Emotion AI  (x=1520, w=870) -->
     <g opacity="0">
       <animate attributeName="opacity" from="0" to="1" dur="0.5s" begin="1.2s" fill="freeze"/>
-      <rect x="1580" y="680" width="450" height="100" rx="50"
+      <rect x="1520" y="680" width="870" height="100" rx="50"
             fill="url(#p2g)" stroke="#059669" stroke-width="2" stroke-opacity="0.40"/>
-      <circle cx="1638" cy="730" r="16" fill="#059669"/>
-      <text x="1670" y="740"
+      <circle cx="1578" cy="730" r="16" fill="#059669"/>
+      <text x="1610" y="742"
             font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
-            font-size="44" font-weight="600" fill="#064e3b">Emotion AI</text>
+            font-size="44" font-weight="600" fill="#064e3b">Custom Multimodal Emotion AI</text>
     </g>
 
-    <!-- Pill 3: Whisper ASR -->
+    <!-- Pill 3: Whisper ASR  (x=2420, w=460) -->
     <g opacity="0">
       <animate attributeName="opacity" from="0" to="1" dur="0.5s" begin="1.4s" fill="freeze"/>
-      <rect x="2060" y="680" width="470" height="100" rx="50"
+      <rect x="2420" y="680" width="460" height="100" rx="50"
             fill="url(#p3g)" stroke="#0284c7" stroke-width="2" stroke-opacity="0.40"/>
-      <circle cx="2118" cy="730" r="16" fill="#0284c7"/>
-      <text x="2150" y="740"
+      <circle cx="2478" cy="730" r="16" fill="#0284c7"/>
+      <text x="2510" y="742"
             font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
             font-size="44" font-weight="600" fill="#0c4a6e">Whisper ASR</text>
     </g>
 
-    <!-- Pill 4: Groq LLM -->
+    <!-- Pill 4: AI-Powered Summaries & Insights  (x=2910, w=860) -->
     <g opacity="0">
       <animate attributeName="opacity" from="0" to="1" dur="0.5s" begin="1.6s" fill="freeze"/>
-      <rect x="2560" y="680" width="390" height="100" rx="50"
+      <rect x="2910" y="680" width="860" height="100" rx="50"
             fill="url(#p4g)" stroke="#dc2626" stroke-width="2" stroke-opacity="0.40"/>
-      <circle cx="2618" cy="730" r="16" fill="#dc2626">
+      <circle cx="2968" cy="730" r="16" fill="#dc2626">
         <animate attributeName="opacity" values="1;0.3;1" dur="2s" repeatCount="indefinite"/>
       </circle>
-      <text x="2650" y="740"
+      <text x="3000" y="742"
             font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
-            font-size="44" font-weight="600" fill="#7f1d1d">Groq LLM</text>
+            font-size="44" font-weight="600" fill="#7f1d1d">AI-Powered Summaries &amp; Insights</text>
     </g>
 
   </g><!-- end clip -->
