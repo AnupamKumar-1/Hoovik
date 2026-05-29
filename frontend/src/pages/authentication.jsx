@@ -14,26 +14,69 @@ export default function Authentication() {
   const [formState, setFormState] = React.useState(0); // 0 = login, 1 = register
   const [open, setOpen] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
+  const [fieldErrors, setFieldErrors] = React.useState({});
 
   const { handleRegister, handleLogin } = React.useContext(AuthContext);
 
+  const isLogin = formState === 0;
+
+  const validate = () => {
+    const errors = {};
+
+    if (!isLogin && !name.trim()) {
+      errors.name = "Name is required";
+    }
+
+    if (username.length < 3) {
+      errors.username = "Username must be at least 3 characters";
+    } else if (!/^[a-z0-9_.-]+$/.test(username)) {
+      errors.username =
+        "Username may contain only lowercase letters, numbers, _, ., and -";
+    }
+
+    if (password.length < 8) {
+      errors.password = "Password must be at least 8 characters";
+    }
+
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleAuth = async (e) => {
     e.preventDefault();
+
     setError("");
+
+    if (!validate()) {
+      return;
+    }
+
     setLoading(true);
+
     try {
       if (formState === 0) {
         await handleLogin(username, password);
         navigate("/home", { replace: true });
       } else {
-        const result = await handleRegister(name, username, password);
-        setUsername(""); setPassword(""); setName("");
+        const result = await handleRegister(
+          name,
+          username,
+          password
+        );
+
+        setUsername("");
+        setPassword("");
+        setName("");
+
         setMessage(result || "Registered successfully");
         setOpen(true);
         setFormState(0);
       }
     } catch (err) {
-      setError(err?.response?.data?.message || "Something went wrong");
+      setError(
+        err?.response?.data?.message ||
+        "Something went wrong"
+      );
     } finally {
       setLoading(false);
     }
@@ -44,8 +87,6 @@ export default function Authentication() {
     const t = setTimeout(() => setOpen(false), 4000);
     return () => clearTimeout(t);
   }, [open]);
-
-  const isLogin = formState === 0;
 
   return (
     <div className="au-root">
@@ -138,7 +179,7 @@ export default function Authentication() {
               role="tab"
               aria-selected={isLogin}
               className={`au-tab ${isLogin ? "au-tab-active" : ""}`}
-              onClick={() => { setFormState(0); setError(""); }}
+              onClick={() => { setFormState(0); setError(""); setFieldErrors({}); }}
               type="button"
             >
               Sign In
@@ -147,7 +188,7 @@ export default function Authentication() {
               role="tab"
               aria-selected={!isLogin}
               className={`au-tab ${!isLogin ? "au-tab-active" : ""}`}
-              onClick={() => { setFormState(1); setError(""); }}
+              onClick={() => { setFormState(1); setError(""); setFieldErrors({}); }}
               type="button"
             >
               Sign Up
@@ -166,10 +207,21 @@ export default function Authentication() {
                   type="text"
                   placeholder="e.g. Anupam Kumar"
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    setFieldErrors((prev) => ({
+                      ...prev,
+                      name: "",
+                    }));
+                  }}
                   autoComplete="name"
                   required
                 />
+                {fieldErrors.name && (
+                  <div className="au-field-error">
+                    {fieldErrors.name}
+                  </div>
+                )}
               </div>
             )}
 
@@ -181,10 +233,21 @@ export default function Authentication() {
                 type="text"
                 placeholder="your username"
                 value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                onChange={(e) => {
+                  setUsername(e.target.value);
+                  setFieldErrors((prev) => ({
+                    ...prev,
+                    username: "",
+                  }));
+                }}
                 autoComplete="username"
                 required
               />
+              {fieldErrors.username && (
+                <div className="au-field-error">
+                  {fieldErrors.username}
+                </div>
+              )}
             </div>
 
             <div className="au-field">
@@ -195,10 +258,21 @@ export default function Authentication() {
                 type="password"
                 placeholder="••••••••"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  setFieldErrors((prev) => ({
+                    ...prev,
+                    password: "",
+                  }));
+                }}
                 autoComplete={isLogin ? "current-password" : "new-password"}
                 required
               />
+              {fieldErrors.password && (
+                <div className="au-field-error">
+                  {fieldErrors.password}
+                </div>
+              )}
             </div>
 
 
@@ -242,7 +316,7 @@ export default function Authentication() {
             <button
               type="button"
               className="au-form-foot-link"
-              onClick={() => { setFormState(isLogin ? 1 : 0); setError(""); }}
+              onClick={() => { setFormState(isLogin ? 1 : 0); setError(""); setFieldErrors({}); }}
             >
               {isLogin ? "Sign up" : "Sign in"}
             </button>

@@ -590,3 +590,9 @@ html, body, #root {
     padding-top: 40px;
   }
 }
+
+.au-field-error {
+  color: #ef4444;
+  font-size: 0.8rem;
+  margin-top: 6px;
+}
