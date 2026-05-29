@@ -2,169 +2,169 @@
 
 <br/>
 
-<img src="./frontend/public/logo.svg" width="88" alt="Hoovik Logo" />
+<img src="docs/hoovik-header.svg" width="800" alt="Hoovik — Video meetings that think. In real time." />
 
-<h1>
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://readme-typing-svg.demolab.com?font=Syne&weight=800&size=52&pause=1000&color=FFFFFF&center=true&vCenter=true&width=400&height=70&lines=Hoovik" />
-    <img src="https://readme-typing-svg.demolab.com?font=Syne&weight=800&size=52&pause=1000&color=0F0F0F&center=true&vCenter=true&width=400&height=70&lines=Hoovik" alt="Hoovik" />
-  </picture>
-</h1>
+<br/><br/>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/WebRTC-Peer--to--Peer_Media-FF6B35?style=for-the-badge&logo=webrtc&logoColor=white" />
+  <a href="https://github.com/AnupamKumar-1/Hoovik/stargazers"><img src="https://img.shields.io/github/stars/AnupamKumar-1/Hoovik?style=for-the-badge&logo=github&color=7F77DD&logoColor=white" alt="Stars" /></a>
   &nbsp;
-  <img src="https://img.shields.io/badge/Emotion_Analysis-Multimodal_Inference-7C3AED?style=for-the-badge&logo=pytorch&logoColor=white" />
+  <a href="https://github.com/AnupamKumar-1/Hoovik/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/AnupamKumar-1/Hoovik/ci.yml?style=for-the-badge&label=CI" alt="CI" /></a>
   &nbsp;
-  <img src="https://img.shields.io/badge/Real--Time-4_Microservices-0EA5E9?style=for-the-badge&logo=socketdotio&logoColor=white" />
+  <img src="https://img.shields.io/badge/License-MIT-534AB7?style=for-the-badge" />
+  &nbsp;
+  <img src="https://img.shields.io/badge/PRs-Welcome-1D9E75?style=for-the-badge" />
 </p>
 
 <p align="center">
-  <em>Open-source, AI-powered video meeting platform with real-time emotion analysis, meeting transcription, and distributed backend architecture.</em>
+  <img src="https://img.shields.io/badge/WebRTC-P2P_Video-FF6B35?style=for-the-badge&logo=webrtc&logoColor=white" />
+  &nbsp;
+  <img src="https://img.shields.io/badge/Emotion_AI-Real--Time_Inference-7C3AED?style=for-the-badge&logo=pytorch&logoColor=white" />
+  &nbsp;
+  <img src="https://img.shields.io/badge/Transcription-Whisper_+_LLM-0EA5E9?style=for-the-badge&logo=openai&logoColor=white" />
 </p>
 
 <br/>
 
-<p align="center">
-  <a href="https://github.com/AnupamKumar-1/Hoovik/actions/workflows/ci.yml">
-    <img src="https://github.com/AnupamKumar-1/Hoovik/actions/workflows/ci.yml/badge.svg" alt="CI" />
-  </a>
-  &nbsp;
-  <a href="https://github.com/AnupamKumar-1/Hoovik/stargazers">
-    <img src="https://img.shields.io/github/stars/AnupamKumar-1/Hoovik?style=social" alt="GitHub Stars" />
-  </a>
-  &nbsp;
-  <img src="https://img.shields.io/badge/License-MIT-22C55E?style=flat-square" />
-  &nbsp;
-  <img src="https://img.shields.io/badge/PRs-Welcome-F59E0B?style=flat-square" />
-</p>
-
-<p align="center">If you find this project useful, a ⭐ goes a long way — thank you!</p>
+> **If Hoovik has been useful, please give it a ⭐ — it takes 2 seconds and means the world.**
 
 <br/>
 
 <a href="https://hoovik.onrender.com">
-  <img src="https://img.shields.io/badge/%20Live%20Demo-hoovik.onrender.com-000000?style=for-the-badge&logoColor=white" alt="Live Demo" />
+  <img src="https://img.shields.io/badge/Live_Demo-hoovik.onrender.com-000000?style=for-the-badge&logo=render&logoColor=white" alt="Live Demo" />
 </a>
 
 <br/><br/>
 
 ![Hoovik demo](docs/src/Hoovik.gif)
 
+</div>
+
+
+---
+
+## ✨ What Makes Hoovik Different
+
+Most video tools record a meeting and leave you with a wall of audio. Hoovik goes further — every meeting is automatically transcribed, each speaker's emotional tone is tracked per segment, and an LLM generates a structured summary with a **discrepancy report** that flags where what someone *said* didn't match how they *felt*.
+
 <br/>
 
-<table>
-  <thead>
-    <tr>
-      <th align="center">Frontend</th>
-      <th align="center">Backend (Node.js)</th>
-      <th align="center">Emotion Service</th>
-      <th align="center">Transcript Service</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td align="center"><img src="https://img.shields.io/badge/Render-46E3B7?style=for-the-badge&logo=render&logoColor=000" /></td>
-      <td align="center"><img src="https://img.shields.io/badge/Render-46E3B7?style=for-the-badge&logo=render&logoColor=000" /></td>
-      <td align="center"><img src="https://img.shields.io/badge/Azure-0078D4?style=for-the-badge&logo=microsoftazure&logoColor=white" /></td>
-      <td align="center"><img src="https://img.shields.io/badge/Azure-0078D4?style=for-the-badge&logo=microsoftazure&logoColor=white" /></td>
-    </tr>
-  </tbody>
-</table>
+<div align="center">
+
+| Feature | Details |
+|---|---|
+| 🎥 **P2P Video & Audio** | WebRTC — streams never touch the backend |
+| 😮 **Live Emotion AI** | Facial landmarks + audio → ~300–500 ms P50 latency |
+| 📝 **Auto Transcription** | Whisper ASR per speaker, delivered post-meeting |
+| 🤖 **AI Meeting Summary** | Groq LLM summary + NLP-vs-live emotion discrepancy detection |
+| ⚡ **Distributed Backend** | 3 pm2 processes unified by Redis pub/sub |
+| 🔒 **Auth & Rate Limiting** | JWT + refresh rotation, Redis Lua locks, account lockout |
 
 </div>
 
 ---
 
-## What Hoovik Does
+## 📝 Meeting Transcripts & AI Summaries
 
-Hoovik is an open-source AI-powered video meeting platform built as four independently deployed services with a distributed backend architecture:
+This is Hoovik's flagship post-meeting feature — and the reason you'll actually use it every day.
 
-- **WebRTC peer-to-peer video/audio** — audio/video streams are exchanged directly between participants; backend handles signalling only
-- **Real-time multimodal emotion inference** — per-participant facial + audio analysis with ~300–500 ms observed P50 latency during local testing with 10 concurrent participants
-- **Async meeting transcription + AI summaries** — Whisper ASR → per-segment emotion → Groq LLM summary with NLP-vs-live discrepancy detection
-- **Multi-process Node.js backend** — 3 pm2 instances unified via Redis pub/sub; distributed join locks; JWT auth with refresh token rotation
-- **25-test Redis suite** — distributed cache, locks, rate limiting, pub/sub, reconnection recovery
+### How it works
 
-### Stack
+```
+Meeting ends
+    │
+    ▼
+Browser uploads audio blob(s) → Transcript Service (HTTP multipart)
+    │
+    ▼  HTTP 202 returned immediately; pipeline runs in background
+    ▼
+ffmpeg → mono 16 kHz WAV
+    │
+    ▼
+Whisper (small) transcribes → raw segments
+    │
+    ▼
+Consecutive segments merged (gap ≤ 2 s, ≤ 60 words)
+    │
+    ▼
+DistilRoBERTa classifies emotion per segment
+    │
+    ▼
+Cross-speaker segments merged + sorted by timestamp
+    │
+    ▼
+build_intelligent_summary() → summary, key points, emotion distribution,
+                               top topics, per-speaker stats, WPM
+    │
+    ▼
+HTTP POST callback → Backend (3 retries: 5 s → 15 s → 30 s on network/5xx)
+    │
+    ▼
+Backend stores transcript + metadata in MongoDB
+    │
+    ▼
+POST /api/v1/transcripts/:id/summary  (rate-limited: 2× per 2 hours)
+    │
+    ▼
+Groq LLM annotates Whisper segments with live facial/audio emotion per speaker
+    + detects NLP-vs-live discrepancies
+    → returns structured summary + `discrepancies[]` array
+```
 
-<p>
-  <img src="https://img.shields.io/badge/React-20232A?style=flat-square&logo=react&logoColor=61DAFB" />
-  <img src="https://img.shields.io/badge/WebRTC-FF6B35?style=flat-square&logo=webrtc&logoColor=white" />
-  <img src="https://img.shields.io/badge/Node.js-339933?style=flat-square&logo=nodedotjs&logoColor=white" />
-  <img src="https://img.shields.io/badge/Socket.IO-010101?style=flat-square&logo=socketdotio&logoColor=white" />
-  <img src="https://img.shields.io/badge/MongoDB-47A248?style=flat-square&logo=mongodb&logoColor=white" />
-  <img src="https://img.shields.io/badge/Redis-DC382D?style=flat-square&logo=redis&logoColor=white" />
-  <img src="https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white" />
-  <img src="https://img.shields.io/badge/PyTorch-EE4C2C?style=flat-square&logo=pytorch&logoColor=white" />
-</p>
+### What you get
 
-> **[Detailed architecture ↓](#system-architecture)**
+After every meeting, the transcript viewer in the frontend shows:
+
+- **Full transcript** — timestamped, speaker-attributed segments
+- **Per-segment emotion** — what the speaker's tone was at each moment
+- **AI Summary** — structured LLM-generated recap of the whole meeting
+- **Discrepancy Report** — segments where a speaker's detected live emotion contradicted their spoken sentiment (e.g. saying "that's fine" with stressed vocal tone and a tense facial expression)
+
+### API
+
+The transcript service POSTs the full structured result to the backend, which stores it in MongoDB. The AI summary endpoint then enriches it with live emotion data:
+
+```http
+POST /api/v1/transcripts/:id/summary
+Content-Type: application/json
+
+{ "emotionData": {...}, "emotionNames": {...} }
+```
+
+Response:
+
+```json
+{
+  "summary": "...",
+  "key_points": ["..."],
+  "discrepancies": [
+    {
+      "speaker": "Alice",
+      "segment": "That timeline works for me.",
+      "nlp_emotion": "positive",
+      "live_emotion": "stressed"
+    }
+  ],
+  "insights": {
+    "dominant_emotion": "neutral",
+    "emotion_distribution": { "neutral": 60, "joy": 25, "anger": 15 },
+    "speaker_stats": {
+      "Alice": { "turns": 12, "dominant_emotion": "neutral", "word_count": 342 }
+    },
+    "top_topics": ["deadline", "budget", "Q3"],
+    "speaking_pace_wpm": 148
+  }
+}
+```
+
+> **Note:** The frontend polls every 20 s (up to 30 attempts) for transcript availability after the meeting ends. Summary generation is rate-limited to 2 requests per 2 hours per transcript.
 
 ---
 
-## Table of Contents
+## 🏗 Architecture
 
-- [What Hoovik Does](#what-hoovik-does)
-  - [Stack](#stack)
-- [Table of Contents](#table-of-contents)
-- [Key Technical Highlights](#key-technical-highlights)
-- [Services Overview](#services-overview)
-  - [Transports](#transports)
-- [System Architecture](#system-architecture)
-  - [State Map](#state-map)
-- [Deployment Topology](#deployment-topology)
-- [Running the System](#running-the-system)
-  - [Quick start](#quick-start)
-  - [Step by step](#step-by-step)
-- [Engineering Challenges](#engineering-challenges)
-- [Known Limitations](#known-limitations)
-- [Dataset](#dataset)
-- [Contributing](#contributing)
-- [License](#license)
-- [Documentation](#documentation)
-
----
-
-## Key Technical Highlights
-
-| Area | What was built |
-|---|---|
-| **WebRTC signalling** | SDP/ICE relay over Socket.IO; Redis adapter fans events across 3 pm2 processes; distributed join lock (`SET NX PX 10000` + Lua CAS) serialises concurrent joins |
-| **Multimodal emotion inference** | Per-participant: MediaPipe face landmarks + Wav2Vec2 audio → `EmotionTransformer` (PyTorch) + XGBoost → EMA smoothing + anomaly detection; **~300–500 ms observed P50 latency during local testing with 10 concurrent participants**; server-side backpressure; live P50/P90/P95 at `GET /stats` |
-| **Browser media pipeline** | `AudioWorklet` + `AnalyserNode` for RMS-gated noise detection; `MediaRecorder` per participant; JPEG frames from `<video>` at self-throttled rates; SSRC-based active speaker with RMS fallback |
-| **Async transcript pipeline** | HTTP 202 immediately; background: ffmpeg → Whisper (`small`) → DistilRoBERTa per-segment emotion → speaker merge → HTTP POST callback to backend (3 retries, 5 s → 15 s → 30 s) |
-| **Multi-process backend** | 3 pm2 instances unified by `@socket.io/redis-adapter`; all room state in Redis — no in-process state; participant map as Redis Hash (`HSET`/`HDEL` per event) |
-| **Auth & rate limiting** | JWT + HttpOnly refresh token rotation; per-IP and per-username rate limiting via Redis Lua INCR+EXPIRE; account lockout after 10 failed logins; uniform `401` prevents username enumeration |
-| **Chat** | Server-assigned timestamps; `chat-ack` delivery confirmation; 5,000 ms ACK timeout with user-initiated retry; capped at 500 messages |
-| **Host verification** | `declare-host` verified server-side against `hostSecretHash` (SHA-256); `isHost` state set only after server ACK; `end-meeting` guard on `socket.data.isHost` |
-| **AI summary** | `POST /transcripts/:id/summary` annotates Whisper segments with live facial/audio emotion per speaker; returns `discrepancies` array (NLP-vs-live mismatches); rate-limited 2× per 2 hours |
-| **Redis test suite** | **25 tests** covering distributed cache, locks, rate limiting, pub/sub, batch ops, reconnection recovery; CI runs 20 via `npm run test:redis:ci` |
-
----
-
-## Services Overview
-
-| Service | Runtime | Role |
-|---|---|---|
-| **Frontend** | React SPA | UI, WebRTC, emotion capture, chat, transcript viewer |
-| **Backend** | Node.js / Express + Socket.IO | Signalling, auth, room management, transcript storage |
-| **Emotion Service** | Python / FastAPI + Socket.IO | Real-time multimodal emotion inference |
-| **Transcript Service** | Python / FastAPI | Post-meeting ASR, per-segment emotion, callback delivery |
-
-### Transports
-
-| Transport | Between | Purpose |
-|---|---|---|
-| WebRTC | Browser ↔ Browser (via backend signalling) | Live audio/video — never proxied through backend |
-| Socket.IO / WS | Frontend ↔ Backend | SDP/ICE relay, chat, participant state, room lifecycle |
-| Socket.IO / WS | Frontend ↔ Emotion Service | `emotion.frame` (JPEG), `audio_chunk` (Float32 PCM), `emotion.result` |
-| HTTP multipart POST | Frontend → Transcript Service | Audio blob upload after meeting ends |
-| HTTP REST | Frontend ↔ Backend | Auth, rooms, transcripts, meeting history |
-
----
-
-## System Architecture
+<details>
+<summary><strong>System diagram</strong></summary>
 
 ```mermaid
 graph TD
@@ -201,19 +201,10 @@ graph TD
     Redis -- "pub/sub adapter" --> SIO_B
 ```
 
-### State Map
+</details>
 
-| Store | What lives there |
-|---|---|
-| **MongoDB** | Users, rooms, meetings, chat history (cap: 500), transcripts, AI summaries |
-| **Redis** | Participant maps (Hash), socket-ID arrays, join locks, rate limit counters, account lock flags, TTL caches |
-| **In-process — Backend** | Nothing — all room state is in Redis |
-| **In-process — Emotion Service** | Embedding buffers, EMA state, pump coroutine handles (not shared across instances) |
-| **Browser localStorage** | JWT, `host:<code>` secret, `emotions:<code>` + `emotionNames:<code>` for AI summary |
-
----
-
-## Deployment Topology
+<details>
+<summary><strong>Deployment topology</strong></summary>
 
 ```mermaid
 graph TD
@@ -244,34 +235,110 @@ graph TD
     TS -- "HTTP callback" --> LB
 ```
 
-| Service | Notes |
-|---|---|
-| **Backend (pm2)** | 3 instances on ports 8000–8002; 512 MiB `max_memory_restart`; exponential-backoff restart; `merge_logs: true` |
-| **Emotion Service** | Single uvicorn process; in-process participant state — no horizontal scaling without Redis-backed externalisation |
-| **Transcript Service** | Single uvicorn process; models loaded at startup; uploads deleted after 120 s |
-| **MongoDB + Redis** | Both required at startup — connection failure → `process.exit(1)` |
+</details>
 
-> Docker / Kubernetes / cloud autoscaling not implemented.
+### State map
+
+| Store | What lives there |
+|---|---|
+| **MongoDB** | Users, rooms, meetings, chat history (cap: 500), transcripts, AI summaries |
+| **Redis** | Participant maps, socket-ID arrays, join locks, rate limit counters, account lock flags, TTL caches |
+| **In-process — Backend** | Nothing — all room state is in Redis |
+| **In-process — Emotion Service** | Embedding buffers, EMA state, pump coroutine handles |
+| **Browser localStorage** | JWT, `host:<code>` secret, emotion data for AI summary |
 
 ---
 
-## Running the System
+## 🧠 Real-Time Emotion Analysis
+
+Per-participant pipeline running at ~300–500 ms P50 latency (load tested with 10 concurrent participants, 2026-05-07):
+
+```
+Video frame (JPEG)          Audio chunk (Float32 PCM)
+        │                              │
+        ▼                              ▼
+MediaPipe face landmarks         Wav2Vec2 embedding
+(136 landmarks + 51 blendshapes  (audeering/wav2vec2-large-
+ + head pose)                     robust-12-ft-emotion-msp-dim)
+        │                              │
+        └──────────────┬───────────────┘
+                       ▼
+              Z-score normalisation
+               (norm_stats.npz)
+                  │           │
+                  ▼           ▼
+           Ensemble        Anomaly detection
+      (EmotionTransformer  (per-modality IsolationForest
+         + XGBoost,         + PCA; flags suspect cycles)
+       temp-calibrated)
+                  │           │
+                  └─────┬─────┘
+                        ▼
+               EMA smoothing (α=0.65, TTL=2 s)
+                        │
+                        ▼
+              emotion.result → frontend overlay
+```
+
+Live stats at `GET /stats` (browser dashboard) and `GET /stats/json` — P50 / P90 / P95 per modality + active participant count. Server-side backpressure throttles clients when face queue depth hits 3.
+
+---
+
+## 🔧 Key Technical Highlights
+
+| Area | What was built |
+|---|---|
+| **WebRTC signalling** | SDP/ICE relay over Socket.IO; Redis adapter fans events across 3 pm2 processes; distributed join lock (`SET NX PX 10000` + Lua CAS) serialises concurrent joins |
+| **Multimodal emotion inference** | MediaPipe (136 landmarks + blendshapes + head pose) + Wav2Vec2 → `EmotionTransformer` + XGBoost (temp-calibrated) + per-modality IsolationForest anomaly detection → EMA (α=0.65); graceful `both/audio_only/video_only` modality fallback; ~300–500 ms P50 |
+| **Browser media pipeline** | `AudioWorklet` + `AnalyserNode` for RMS-gated noise detection; `MediaRecorder` per participant; SSRC-based active speaker with RMS fallback |
+| **Async transcript pipeline** | HTTP 202 immediately; background: ffmpeg → Whisper (`small`) → segment merging → DistilRoBERTa per-segment emotion → `build_intelligent_summary` → HTTP POST callback (3 retries: 5 s → 15 s → 30 s on network/5xx; 4xx not retried) |
+| **Multi-process backend** | 3 pm2 instances via `@socket.io/redis-adapter`; participant map as Redis Hash (`HSET`/`HDEL` per event); no in-process room state |
+| **Auth & rate limiting** | JWT + HttpOnly refresh token rotation; Redis Lua INCR+EXPIRE per-IP and per-username; account lockout after 10 failed logins (900 s TTL); uniform `401` prevents username enumeration |
+| **AI summary** | `generateAiSummaryService` accepts `emotionData`/`emotionNames` from browser; `buildGroqPrompt` annotates each Whisper segment with matched live facial/audio emotion via `buildSpeakerLiveMap`; returns `discrepancies[]` and `live_dominant_emotion` per speaker; rate-limited 2× per 2 hours |
+| **Redis test suite** | 25 tests covering distributed cache, locks, rate limiting, pub/sub, batch ops, reconnection recovery; CI runs 20 via `npm run test:redis:ci` |
+
+---
+
+## 🚀 Services
+
+| Service | Runtime | Hosted on | Role |
+|---|---|---|---|
+| **Frontend** | React SPA | Render | UI, WebRTC, emotion capture, chat, transcript viewer |
+| **Backend** | Node.js / Express + Socket.IO | Render | Signalling, auth, room management, transcript storage |
+| **Emotion Service** | Python / FastAPI + Socket.IO | Azure | Real-time multimodal emotion inference |
+| **Transcript Service** | Python / FastAPI | Azure | Post-meeting ASR, per-segment emotion, callback delivery |
+
+### Transports
+
+| Transport | Between | Purpose |
+|---|---|---|
+| WebRTC | Browser ↔ Browser | Live audio/video — never proxied |
+| Socket.IO / WS | Frontend ↔ Backend | SDP/ICE relay, chat, participant state |
+| Socket.IO / WS | Frontend ↔ Emotion Service | `emotion.frame`, `audio_chunk`, `emotion.result` |
+| HTTP multipart | Frontend → Transcript Service | Audio blob upload after meeting ends |
+| HTTP REST | Frontend ↔ Backend | Auth, rooms, transcripts, meeting history |
+
+---
+
+## ⚡ Running Locally
 
 ### Quick start
 
 ```bash
 chmod +x dev.sh   # one-time
-./dev.sh          # starts all 4 services in parallel with colour-coded output
+./dev.sh          # starts all 4 services with colour-coded output
 ```
 
 | Prefix | Service | Port |
 |---|---|---|
 | `FRONTEND` | React SPA | `3000` |
-| `BACKEND` | Node.js / Express + Socket.IO | `8000` |
+| `BACKEND` | Node.js / Express | `8000` |
 | `EMOTION` | FastAPI emotion inference | `5002` |
-| `TRANSCRIPT` | FastAPI transcription pipeline | `5001` |
+| `TRANSCRIPT` | FastAPI transcription | `5001` |
 
-> Python venvs must exist at `emotion_service/venv` and `transcript_service/venv`. Start MongoDB and Redis first. `Ctrl+C` shuts down all services cleanly.
+> Start MongoDB and Redis first. Python venvs must exist at `emotion_service/venv` and `transcript_service/venv` — `dev.sh` invokes them directly via `./emotion_service/venv/bin/python` and `./transcript_service/venv/bin/python`. `Ctrl+C` sends `SIGINT` and kills all child processes cleanly.
+>
+> **Windows:** `dev.sh` is a bash script. Use WSL2 (recommended), Git Bash, or start each service manually in four separate terminals — see [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) for the PowerShell commands.
 
 ### Step by step
 
@@ -284,8 +351,9 @@ redis-server
 **2 — Backend**
 ```bash
 cd backend && npm install
-pm2 start ecosystem.config.cjs          # production (3 processes)
-PORT=8000 node src/app.js               # single-process dev
+cp .env.example .env             # fill in JWT_SECRET, MONGO_URI, GROQ_API_KEY etc.
+npm run dev                      # single-process dev (nodemon)
+npm run prod                     # production: pm2 start ecosystem.config.cjs (3 processes)
 ```
 
 Redis tests:
@@ -296,17 +364,23 @@ npm run test:redis:ci   # 20 tests (no recovery tests — safe for CI)
 
 **3 — Emotion Service**
 ```bash
-cd emotion_service && pip install -r requirements.txt
-uvicorn app:app --host 0.0.0.0 --port 5002
+cd emotion_service
+python3.12 -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+uvicorn app:app --host 0.0.0.0 --port 5002 --reload
 ```
-> `models/` must contain `best_modal.pt`, `xgb_model.joblib`, `weights.json`, and anomaly detectors.
+> `models/` must contain `best_modal.pt`, `xgb_model.joblib`, `weights.json`, anomaly detectors, and `embeddings/face_landmarker.task`. The server refuses to start if any model fails to load.
 
 **4 — Transcript Service**
 ```bash
-cd transcript_service && pip install -r requirements.txt
+cd transcript_service
+python3.13 -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
 uvicorn app:app --host 0.0.0.0 --port 5001
 ```
-> `ffmpeg` must be in `PATH` — validated at startup. Whisper + DistilRoBERTa downloaded from HuggingFace on first run.
+> `ffmpeg` must be in `PATH` — validated at startup. Whisper + DistilRoBERTa download from HuggingFace on first run. Do **not** use `python app.py` — invoke via `uvicorn app:app` directly. (`dev.sh` runs this without `--reload`; the emotion service uses `--reload`.)
 
 **5 — Frontend**
 ```bash
@@ -317,51 +391,63 @@ npm run build    # production
 
 ---
 
-## Engineering Challenges
+## 🧩 Engineering Challenges
 
-**1 — Multi-process Socket.IO fan-out** — `@socket.io/redis-adapter` uses Redis pub/sub to deliver events across all 3 pm2 instances. All room state lives in Redis so any process can serve any client. Sticky sessions at the load balancer are still required for the Socket.IO handshake.
+**1 — Multi-process Socket.IO fan-out** — `@socket.io/redis-adapter` delivers events across all 3 pm2 instances via Redis pub/sub. All room state lives in Redis so any process can serve any client.
 
-**2 — Concurrent join races** — Without coordination, parallel joins produce lost updates. A Redis distributed lock (`SET NX PX 10000`, Lua CAS release) serialises participant state mutations within a 10-second window per room.
+**2 — Concurrent join races** — A Redis distributed lock (`SET NX PX 10000`, Lua CAS release) serialises participant state mutations within a 10-second window per room.
 
-**3 — CPU-bound inference without blocking** — The emotion service runs PyTorch and MediaPipe inside per-participant async pump coroutines, offloading to a thread-pool executor. Backpressure events throttle the client when the face queue depth hits 3, preventing memory growth.
+**3 — CPU-bound inference without blocking** — The emotion service offloads PyTorch and MediaPipe to a thread-pool executor. Backpressure events throttle the client when the face queue depth hits 3.
 
-**4 — Async transcript delivery with no shared state** — Services share no DB or queue. The transcript service delivers via HTTP POST callback to the backend. The frontend polls every 20 s (up to 30 attempts) rather than waiting for a push — fully decoupled but eventually consistent.
+**4 — Async transcript delivery with no shared state** — Services share no DB or queue. The transcript service delivers via HTTP POST callback. The frontend polls every 20 s (up to 30 attempts) — fully decoupled.
 
-**5 — Parallel media capture in the browser** — Host simultaneously plays WebRTC video, captures frames for emotion analysis, and records audio for transcription. Three separate tap points avoid interference: `captureStream()` for frames, cloned `MediaStream` + `AudioWorklet` for recording, standard `<video>` for playback.
+**5 — Parallel media capture in the browser** — Host simultaneously captures frames for emotion, records audio for transcription, and plays WebRTC video via three independent tap points.
 
-**6 — Reconnect state gap** — Backend reconstructs participant records from Redis on reconnect. The emotion service holds per-participant inference state in process memory. The two stores are not reconciled — stale buffers may persist in the emotion service after a reconnect.
+**6 — Reconnect state gap** — Backend reconstructs participant records from Redis on reconnect; the emotion service holds per-participant state in process memory. The two stores are not reconciled — stale buffers may persist after reconnect.
 
 ---
 
-## Known Limitations
+## ⚠️ Known Limitations
 
 | Area | Limitation |
 |---|---|
 | **Inference scaling** | Emotion service in-process state cannot be horizontally scaled without externalising to Redis. Transcript service model singletons have the same constraint. |
-| **Transcript delivery** | A crashed transcription process or empty merged-segment result causes silent data loss. Network/5xx failures are retried (3×) and the user is alerted on final failure. |
+| **Transcript delivery** | An empty merged-segment result causes a silent no-callback. A 4xx response from the backend also causes silent loss (only network errors and 5xx are retried). |
+| **NODE_API timeout** | `requests.post(..., timeout=None)` — a hung backend blocks the transcript background thread indefinitely across all retry attempts. |
 | **Cleanup timer** | `cleanupOldMeetings` runs in all 3 pm2 processes independently every hour — no distributed leader election. |
-| **Transcription language** | Whisper hardcoded to `language="en"`. Multilingual meetings produce degraded output. |
+| **Transcription language** | Whisper hardcoded to `language="en"` — multilingual meetings produce degraded output. |
 | **Orchestration** | No unified supervisor across 4 services. Only the emotion service exposes `GET /health` and `GET /ready`. |
 | **CORS** | Backend allows `localhost:3000` + one `CLIENT_ORIGIN`. Additional origins require a code change. |
-| **Frontend — camera mute diff** | `cameraEnabled` always passed as `true` in remote mute sync; camera state is not tracked in the diff. |
-| **Frontend — hot reload** | `_activeRooms` module-level `Set` persists across React hot-reloads in dev, which can suppress room re-entry. |
-| **Chat history** | Capped at 500 messages; no archival or export. |
+| **Chat history** | Capped at 500 messages — no archival or export. |
+| **Inference concurrency** | Shared `asr_model` and `emotion_pipeline` singletons in the transcript service have no explicit locking; thread safety depends on upstream library internals. |
 
 ---
 
-## Dataset
+## 📦 Dataset
 
-The `EmotionTransformer` + XGBoost ensemble was trained on a custom dataset of paired audio/video embedding sequences with ground-truth emotion labels, collected across multiple participants and lighting conditions.
+The `EmotionTransformer` + XGBoost ensemble was trained on RAVDESS and CREMA-D datasets with actor-disjoint train/val/test splits (strict speaker-independent evaluation). Hyperparameters were tuned via Optuna separately for the Transformer and XGBoost models.
 
-**Download**: [dataset.npz — Google Drive](https://drive.google.com/file/d/135wYH7DB8_10Jc8g08MfC6Poews_Lkgp/view?usp=sharing)
+**Download:** [dataset.npz — Google Drive](https://drive.google.com/file/d/135wYH7DB8_10Jc8g08MfC6Poews_Lkgp/view?usp=sharing)
 
-Place under `emotion_service/extracted_dataset/` before running the training pipeline. Not required to run the inference server — only pre-trained model files under `models/` are needed. See [`docs/emotion-service.md`](docs/emotion-service.md) for the full training procedure.
+Place under `emotion_service/extracted_dataset/` before running the training pipeline. Pre-trained model files under `models/` are all that's needed to run the inference server. See [`docs/emotion-service.md`](docs/emotion-service.md) for the full training procedure.
 
 ---
 
-## Contributing
+## 🤝 Contributing
 
 See [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) — covers prerequisites, local setup, env configuration, load testing, and PR checklist.
+
+---
+
+## 📚 Documentation
+
+| File | Contents |
+|---|---|
+| [`docs/frontend.md`](docs/frontend.md) | Hook architecture, WebRTC lifecycle, emotion pipeline, event contracts, error handling |
+| [`docs/backend.md`](docs/backend.md) | Routes, Socket.IO handlers, Redis lock design, pm2 config, API contracts, security |
+| [`docs/realTimeEmotionService.md`](docs/realTimeEmotionService.md) | Inference pipeline, model training, configuration schema, performance |
+| [`docs/transcript_service.md`](docs/transcript_service.md) | ASR pipeline, segment merging, callback schema, error handling |
+| [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) | Setup guide, prerequisites, contribution workflow |
 
 ---
 
@@ -371,12 +457,16 @@ MIT — see [LICENSE](LICENSE).
 
 ---
 
-## Documentation
+<div align="center">
 
-| File | Contents |
-|---|---|
-| [`docs/frontend.md`](docs/frontend.md) | Hook architecture, WebRTC lifecycle, emotion pipeline, event contracts, error handling |
-| [`docs/backend.md`](docs/backend.md) | Routes, Socket.IO handlers, Redis lock design, pm2 config, API contracts, security |
-| [`docs/realTimeEmotionService.md`](docs/realTimeEmotionService.md) | Inference pipeline, model training, configuration schema, performance |
-| [`docs/transcript_service.md`](docs/transcript_service.md) | ASR pipeline, segment merging, callback schema, error handling |
-| [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) | Setup guide, prerequisites, contribution workflow |
+<br/>
+
+**Built something cool with Hoovik? Open a PR — contributions are welcome.**
+
+<br/>
+
+⭐ **Star this repo if it's useful — it helps more people find it.**
+
+<br/><br/>
+
+</div>
