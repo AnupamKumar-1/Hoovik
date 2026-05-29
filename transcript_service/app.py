@@ -148,9 +148,15 @@ async def run_processing(
             
             if 500 <= res.status_code < 600:
                 raise requests.RequestException(f"HTTP {res.status_code}")
-                
-            print(f"Node API response: {res.status_code} {res.text[:200]}")
-            break
+            if 400 <= res.status_code < 500:
+                print(
+                    f"[transcript] Node API rejected with "
+                    f"{res.status_code}: {res.text[:200]} - not retrying"
+                    )
+                break
+            if res.status_code < 400:
+                print(f"[transcript] Node API callback success: {res.status_code}")
+                break
             
         except requests.RequestException as e:
             if attempt < len(delays):
