@@ -403,6 +403,10 @@ export default function Home() {
         pollTimerRef.current = setTimeout(poll, getDelay(attempt));
       } else {
         stopPolling();
+        showSnack(
+          "Transcript unavailable — please contact support if this persists.",
+          "error"
+        );
       }
     };
 
