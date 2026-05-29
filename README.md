@@ -64,9 +64,100 @@ Most video tools record a meeting and leave you with a wall of audio. Hoovik goe
 
 ---
 
-## 📝 Meeting Transcripts & AI Summaries
+## 🔬 Flagship Services
 
-This is Hoovik's flagship post-meeting feature — and the reason you'll actually use it every day.
+> GitHub doesn't support interactive tabs — click each panel below to expand it. Both are flagship features; the Emotion Service runs **live during the meeting**, the Transcript Service runs **after it ends**.
+
+<br/>
+
+<!-- ═══════════════════════════════════════════════════════
+     PANEL 1 — EMOTION SERVICE   (open by default)
+════════════════════════════════════════════════════════ -->
+
+<details open>
+<summary><strong>😮 Real-Time Emotion Service — live inference during your meeting</strong></summary>
+
+<br/>
+
+Per-participant multimodal emotion pipeline running at **~300–500 ms P50 latency** (load-tested with 10 concurrent participants, 2026-05-07).
+
+### How it works
+
+```
+Video frame (JPEG)          Audio chunk (Float32 PCM)
+        │                              │
+        ▼                              ▼
+MediaPipe face landmarks         Wav2Vec2 embedding
+(136 landmarks + 51 blendshapes  (audeering/wav2vec2-large-
+ + head pose)                     robust-12-ft-emotion-msp-dim)
+        │                              │
+        └──────────────┬───────────────┘
+                       ▼
+              Z-score normalisation
+               (norm_stats.npz)
+                  │           │
+                  ▼           ▼
+           Ensemble        Anomaly detection
+      (EmotionTransformer  (per-modality IsolationForest
+         + XGBoost,         + PCA; flags suspect cycles)
+       temp-calibrated)
+                  │           │
+                  └─────┬─────┘
+                        ▼
+               EMA smoothing (α=0.65, TTL=2 s)
+                        ▼
+              emotion.result → frontend overlay
+```
+
+### What you get — live, during the call
+
+- **Per-participant emotion overlay** — updated every ~300–500 ms directly in the video UI
+- **Modality fallback** — gracefully degrades: `both → audio_only → video_only` if a modality drops
+- **Anomaly flagging** — IsolationForest + PCA detects and suppresses suspect inference cycles
+- **Live stats dashboard** — `GET /stats` (browser) and `GET /stats/json` expose P50 / P90 / P95 per modality + active participant count
+- **Backpressure** — server throttles clients automatically when face queue depth hits 3
+
+### Socket.IO events
+
+| Event | Direction | Payload |
+|---|---|---|
+| `emotion.frame` | Frontend → Service | `{ participantId, jpeg: base64 }` |
+| `audio_chunk` | Frontend → Service | `{ participantId, pcm: Float32Array }` |
+| `emotion.result` | Service → Frontend | `{ participantId, emotion, confidence, modality }` |
+
+### Model stack
+
+| Layer | Model / Library |
+|---|---|
+| Face landmarks | MediaPipe (136 landmarks + 51 blendshapes + head pose) |
+| Audio embedding | `audeering/wav2vec2-large-robust-12-ft-emotion-msp-dim` |
+| Fusion classifier | Custom `EmotionTransformer` (PyTorch) + XGBoost (temp-calibrated) |
+| Anomaly filter | Per-modality IsolationForest + PCA |
+| Smoothing | EMA α=0.65, TTL=2 s |
+
+### Health endpoints
+
+```http
+GET /health   → 200 OK if all models loaded
+GET /ready    → 200 OK if service is accepting connections
+GET /stats    → live performance dashboard (browser)
+GET /stats/json → machine-readable P50/P90/P95 + participant count
+```
+
+</details>
+
+<br/>
+
+<!-- ═══════════════════════════════════════════════════════
+     PANEL 2 — TRANSCRIPT SERVICE   (collapsed by default)
+════════════════════════════════════════════════════════ -->
+
+<details>
+<summary><strong>📝 Transcript Service — AI summaries & insights delivered post-meeting</strong></summary>
+
+<br/>
+
+Hoovik's post-meeting pipeline — every meeting is automatically transcribed, per-segment emotion is classified, and a Groq LLM generates a structured summary with a **discrepancy report** that flags where what someone *said* didn't match how they *felt*.
 
 ### How it works
 
@@ -111,18 +202,29 @@ Groq LLM annotates Whisper segments with live facial/audio emotion per speaker
     → returns structured summary + `discrepancies[]` array
 ```
 
-### What you get
-
-After every meeting, the transcript viewer in the frontend shows:
+### What you get — after every meeting
 
 - **Full transcript** — timestamped, speaker-attributed segments
-- **Per-segment emotion** — what the speaker's tone was at each moment
+- **Per-segment emotion** — what the speaker's tone was at each moment (DistilRoBERTa)
 - **AI Summary** — structured LLM-generated recap of the whole meeting
 - **Discrepancy Report** — segments where a speaker's detected live emotion contradicted their spoken sentiment (e.g. saying "that's fine" with stressed vocal tone and a tense facial expression)
 
-### API
+### Pipeline entry point
 
-The transcript service POSTs the full structured result to the backend, which stores it in MongoDB. The AI summary endpoint then enriches it with live emotion data:
+```http
+POST /process_meeting
+Content-Type: multipart/form-data
+
+audio_files[]: <blob>        # one file per speaker
+meeting_code: "ABC123"
+speaker_map: {"alice": "Alice"}   # filename-base → display name
+x-host-secret: <secret>
+x-user-token: <jwt>          # optional
+```
+
+Returns `HTTP 202` immediately. Processing happens in the background.
+
+### AI Summary API
 
 ```http
 POST /api/v1/transcripts/:id/summary
@@ -158,6 +260,17 @@ Response:
 ```
 
 > **Note:** The frontend polls every 20 s (up to 30 attempts) for transcript availability after the meeting ends. Summary generation is rate-limited to 2 requests per 2 hours per transcript.
+
+### Retry & delivery guarantees
+
+| Scenario | Behaviour |
+|---|---|
+| Network error or 5xx from backend | Retried at 5 s → 15 s → 30 s (3 attempts) |
+| 4xx from backend | Not retried — logged and dropped |
+| Empty merged-segment result | No callback sent (silent skip) |
+| `timeout=None` on POST | Hung backend blocks thread indefinitely — known limitation |
+
+</details>
 
 ---
 
@@ -246,41 +359,6 @@ graph TD
 | **In-process — Backend** | Nothing — all room state is in Redis |
 | **In-process — Emotion Service** | Embedding buffers, EMA state, pump coroutine handles |
 | **Browser localStorage** | JWT, `host:<code>` secret, emotion data for AI summary |
-
----
-
-## 🧠 Real-Time Emotion Analysis
-
-Per-participant pipeline running at ~300–500 ms P50 latency (load tested with 10 concurrent participants, 2026-05-07):
-
-```
-Video frame (JPEG)          Audio chunk (Float32 PCM)
-        │                              │
-        ▼                              ▼
-MediaPipe face landmarks         Wav2Vec2 embedding
-(136 landmarks + 51 blendshapes  (audeering/wav2vec2-large-
- + head pose)                     robust-12-ft-emotion-msp-dim)
-        │                              │
-        └──────────────┬───────────────┘
-                       ▼
-              Z-score normalisation
-               (norm_stats.npz)
-                  │           │
-                  ▼           ▼
-           Ensemble        Anomaly detection
-      (EmotionTransformer  (per-modality IsolationForest
-         + XGBoost,         + PCA; flags suspect cycles)
-       temp-calibrated)
-                  │           │
-                  └─────┬─────┘
-                        ▼
-               EMA smoothing (α=0.65, TTL=2 s)
-                        │
-                        ▼
-              emotion.result → frontend overlay
-```
-
-Live stats at `GET /stats` (browser dashboard) and `GET /stats/json` — P50 / P90 / P95 per modality + active participant count. Server-side backpressure throttles clients when face queue depth hits 3.
 
 ---
 
