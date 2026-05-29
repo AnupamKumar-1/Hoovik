@@ -1,5 +1,3 @@
-import httpStatus from "http-status";
-import { makeLogger } from "../utils/redis.utils.js";
 import {
   loginService,
   registerService,
@@ -14,45 +12,46 @@ import {
   refreshTokenService,
 } from "../services/user.service.js";
 
-const log = makeLogger("user");
-
-const cookieOpts = {
+const COOKIE_BASE = {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
   sameSite: "Strict",
   path: "/",
 };
 
-const logout = async (req, res) => {
-  const { status, body } = await logoutService(req);
-  res.clearCookie("refreshToken", cookieOpts);
-  return res.status(status).json(body);
-};
+function setRefreshCookie(res, cookiePayload) {
+  if (cookiePayload?.refreshToken) {
+    res.cookie("refreshToken", cookiePayload.refreshToken.value, {
+      ...COOKIE_BASE,
+      maxAge: cookiePayload.refreshToken.ttlSec * 1000,
+    });
+  }
+}
+
+function clearRefreshCookie(res) {
+  res.clearCookie("refreshToken", COOKIE_BASE);
+}
 
 const login = async (req, res) => {
   const { status, body, cookies } = await loginService(req);
-  if (cookies?.refreshToken) {
-    res.cookie("refreshToken", cookies.refreshToken.value, {
-      ...cookieOpts,
-      maxAge: cookies.refreshToken.ttlSec * 1000,
-    });
-  }
-  return res.status(status).json(body);
-};
-
-const refreshToken = async (req, res) => {
-  const { status, body, cookies } = await refreshTokenService(req);
-  if (cookies?.refreshToken) {
-    res.cookie("refreshToken", cookies.refreshToken.value, {
-      ...cookieOpts,
-      maxAge: cookies.refreshToken.ttlSec * 1000,
-    });
-  }
+  setRefreshCookie(res, cookies);
   return res.status(status).json(body);
 };
 
 const register = async (req, res) => {
   const { status, body } = await registerService(req);
+  return res.status(status).json(body);
+};
+
+const refreshToken = async (req, res) => {
+  const { status, body, cookies } = await refreshTokenService(req);
+  setRefreshCookie(res, cookies);
+  return res.status(status).json(body);
+};
+
+const logout = async (req, res) => {
+  const { status, body } = await logoutService(req);
+  clearRefreshCookie(res);
   return res.status(status).json(body);
 };
 

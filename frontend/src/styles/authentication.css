@@ -15,7 +15,6 @@
   --au-font-b:        'DM Sans', sans-serif;
 }
 
-
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
@@ -27,7 +26,6 @@ html, body, #root {
   background: var(--au-bg);
 }
 
-
 .au-root {
   min-height: 100vh;
   display: flex;
@@ -37,7 +35,6 @@ html, body, #root {
   position: relative;
   overflow: hidden;
 }
-
 
 .au-bg {
   position: fixed;
@@ -83,7 +80,6 @@ html, body, #root {
   gap: 40px;
 }
 
-
 .au-hero-logo {
   display: flex;
   align-items: center;
@@ -94,9 +90,6 @@ html, body, #root {
   letter-spacing: -0.02em;
   color: var(--au-text);
 }
-
-.au-hero-logo svg { flex-shrink: 0; }
-
 
 .au-hero-content {
   display: flex;
@@ -182,7 +175,6 @@ html, body, #root {
   font-weight: 400;
 }
 
-
 .au-hero-card {
   border-radius: 18px;
   background: rgba(7, 13, 26, 0.7);
@@ -212,6 +204,7 @@ html, body, #root {
 }
 
 .au-hero-card-dots { display: flex; gap: 5px; }
+
 .au-dot {
   width: 7px;
   height: 7px;
@@ -264,7 +257,6 @@ html, body, #root {
 .au-chip-sky  { background: rgba(14,165,233,0.1); color: var(--au-sky-bright); border: 1px solid rgba(14,165,233,0.2); }
 .au-chip-gold { background: rgba(245,158,11,0.1); color: #fbbf24; border: 1px solid rgba(245,158,11,0.2); }
 
-
 .au-panel {
   position: relative;
   z-index: 1;
@@ -289,9 +281,7 @@ html, body, #root {
   animation: au-fadeUp 0.55s ease both;
   display: flex;
   flex-direction: column;
-  gap: 0;
 }
-
 
 .au-form-brand {
   display: flex;
@@ -315,7 +305,6 @@ html, body, #root {
   color: var(--au-text);
 }
 
-
 .au-form-title {
   font-family: var(--au-font-d);
   font-size: 1.75rem;
@@ -334,11 +323,8 @@ html, body, #root {
   line-height: 1.5;
 }
 
-
-
 .au-tabs {
   display: flex;
-  gap: 0;
   margin-bottom: 28px;
   background: rgba(4, 8, 15, 0.5);
   border-radius: 12px;
@@ -372,6 +358,10 @@ html, body, #root {
   box-shadow: 0 0 20px rgba(14, 165, 233, 0.3);
 }
 
+.au-tab:focus-visible {
+  outline: 2px solid var(--au-sky-bright);
+  outline-offset: 2px;
+}
 
 .au-form {
   display: flex;
@@ -420,6 +410,15 @@ html, body, #root {
   box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
 }
 
+.au-input-invalid {
+  border-color: rgba(239, 68, 68, 0.55);
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.08);
+}
+
+.au-input-invalid:focus {
+  border-color: rgba(239, 68, 68, 0.7);
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.12);
+}
 
 .au-error {
   display: flex;
@@ -437,9 +436,12 @@ html, body, #root {
 
 .au-error svg { flex-shrink: 0; }
 
-
-
-
+.au-field-error {
+  color: #f87171;
+  font-size: 0.78rem;
+  margin-top: 2px;
+  font-family: var(--au-font-b);
+}
 
 .au-submit {
   width: 100%;
@@ -476,13 +478,10 @@ html, body, #root {
   cursor: not-allowed;
 }
 
-.au-submit:focus {
-  outline: 3px solid rgba(14, 165, 233, 0.3);
+.au-submit:focus-visible {
+  outline: 3px solid rgba(14, 165, 233, 0.4);
   outline-offset: 2px;
 }
-
-
-
 
 .au-spinner {
   width: 18px;
@@ -493,7 +492,6 @@ html, body, #root {
   animation: au-spin 0.75s linear infinite;
   display: inline-block;
 }
-
 
 .au-form-foot {
   margin-top: 20px;
@@ -524,6 +522,11 @@ html, body, #root {
   text-decoration-color: rgba(56, 189, 248, 0.4);
 }
 
+.au-form-foot-link:focus-visible {
+  outline: 2px solid var(--au-sky-bright);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
 
 .au-snack {
   position: fixed;
@@ -547,7 +550,6 @@ html, body, #root {
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
   animation: au-snackIn 0.3s ease both;
 }
-
 
 @keyframes au-fadeUp {
   from { opacity: 0; transform: translateY(16px); }
@@ -573,7 +575,6 @@ html, body, #root {
   to   { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 
-
 @media (max-width: 600px) {
   .au-form-card {
     padding: 28px 22px;
@@ -591,8 +592,18 @@ html, body, #root {
   }
 }
 
-.au-field-error {
-  color: #ef4444;
-  font-size: 0.8rem;
-  margin-top: 6px;
+@media (prefers-reduced-motion: reduce) {
+  .au-hero-badge-dot,
+  .au-spinner,
+  .au-hero-card,
+  .au-form-card,
+  .au-snack,
+  .au-field-animate {
+    animation: none;
+  }
+  .au-submit,
+  .au-tab,
+  .au-input {
+    transition: none;
+  }
 }
