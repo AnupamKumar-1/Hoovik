@@ -412,12 +412,12 @@
     <!-- Pill 3: Whisper ASR  (x=2420, w=460) -->
     <g opacity="0">
       <animate attributeName="opacity" from="0" to="1" dur="0.5s" begin="1.4s" fill="freeze"/>
-      <rect x="2420" y="680" width="460" height="100" rx="50"
+      <rect x="2420" y="680" width="420" height="100" rx="50"
             fill="url(#p3g)" stroke="#0284c7" stroke-width="2" stroke-opacity="0.40"/>
       <circle cx="2478" cy="730" r="16" fill="#0284c7"/>
       <text x="2510" y="742"
             font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
-            font-size="44" font-weight="600" fill="#0c4a6e">Whisper ASR</text>
+            font-size="44" font-weight="600" fill="#0c4a6e">Transcription</text>
     </g>
 
     <!-- Pill 4: AI-Powered Summaries & Insights  (x=2910, w=860) -->

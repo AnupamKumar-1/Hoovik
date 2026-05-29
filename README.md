@@ -2,7 +2,7 @@
 
 <br/>
 
-<img src="docs/hoovik-header.svg" width="800" alt="Hoovik — Video meetings that think. In real time." />
+<img src="docs/hoovik-header.svg" width="900" alt="Hoovik — Video meetings that think. In real time." />
 
 <br/><br/>
 
