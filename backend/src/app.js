@@ -120,7 +120,7 @@ const start = async () => {
   });
 };
 
-console.log("SERVER PORT:", process.env.PORT);
+console.info(`server: PORT env -> ${process.env.PORT}`);
 
 process.on("unhandledRejection", (reason) => {
   console.error("server: unhandled promise rejection —", reason?.message ?? reason);
