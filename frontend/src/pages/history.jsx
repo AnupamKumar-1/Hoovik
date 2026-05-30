@@ -252,13 +252,7 @@ export default function History() {
     return String(pUserId) === String(hostId);
   };
 
-  const isYou = (pRaw) => {
-    if (!userData || !pRaw) return false;
-    const pUserId = pRaw?._id || pRaw?.id || pRaw?.userId || pRaw?.user_id || pRaw?.meta?.userId || null;
-    const uId = userData?._id || userData?.id || null;
-    if (!pUserId || !uId) return false;
-    return String(pUserId) === String(uId);
-  };
+  const isYou = (pRaw) => userMatchesParticipant(userData, pRaw);
 
   const PREVIEW_LIMIT = 6;
 
