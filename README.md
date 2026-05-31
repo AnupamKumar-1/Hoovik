@@ -66,7 +66,7 @@ Most video tools record a meeting and leave you with a wall of audio. Hoovik goe
 
 ## 🔬 Flagship Services
 
-> GitHub doesn't support interactive tabs — click each panel below to expand it. Both are flagship features; the Emotion Service runs **live during the meeting**, the Transcript Service runs **after it ends**.
+> the Emotion Service runs **live during the meeting**, the Transcript Service runs **after it ends**.
 
 <br/>
 
