@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import "../styles/history.css";
 
 function formatDate(dateStr) {
@@ -300,6 +300,7 @@ function MeetingCard({ meeting, isExpanded, onToggle }) {
 }
 
 export default function HistoryPanel({ getHistoryOfUser, userData, authLoading }) {
+  const fallbackIdsRef = useRef([]);
   const [meetings, setMeetings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -512,7 +513,10 @@ export default function HistoryPanel({ getHistoryOfUser, userData, authLoading }
         {!loading && !error && filtered.length > 0 && (
           <div className="hs-meetings-list">
             {filtered.map((meeting, i) => {
-              const id = meeting._id || meeting.meetingCode || i;
+              const id =
+                meeting._id ||
+                meeting.meetingCode ||
+                (fallbackIdsRef.current[i] ??= crypto.randomUUID());
               return (
                 <MeetingCard
                   key={id}
