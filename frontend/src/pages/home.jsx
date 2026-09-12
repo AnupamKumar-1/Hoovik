@@ -1377,15 +1377,19 @@ export default function Home() {
     return null;
   }, []);
 
-  const stopPolling = useCallback(() => {
-    if (pollTimerRef.current) {
-      clearTimeout(pollTimerRef.current);
-      pollTimerRef.current = null;
-    }
-    pollAttemptsRef.current = 0;
+  const stopPolling = useCallback((clearPending = true) => {
+  if (pollTimerRef.current) {
+    clearTimeout(pollTimerRef.current);
+    pollTimerRef.current = null;
+  }
+
+  pollAttemptsRef.current = 0;
+
+  if (clearPending) {
     localStorage.removeItem(PENDING_TRANSCRIPT_KEY);
     setPendingTranscriptCode(null);
-  }, []);
+  }
+}, []);
 
   const startPollingForTranscript = useCallback((meetingCode) => {
     if (pollTimerRef.current) return;
@@ -1429,7 +1433,7 @@ export default function Home() {
       if (Date.now() - startTime < MAX_TOTAL_MS) {
         pollTimerRef.current = setTimeout(poll, getDelay(attempt));
       } else {
-        stopPolling();
+        stopPolling(false);
         showSnack("Transcript unavailable — please contact support if this persists.", "error");
       }
     };
