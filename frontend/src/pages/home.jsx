@@ -1426,8 +1426,9 @@ export default function Home() {
           }
         }
       } catch {
-        stopPolling();
-        return;
+        stopPolling(false);
+showSnack("Transcript unavailable — please contact support if this persists.", "error");
+return;
       }
 
       if (Date.now() - startTime < MAX_TOTAL_MS) {
