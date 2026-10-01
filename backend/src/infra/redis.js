@@ -28,4 +28,8 @@ export async function connectRedis() {
     ]);
 }
 
+export function isRedisReady() {
+    return redisClient.isReady === true;
+}
+
 export default redisClient;
