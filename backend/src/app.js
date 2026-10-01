@@ -16,6 +16,7 @@ import "./models/ragSession.model.js";
 import userRoutes from "./routes/users.routes.js";
 import roomsRoutes from "./routes/rooms.js";
 import meetingsRoutes from "./routes/meetings.routes.js";
+import healthRoutes from "./routes/health.routes.js";
 import transcriptRoutes from "./routes/transcripts.js";
 import { connectToSocket } from "./controllers/socket.controller.js";
 import { logout } from "./controllers/user.controller.js";
@@ -53,6 +54,9 @@ app.use("/api/v1/rooms", roomsRoutes);
 app.use("/api/v1/transcripts/proxy", transcriptProxyRoutes);
 app.use("/api/v1/transcripts", transcriptRoutes);
 app.use("/api/v1/meetings", meetingsRoutes);
+
+app.use("/api/v1/health", healthRoutes);
+
 app.use("/api/v1/transcript-requests", transcriptRequestRoutes);
 app.use("/api/v1/rag", ragRoutes);
 
