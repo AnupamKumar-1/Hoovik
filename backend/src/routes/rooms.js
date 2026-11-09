@@ -43,6 +43,8 @@ function generateRoomCode() {
   return crypto.randomBytes(4).toString("hex").toUpperCase();
 }
 
+const ROOM_CODE_RE = /^[0-9A-F]{8}$/;
+
 router.post("/", softAuth, async (req, res) => {
   const start = startTimer();
   try {
@@ -140,6 +142,10 @@ router.get("/:roomCode", async (req, res) => {
 
     if (!roomCode || typeof roomCode !== "string") {
       return res.status(400).json({ error: "Room code is required" });
+    }
+
+    if (!ROOM_CODE_RE.test(roomCode)) {
+      return res.status(400).json({ error: "Invalid room code format" });
     }
 
     const meeting = await findActiveMeetingByCode(roomCode);
