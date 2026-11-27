@@ -2,13 +2,13 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, "feat/**"]
   pull_request:
     branches: [main]
 
 jobs:
   frontend:
-    name: Frontend — build
+    name: Frontend — tests and build
     runs-on: ubuntu-latest
 
     defaults:
@@ -28,14 +28,18 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build
-        run: CI=false npm run build
+      - name: Unit and component tests
+        run: npm test
+
+      - name: Build (with no Firebase variables set)
+        run: npm run build
         env:
-          REACT_APP_SIGNALING_URL: http://localhost:8000
-          REACT_APP_EMOTION_SOCKET_URL: http://localhost:5002
-          REACT_APP_TRANSCRIPT_URL: http://localhost:5001
-          REACT_APP_API_URL: http://localhost:8000/api/v1
-          REACT_APP_SERVER_URL: http://localhost:8000
+          VITE_SERVER_URL: http://localhost:8000
+          VITE_API_URL: http://localhost:8000/api/v1
+          VITE_SOCKET_URL: http://localhost:8000
+          VITE_SIGNALING_URL: http://localhost:8000
+          VITE_EMOTION_SOCKET_URL: http://localhost:5002
+          VITE_TRANSCRIPT_URL: http://localhost:8000/api/v1/transcripts/proxy
 
   backend:
     name: Backend — tests
