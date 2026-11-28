@@ -4,9 +4,9 @@
 
 export const EMOJI = {
   neutral: "😐",
-  happy: "😊",
-  sad: "😢",
-  angry: "😠",
+  joy: "😊",
+  sadness: "😢",
+  anger: "😠",
   fear: "😨",
   surprise: "😮",
   disgust: "🤢",
@@ -72,13 +72,13 @@ export function buildAgendaMeeting(topicCount) {
     const actionLine = `${owner} will ${task} for item ${i + 1} by ${day}.`;
     turns.push(["Priya", `Next topic is the ${topic}. Where do we stand on it?`, "neutral"]);
     turns.push(["Marcus", `Right now it is mostly on track. The main risk is that ${noun} depends on two other teams, and I would rather flag that early than discover it late in a review.`, "neutral"]);
-    turns.push(["Elena", `That matches what I hear from customers. Several calls this week mentioned ${noun} without us bringing it up, so people clearly care about how the ${aspect} turns out.`, "happy"]);
+    turns.push(["Elena", `That matches what I hear from customers. Several calls this week mentioned ${noun} without us bringing it up, so people clearly care about how the ${aspect} turns out.`, "joy"]);
     turns.push(["Dev", `If we hold the current plan we keep the rest of the schedule intact. The cost is that we cannot take on anything extra until the end of the month, which I think is acceptable.`, "neutral"]);
     turns.push(["Priya", `${decisionLine} ${actionLine}`, "neutral"]);
     decisions.push({ text: choice, quote: decisionLine });
     actionItems.push({ task, owner, deadline: day, quote: actionLine, attribution: { type: "explicit" } });
   }
-  turns.push(["Priya", "That is everything for today. Thanks all, talk next week.", "happy"]);
+  turns.push(["Priya", "That is everything for today. Thanks all, talk next week.", "joy"]);
   return { segments: buildSegments(turns), decisions, actionItems };
 }
 

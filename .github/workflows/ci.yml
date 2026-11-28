@@ -28,8 +28,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Unit and component tests
-        run: npm test
+      - name: Unit and component tests (with coverage thresholds)
+        run: npm run test:coverage
 
       - name: Build (with no Firebase variables set)
         run: npm run build

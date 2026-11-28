@@ -11,5 +11,18 @@ export default defineConfig({
     globals: true,
     setupFiles: ["./src/setupTests.js"],
     include: ["src/**/*.test.{js,jsx}", "tests/**/*.test.{js,jsx}"],
+    coverage: {
+      provider: "v8",
+      include: ["src/ai/services/**/*.js"],
+      exclude: ["src/ai/services/**/*.test.js"],
+      reporter: ["text-summary", "text"],
+      thresholds: {
+        "src/ai/services/policy.js": { statements: 100, branches: 95, functions: 100, lines: 100 },
+        "src/ai/services/validator.js": { statements: 95, branches: 90, functions: 100, lines: 95 },
+        "src/ai/services/prepare.js": { statements: 95, branches: 85, functions: 100, lines: 95 },
+        "src/ai/services/insights.js": { statements: 95, branches: 85, functions: 100, lines: 95 },
+        "src/ai/services/adapter.js": { statements: 95, branches: 85, functions: 100, lines: 95 },
+      },
+    },
   },
 });

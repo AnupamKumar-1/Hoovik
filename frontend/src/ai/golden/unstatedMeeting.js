@@ -6,7 +6,7 @@ const segments = buildSegments([
   ["Elena", "We ought to send the vendors a reminder about the missing tax forms.", "neutral"],
   ["Dev", "Yes, and someone has to decide which template we standardise on.", "neutral"],
   ["Priya", "Let's not decide the template today. We need more input first.", "neutral"],
-  ["Marcus", "Agreed. Also the quarterly report needs updating soon, but nobody has picked it up.", "sad"],
+  ["Marcus", "Agreed. Also the quarterly report needs updating soon, but nobody has picked it up.", "sadness"],
   ["Elena", "I think the finance team might do it, I am not sure.", "neutral"],
   ["Priya", "We will revisit this next week.", "neutral"],
 ]);

@@ -15,7 +15,7 @@ const segments = buildSegments([
   ["Marcus", "Her direct line is +1 (415) 555-0137 if we need to reach her before the hearing.", "neutral"],
   ["Elena", "The case file is at https://intranet.northwind.example/cases/2291, and the claimant's reference is 884-22-1907.", "neutral"],
   ["Dev", "For the settlement they proposed $48,500 paid into account 0012345678901 within thirty days.", "neutral"],
-  ["Priya", "That seems low. Rahul Venkataraman at the other firm said they would go higher if we respond this week.", "angry"],
+  ["Priya", "That seems low. Rahul Venkataraman at the other firm said they would go higher if we respond this week.", "anger"],
   ["Marcus", "I will send Maria the counter proposal by Thursday.", "neutral"],
   ["Elena", "We agreed to reject the first offer and counter above the proposed figure.", "neutral"],
   ["Dev", "Understood. I will prepare the supporting document bundle by Friday.", "neutral"],
