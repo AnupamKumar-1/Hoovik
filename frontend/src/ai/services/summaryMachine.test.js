@@ -91,3 +91,23 @@ describe("summaryReducer", () => {
     expect(summaryReducer(s, { type: "NOPE" })).toBe(s);
   });
 });
+
+describe("summaryReducer receipts", () => {
+  const receipt = { verdict: "no-ai-requests" };
+  it("starts without a receipt and clears it when a new run starts or on reset", () => {
+    expect(initialSummaryState.receipt).toBeNull();
+    const done = step(running(), { type: "RESULT", result: { status: "done", analysis: { summary: "s" }, receipt } });
+    expect(done.receipt).toBe(receipt);
+    expect(step(done, { type: "RUN_STARTED" }).receipt).toBeNull();
+    expect(step(done, { type: "RESET" }).receipt).toBeNull();
+  });
+  it("keeps the receipt for every outcome that has one", () => {
+    for (const status of ["done", "consent-required", "unsupported", "too-long", "failed"]) {
+      const s = step(running(), { type: "RESULT", result: { status, analysis: { summary: "s" }, receipt } });
+      expect(s.receipt, status).toBe(receipt);
+    }
+  });
+  it("is null when the result has no receipt", () => {
+    expect(step(running(), { type: "RESULT", result: { status: "failed" } }).receipt).toBeNull();
+  });
+});

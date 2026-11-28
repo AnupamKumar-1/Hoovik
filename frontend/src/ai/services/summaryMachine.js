@@ -22,6 +22,7 @@ export const initialSummaryState = Object.freeze({
   analysis: null,
   error: null, // { code, message }
   consent: null, // { reason } while consent is required
+  receipt: null, // privacy receipt of the last run (any outcome), when one was produced
 });
 
 const RUNNING = new Set([SUMMARY_STATES.INITIALISING, SUMMARY_STATES.GENERATING]);
@@ -40,7 +41,7 @@ export function summaryReducer(state, action) {
     case "RESULT": {
       if (!RUNNING.has(state.status)) return state;
       const r = action.result || {};
-      const base = { ...initialSummaryState };
+      const base = { ...initialSummaryState, receipt: r.receipt ?? null };
       switch (r.status) {
         case "done":
           return { ...base, status: SUMMARY_STATES.DONE, analysis: r.analysis };

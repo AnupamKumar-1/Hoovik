@@ -3,9 +3,9 @@
 // booleans, and strings must look like short identifiers (codes, enum values, ids).
 
 const MAX_RECORDS = 200;
-const NUMBER_FIELDS = ["startedAt", "latencyMs", "inputChars", "outputChars", "chunkCount", "failedChunks", "calls"];
+const NUMBER_FIELDS = ["startedAt", "latencyMs", "inputChars", "outputChars", "chunkCount", "failedChunks", "calls", "aiRequests", "externalRequests"];
 const BOOLEAN_FIELDS = ["success", "fallback"];
-const IDENT_FIELDS = ["requestId", "source", "policy", "mode", "phase", "status", "errorCode"];
+const IDENT_FIELDS = ["requestId", "source", "policy", "mode", "phase", "status", "errorCode", "verdict"];
 const IDENT = /^[A-Za-z0-9_.:-]{1,48}$/;
 
 let records = [];

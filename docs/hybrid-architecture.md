@@ -26,7 +26,16 @@ Pure functions with no Firebase or network dependency, unit-tested with vitest.
 | `errors.js` | Maps SDK and browser errors to fixed codes with fixed user-safe messages. |
 | `queue.js` | Strict serial execution for model calls. |
 | `telemetry.js` | Metrics-only records rebuilt from a whitelist; text cannot be stored. |
-| `summaryMachine.js` | Pure reducer for the UI states. |
+| `summaryMachine.js` | Pure reducer for the UI states; keeps the receipt of the last run. |
 | `useHybridSummary.js` | React binding. `approveCloud()` is the only way consent becomes `true`. |
 
 Details, the SDK behaviour this relies on and the Chrome checks: `docs/hybrid-part3-notes.md`.
+
+## Network witness and privacy receipt (Part 5): `frontend/src/ai/services/witness.js`, `frontend/src/components/PrivacyReceipt.jsx`
+| Module | Responsibility |
+|---|---|
+| `witness.js` | Host lists in one place (`HOST_RULES`); classifier; observation window (fetch/XHR wrapper plus Resource Timing, shared by overlapping windows); verdict logic; receipt builder, reader and export. Keeps hosts and counts only. |
+| `hybrid.js` | Opens a window after the policy gate and before any model is created, closes it once the source is known, and attaches the receipt (`provenance.receipt` when done, `result.receipt` otherwise). A witness failure never changes the outcome. |
+| `PrivacyReceipt.jsx` | Verdict badge, plain-language sentence, counts, collapsible details with what the witness cannot see, JSON export. Rendered by the summary panel when a usable receipt is present. |
+
+Details, limits and the Chrome checks: `docs/hybrid-part5-notes.md`.

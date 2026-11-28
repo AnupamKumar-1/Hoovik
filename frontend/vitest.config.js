@@ -13,7 +13,7 @@ export default defineConfig({
     include: ["src/**/*.test.{js,jsx}", "tests/**/*.test.{js,jsx}"],
     coverage: {
       provider: "v8",
-      include: ["src/ai/services/**/*.js", "src/hooks/useHybridSummary.js"],
+      include: ["src/ai/services/**/*.js", "src/hooks/useHybridSummary.js", "src/components/PrivacyReceipt.jsx"],
       exclude: ["src/ai/services/**/*.test.js"],
       reporter: ["text-summary", "text"],
       thresholds: {
@@ -28,6 +28,7 @@ export default defineConfig({
         "src/ai/services/prompt.js": { statements: 100, branches: 95, functions: 100, lines: 100 },
         "src/ai/services/queue.js": { statements: 100, branches: 100, functions: 100, lines: 100 },
         "src/ai/services/summaryMachine.js": { statements: 100, branches: 85, functions: 100, lines: 100 },
+        "src/ai/services/witness.js": { statements: 95, branches: 90, functions: 100, lines: 95 },
         "src/ai/services/telemetry.js": { statements: 90, branches: 90, functions: 100, lines: 90 },
         "src/hooks/useHybridSummary.js": { statements: 90, branches: 85, functions: 90, lines: 90 },
       },

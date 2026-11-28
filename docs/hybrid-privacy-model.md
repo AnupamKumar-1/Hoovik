@@ -1,6 +1,6 @@
 # Privacy model
 
-_Status: validation rules (Part 2) and server-side confidential enforcement (Part 4, see `hybrid-part4-notes.md`) are written here. The receipt and redaction are not built yet and are not claimed._
+_Status: validation rules (Part 2), server-side confidential enforcement (Part 4, see `hybrid-part4-notes.md`) and the network witness / privacy receipt (Part 5, see `hybrid-part5-notes.md`) are written here. Redaction is not built yet and is not claimed._
 
 ## What grounding in the validator does and does not do
 - An action-item owner is kept only if the name is a speaker, or appears as a whole word in the transcript. Generic words (team, someone, everyone, TBD, N/A...) are never accepted as owners.
@@ -17,3 +17,10 @@ _Status: validation rules (Part 2) and server-side confidential enforcement (Par
 - A transcript marked `confidential` is refused by the server on every path that sends it to a third-party AI provider: the Groq summary, RAG indexing (embedding provider) and RAG queries. On-device summaries can still be saved.
 - The transcript text is still stored on Hoovik's server. Confidential means no third-party AI provider, not no storage.
 - Data indexed or summarised before the flag was set is not deleted automatically.
+
+## Privacy receipt (network witness)
+- While a summary is generated, the page counts the outbound requests it makes and groups them by destination: this app, Firebase and App Check housekeeping, generative-AI services, other. The result is stored with the summary as `provenance.receipt` and shown under it.
+- It is a **measurement taken inside the page, not a guarantee.** It cannot see requests made by the browser itself (for example Chrome downloading the on-device model), browser extensions, WebSocket connections or anything outside the page. The UI says so next to every receipt.
+- Only host names and counts are kept: no URLs, query strings, request bodies, transcript text or speaker names.
+- A local run with zero observed requests to AI services is reported as stayed on this device. Any AI request during a run that was expected to be local is reported as a failed check. A cloud result with no observed AI request is reported as inconclusive, never as local.
+- The server stores the receipt as sent by the client and cannot verify it.

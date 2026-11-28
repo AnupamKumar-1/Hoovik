@@ -78,3 +78,15 @@ describe("telemetry store", () => {
     }
   });
 });
+
+describe("telemetry and the network witness", () => {
+  it("keeps the verdict and request counts", () => {
+    const r = sanitizeRecord({ verdict: "local-verified", aiRequests: 0, externalRequests: 2.4 });
+    expect(r).toEqual({ verdict: "local-verified", aiRequests: 0, externalRequests: 2 });
+  });
+  it("drops a verdict that is not a short identifier, and hosts or URLs entirely", () => {
+    const r = sanitizeRecord({ verdict: `Sent ${CANARY} to the cloud`, aiHosts: ["firebasevertexai.googleapis.com"], url: `https://x.test/?k=${CANARY}`, aiRequests: "3" });
+    expect(r).toEqual({});
+    expect(JSON.stringify(r)).not.toContain(CANARY);
+  });
+});

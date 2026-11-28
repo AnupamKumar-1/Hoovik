@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import "../styles/transcript-viewer.css";
+import PrivacyReceipt from "../components/PrivacyReceipt.jsx";
 
 const EMOTION_META = {
     joy: { color: "#f59e0b", bg: "rgba(245,158,11,0.12)", label: "Joy", icon: "✦" },
@@ -280,6 +281,8 @@ function SummaryPanel({ analysis }) {
                     </div>
                 </div>
             )}
+
+            <PrivacyReceipt receipt={analysis.provenance?.receipt} />
         </>
     );
 }

@@ -12,6 +12,10 @@
 //  - long transcripts are split into chunks, each analysed as an independent single-turn request,
 //    then merged (model merge, with a deterministic fallback). Text is never dropped silently:
 //    chunks that fail are counted and flagged with the CHUNK_FAILED issue code.
+//  - the network witness observes the outbound requests made while a run is in progress (model
+//    initialisation, every chunk, the merge). Its receipt goes into provenance.receipt for a
+//    finished summary and onto result.receipt for every other outcome. A receipt is a measurement,
+//    not a guarantee, and it never changes the outcome of a run.
 // Nothing here stores or logs transcript text; telemetry accepts metrics only.
 
 import { prepareTranscript } from "./prepare.js";
@@ -24,6 +28,7 @@ import { createSerialQueue } from "./queue.js";
 import { telemetry as defaultTelemetry } from "./telemetry.js";
 import { buildChunkPrompt, buildMergePrompt, deterministicMerge, splitChunkText } from "./prompt.js";
 import { getModel as defaultGetModel } from "./model.js";
+import { buildReceipt, createWitness } from "./witness.js";
 
 // Chunk budgets are judgements, not measurements. On-device: about half of the 50,000 characters
 // that succeeded in Part 1 (docs/hybrid-part1-findings.md), leaving room for instructions, the
@@ -61,6 +66,7 @@ export function createHybridService({
   isOnline = () => typeof navigator === "undefined" || navigator.onLine !== false,
   queue = createSerialQueue(),
   limits = LIMITS,
+  witness = createWitness(),
 } = {}) {
   let busy = false;
 
@@ -70,6 +76,23 @@ export function createHybridService({
     const stats = { calls: 0, outputChars: 0, inputChars: 0, chunkCount: 0, failedChunks: 0 };
     let mode = null;
     let source = null;
+    let observation = null; // the open witness window, if any
+    let receipt = null;
+
+    // Closes the witness window (once) and builds the receipt from what was observed. Called with
+    // the final status, after the source is known; later calls return the same receipt.
+    const sealReceipt = (status) => {
+      if (receipt) return receipt;
+      if (!observation) return null;
+      const win = observation;
+      observation = null;
+      try {
+        receipt = buildReceipt({ observation: win.stop(), policy, mode, source, status });
+      } catch {
+        receipt = null; // a measurement failure must not change the outcome
+      }
+      return receipt;
+    };
 
     const emit = (e) => {
       try {
@@ -79,7 +102,9 @@ export function createHybridService({
       }
     };
 
-    const finish = (result) => {
+    const finish = (base) => {
+      const rc = sealReceipt(base.status);
+      const result = rc ? { ...base, receipt: rc } : base;
       const ok = result.status === RESULT_STATUS.DONE;
       telemetry.recordRun({
         requestId,
@@ -93,6 +118,9 @@ export function createHybridService({
         success: ok,
         fallback: ok && result.meta.source === "cloud" && policy !== POLICIES.CLOUD_ONLY,
         errorCode: ok ? undefined : result.error?.code,
+        verdict: rc?.verdict,
+        aiRequests: rc?.requests.ai,
+        externalRequests: rc ? rc.requests.total - rc.requests.sameOrigin : undefined,
         ...stats,
       });
       return result;
@@ -135,6 +163,13 @@ export function createHybridService({
       if (mode === MODES.ONLY_IN_CLOUD && !isOnline()) return terminal(ERROR_CODES.OFFLINE);
 
       // 3. Model and on-device initialisation (must run inside the user's click).
+      // The witness window opens here, after the policy gate and before anything can reach a model,
+      // and closes once the source is known.
+      try {
+        observation = witness.start();
+      } catch {
+        observation = null;
+      }
       emit({ type: "stage", stage: "initialising" });
       const got = await getModel(mode);
       if (got.status === "not-configured") return terminal(ERROR_CODES.NOT_CONFIGURED);
@@ -252,7 +287,7 @@ export function createHybridService({
       const analysis = toStoredSummary({
         validated: validated.value,
         insights: computeInsights(prepared.segments),
-        provenance: { source: audit.source, policy, mode, chunkCount: leaves.length, receipt: null },
+        provenance: { source: audit.source, policy, mode, chunkCount: leaves.length, receipt: sealReceipt(RESULT_STATUS.DONE) },
         issues,
       });
       return finish({

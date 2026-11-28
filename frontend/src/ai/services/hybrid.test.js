@@ -500,3 +500,146 @@ describe("default singleton", () => {
     expect(getHybridService()).toBe(getHybridService());
   });
 });
+
+describe("network witness integration", () => {
+  const OBS = (over = {}) => ({
+    methods: { fetch: true, xhr: true, resourceTiming: true },
+    durationMs: 120,
+    startedAt: "2026-11-28T10:00:00.000Z",
+    counts: { total: 2, sameOrigin: 1, firebase: 1, ai: 0, other: 0 },
+    hosts: { firebase: ["content-firebaseappcheck.googleapis.com"], ai: [], other: [] },
+    ...over,
+  });
+  const AI_OBS = () => OBS({ counts: { total: 1, sameOrigin: 0, firebase: 0, ai: 1, other: 0 }, hosts: { firebase: [], ai: ["firebasevertexai.googleapis.com"], other: [] } });
+  const fakeWitness = (obs = OBS()) => {
+    const stop = vi.fn(() => obs);
+    const start = vi.fn(() => ({ stop }));
+    return { start, stop };
+  };
+  const cloudModel = () => fakeModel(() => reply(goodJson("short"), "in_cloud"));
+  const localModel = () => fakeModel(() => reply(goodJson("short")));
+
+  it("a finished local run carries a verified-local receipt in its provenance and on the result", async () => {
+    const witness = fakeWitness();
+    const { svc } = serviceWith({ [MODES.ONLY_ON_DEVICE]: localModel() }, { witness });
+    const r = await run(svc);
+    expect(r.status).toBe(RESULT_STATUS.DONE);
+    expect(r.analysis.provenance.receipt).toMatchObject({ verdict: "local-verified", policy: "local-only", mode: "only_on_device", source: "on-device", status: "done", requests: { ai: 0 } });
+    expect(r.receipt).toBe(r.analysis.provenance.receipt);
+    expect(witness.start).toHaveBeenCalledTimes(1);
+    expect(witness.stop).toHaveBeenCalledTimes(1);
+  });
+
+  it("opens the window after the policy gate and before the model is created, and closes it before returning", async () => {
+    const order = [];
+    const witness = { start: vi.fn(() => { order.push("start"); return { stop: () => { order.push("stop"); return OBS(); } }; }) };
+    const local = fakeModel(() => { order.push("generate"); return reply(goodJson("short")); }, { init: async () => { order.push("init"); } });
+    const getModel = vi.fn(async () => { order.push("getModel"); return { status: "ready", model: local }; });
+    const svc = createHybridService({ getModel, witness, telemetry: { recordRun, newRequestId }, isOnline: () => true });
+    await run(svc);
+    expect(order).toEqual(["start", "getModel", "init", "generate", "stop"]);
+  });
+
+  it("never opens a window when the policy gate refuses the run, and there is no receipt", async () => {
+    const witness = fakeWitness();
+    const { svc } = serviceWith({}, { witness });
+    const r = await run(svc, { phase: "cloud", cloudConsent: true });
+    expect(r.error.code).toBe(ERROR_CODES.POLICY_VIOLATION);
+    expect(witness.start).not.toHaveBeenCalled();
+    expect(r.receipt).toBeUndefined();
+  });
+
+  it("an unsupported local run reports that no AI request was observed", async () => {
+    const witness = fakeWitness();
+    const local = fakeModel(() => reply("unused"), { init: async () => { throw unavailable(); } });
+    const { svc } = serviceWith({ [MODES.ONLY_ON_DEVICE]: local }, { witness });
+    const r = await run(svc);
+    expect(r.status).toBe(RESULT_STATUS.UNSUPPORTED);
+    expect(r.receipt).toMatchObject({ verdict: "no-ai-requests", status: "unsupported", source: null });
+    expect(witness.stop).toHaveBeenCalledTimes(1);
+  });
+
+  it("ask-before-cloud: the consent step shows nothing was sent; the approved cloud run is a cloud receipt", async () => {
+    const local = fakeModel(() => reply("unused"), { init: async () => { throw unavailable(); } });
+    const first = fakeWitness();
+    const { svc } = serviceWith({ [MODES.ONLY_ON_DEVICE]: local, [MODES.ONLY_IN_CLOUD]: cloudModel() }, { witness: first });
+    const ask = await run(svc, { policy: POLICIES.ASK_BEFORE_CLOUD });
+    expect(ask.status).toBe(RESULT_STATUS.CONSENT_REQUIRED);
+    expect(ask.receipt.verdict).toBe("no-ai-requests");
+
+    const second = fakeWitness(AI_OBS());
+    const { svc: svc2 } = serviceWith({ [MODES.ONLY_IN_CLOUD]: cloudModel() }, { witness: second });
+    const done = await run(svc2, { policy: POLICIES.ASK_BEFORE_CLOUD, phase: "cloud", cloudConsent: true });
+    expect(done.status).toBe(RESULT_STATUS.DONE);
+    expect(done.analysis.provenance.receipt).toMatchObject({ verdict: "cloud", source: "cloud", aiHosts: ["firebasevertexai.googleapis.com"] });
+  });
+
+  it("an AI request observed during a local run is reported as a violation without changing the outcome", async () => {
+    const { svc } = serviceWith({ [MODES.ONLY_ON_DEVICE]: localModel() }, { witness: fakeWitness(AI_OBS()) });
+    const r = await run(svc);
+    expect(r.status).toBe(RESULT_STATUS.DONE);
+    expect(r.analysis.provenance.receipt.verdict).toBe("violation");
+  });
+
+  it("a run rejected by the source audit still carries its receipt", async () => {
+    const sneaky = fakeModel(() => reply(goodJson("short"), "in_cloud"));
+    const { svc } = serviceWith({ [MODES.ONLY_ON_DEVICE]: sneaky }, { witness: fakeWitness(AI_OBS()) });
+    const r = await run(svc);
+    expect(r.status).toBe(RESULT_STATUS.FAILED);
+    expect(r.analysis).toBeUndefined();
+    expect(r.receipt).toMatchObject({ verdict: "violation", source: "cloud" });
+  });
+
+  it("closes the window exactly once when generation fails", async () => {
+    const witness = fakeWitness();
+    const broken = fakeModel(() => { throw aiError("fetch-error", "boom"); });
+    const { svc } = serviceWith({ [MODES.ONLY_IN_CLOUD]: broken }, { witness });
+    const r = await run(svc, { policy: POLICIES.CLOUD_ONLY });
+    expect(r.status).toBe(RESULT_STATUS.FAILED);
+    expect(witness.stop).toHaveBeenCalledTimes(1);
+    expect(r.receipt.status).toBe("failed");
+  });
+
+  it("a witness that fails to start or to stop never changes the outcome", async () => {
+    const noStart = { start: () => { throw new Error("no"); } };
+    const a = await run(serviceWith({ [MODES.ONLY_ON_DEVICE]: localModel() }, { witness: noStart }).svc);
+    expect(a.status).toBe(RESULT_STATUS.DONE);
+    expect(a.analysis.provenance.receipt).toBeNull();
+    expect(a.receipt).toBeUndefined();
+
+    const noStop = { start: () => ({ stop: () => { throw new Error("no"); } }) };
+    const b = await run(serviceWith({ [MODES.ONLY_ON_DEVICE]: localModel() }, { witness: noStop }).svc);
+    expect(b.status).toBe(RESULT_STATUS.DONE);
+    expect(b.analysis.provenance.receipt).toBeNull();
+  });
+
+  it("a refused overlapping run does not open a second window", async () => {
+    const witness = fakeWitness();
+    let release;
+    const slow = fakeModel(() => new Promise((res) => { release = () => res(reply(goodJson("short"))); }));
+    const { svc } = serviceWith({ [MODES.ONLY_ON_DEVICE]: slow }, { witness });
+    const first = run(svc);
+    await new Promise((r) => setTimeout(r, 0));
+    const second = await run(svc);
+    expect(second.error.code).toBe(ERROR_CODES.BUSY);
+    expect(witness.start).toHaveBeenCalledTimes(1);
+    release();
+    expect((await first).status).toBe(RESULT_STATUS.DONE);
+  });
+
+  it("telemetry records the verdict and counts, never hosts", async () => {
+    const telemetry = { recordRun: vi.fn(recordRun), newRequestId };
+    const { svc } = serviceWith({ [MODES.ONLY_ON_DEVICE]: localModel() }, { witness: fakeWitness(), telemetry });
+    await run(svc);
+    const rec = getRecords().at(-1);
+    expect(rec).toMatchObject({ verdict: "local-verified", aiRequests: 0, externalRequests: 1 });
+    expect(JSON.stringify(rec)).not.toMatch(/googleapis/);
+  });
+
+  it("works with the default witness in this environment", async () => {
+    const { svc } = serviceWith({ [MODES.ONLY_ON_DEVICE]: localModel() });
+    const r = await run(svc);
+    expect(r.status).toBe(RESULT_STATUS.DONE);
+    expect(["local-verified", "inconclusive"]).toContain(r.analysis.provenance.receipt.verdict);
+  });
+});

@@ -14,7 +14,7 @@ Status labels: **tested in sandbox** means a backend vitest test covers it with 
 - **Unauthorised callers learn nothing.** The confidential refusal comes after the authorisation check, so a stranger gets the same `Not authorized` as before.
 - **"Owner" includes the host secret.** Anonymous meetings have no account, so the host secret is the ownership proof there. This matches how summaries are saved today.
 - **A client summary with `source: "cloud"` is still accepted for a confidential transcript.** The server cannot know where the client ran inference, and refusing the save would not undo a cloud call. Preventing it is the job of the client policy (Part 6 defaults sensitive meetings to local-only).
-- **`receipt` is stored as a small tree of primitives** (depth 3, 40 keys, 4 KB) until Part 5 defines its shape. **Evidence fields** (Part 7) are not whitelisted yet; Part 7 must extend `clientSummary.utils.js`, otherwise they are stripped.
+- **`receipt` is stored as a small tree of primitives** (depth 3, 40 keys, 4 KB) until Part 5 defines its shape (Part 5 defines it; see `hybrid-part5-notes.md`). **Evidence fields** (Part 7) are not whitelisted yet; Part 7 must extend `clientSummary.utils.js`, otherwise they are stripped.
 
 ## Limits of "confidential" (state these in the README)
 - The transcript itself is **still stored on Hoovik's server** and is readable by the owner and approved readers. Confidential blocks third-party AI providers, not storage.
