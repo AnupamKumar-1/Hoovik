@@ -16,6 +16,7 @@ import {
     findTranscriptById,
     findTranscriptByCode,
 } from "../data-access/transcript.repository.js";
+import { CONFIDENTIAL_REFUSAL, isConfidential } from "../utils/privacy.utils.js";
 
 import { connectRedis } from "../infra/redis.js";
 import { TranscriptRequest } from "../models/transcriptRequest.model.js";
@@ -351,10 +352,6 @@ export async function indexTranscriptService(req) {
     const { secret, userId, secretHash } = resolveAuth(req);
     if (!secret && !userId) return { status: 403, body: { success: false, message: "Not authorized" } };
 
-    if (userId && await checkRateLimit(RKEYS.indexRate(userId), RAG_INDEX_RATE_MAX, RAG_INDEX_RATE_WIN_SEC)) {
-        return { status: 429, body: { success: false, message: "RAG index rate limit reached" } };
-    }
-
     const isMongoId = /^[a-f\d]{24}$/i.test(idOrCode);
     let doc = null;
     if (isMongoId) doc = await findTranscriptById(idOrCode);
@@ -369,6 +366,16 @@ export async function indexTranscriptService(req) {
             status: "approved",
         });
         if (!isApproved) return { status: 403, body: { success: false, message: "Not authorized" } };
+    }
+
+    // Indexing sends transcript chunks to an external embedding provider, so it is refused for
+    // confidential transcripts. Checked before the rate limit so a refusal costs no quota.
+    if (isConfidential(doc)) {
+        return { status: 403, body: { success: false, code: "CONFIDENTIAL_TRANSCRIPT", message: CONFIDENTIAL_REFUSAL.rag } };
+    }
+
+    if (userId && await checkRateLimit(RKEYS.indexRate(userId), RAG_INDEX_RATE_MAX, RAG_INDEX_RATE_WIN_SEC)) {
+        return { status: 429, body: { success: false, message: "RAG index rate limit reached" } };
     }
 
     const transcriptId = String(doc._id);
@@ -421,6 +428,14 @@ const indexWorker = new Worker("transcriptIndexing", async (job) => {
     const checksumKey = RKEYS.payloadChecksum(transcriptId);
 
     try {
+        // The job may have been queued before the transcript was marked confidential.
+        const current = await findTranscriptById(transcriptId);
+        if (isConfidential(current)) {
+            await safeRedisDel(statusKey);
+            log.warn("index job skipped: transcript is confidential", { transcriptId });
+            return;
+        }
+
         const transcriptChunks = buildChunks(segments, rawText);
         const summaryChunks = buildSummaryChunks(aiSummary, transcriptChunks.length);
         const chunks = [...transcriptChunks, ...summaryChunks];
@@ -587,15 +602,6 @@ export async function ragQueryService(req, res = null) {
     log.info("ragQuery: auth resolved", { userId, hasSecret: !!secret });
     if (!secret && !userId) return reply(403, { success: false, message: "Not authorized" });
 
-    if (userId && await checkRateLimit(RKEYS.queryRate(userId), RAG_QUERY_RATE_MAX, RAG_QUERY_RATE_WIN_SEC)) {
-        log.warn("ragQuery: rate limited", { userId });
-        return reply(429, { success: false, message: "RAG query rate limit reached (20/hour)" });
-    }
-
-    if (!GROQ_API_KEY) return reply(500, { success: false, message: "AI service not configured (GROQ_API_KEY missing)" });
-    if (!NOMIC_API_KEY) return reply(500, { success: false, message: "Embedding service not configured (NOMIC_API_KEY missing)" });
-    log.info("ragQuery: keys ok");
-
     const isMongoId = /^[a-f\d]{24}$/i.test(idOrCode);
     let doc = null;
     if (isMongoId) doc = await findTranscriptById(idOrCode);
@@ -615,6 +621,21 @@ export async function ragQueryService(req, res = null) {
             if (!isApproved) return reply(403, { success: false, message: "Not authorized" });
         }
     }
+
+    // Queries embed the question and send retrieved transcript passages to Groq, so they are
+    // refused for confidential transcripts. Checked before the rate limit and key checks.
+    if (isConfidential(doc)) {
+        return reply(403, { success: false, code: "CONFIDENTIAL_TRANSCRIPT", message: CONFIDENTIAL_REFUSAL.rag });
+    }
+
+    if (userId && await checkRateLimit(RKEYS.queryRate(userId), RAG_QUERY_RATE_MAX, RAG_QUERY_RATE_WIN_SEC)) {
+        log.warn("ragQuery: rate limited", { userId });
+        return reply(429, { success: false, message: "RAG query rate limit reached (20/hour)" });
+    }
+
+    if (!GROQ_API_KEY) return reply(500, { success: false, message: "AI service not configured (GROQ_API_KEY missing)" });
+    if (!NOMIC_API_KEY) return reply(500, { success: false, message: "Embedding service not configured (NOMIC_API_KEY missing)" });
+    log.info("ragQuery: keys ok");
 
     const transcriptId = String(doc._id);
     const indexStatus = await safeRedisGet(RKEYS.indexStatus(transcriptId));

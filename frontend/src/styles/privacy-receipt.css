@@ -1,0 +1,74 @@
+.pr-card {
+  --pr-accent: #94a3b8;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-left: 3px solid var(--pr-accent);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  color: #cbd5e1;
+}
+.pr-card--local-verified { --pr-accent: #34d399; }
+.pr-card--no-ai-requests { --pr-accent: #60a5fa; }
+.pr-card--cloud { --pr-accent: #f59e0b; }
+.pr-card--violation { --pr-accent: #f87171; }
+.pr-card--inconclusive { --pr-accent: #94a3b8; }
+
+.pr-label { margin-bottom: 8px; }
+
+.pr-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+
+.pr-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--pr-accent);
+  border: 1px solid var(--pr-accent);
+  background: rgba(255, 255, 255, 0.03);
+}
+.pr-badge--local-verified { color: #34d399; border-color: #34d399; }
+.pr-badge--no-ai-requests { color: #60a5fa; border-color: #60a5fa; }
+.pr-badge--cloud { color: #f59e0b; border-color: #f59e0b; }
+.pr-badge--violation { color: #f87171; border-color: #f87171; }
+.pr-badge--inconclusive { color: #94a3b8; border-color: #94a3b8; }
+.pr-glyph { font-weight: 700; }
+
+.pr-verdict { margin: 0 0 4px; font-size: 13px; line-height: 1.5; }
+.pr-note { margin: 0 0 10px; font-size: 11px; color: #64748b; }
+
+.pr-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 6px 16px;
+  margin: 0 0 10px;
+}
+.pr-fact { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; }
+.pr-fact dt { color: #64748b; }
+.pr-fact dd { margin: 0; color: #e2e8f0; font-family: 'DM Mono', monospace; text-align: right; }
+
+.pr-details { margin-bottom: 10px; font-size: 12px; }
+.pr-details summary { cursor: pointer; color: #94a3b8; }
+.pr-details summary:focus-visible,
+.pr-export:focus-visible { outline: 2px solid #38bdf8; outline-offset: 2px; }
+.pr-details[open] summary { margin-bottom: 8px; }
+
+.pr-hosts { margin-bottom: 8px; }
+.pr-hosts-title { font-size: 11px; font-weight: 600; color: #94a3b8; margin: 8px 0 4px; }
+.pr-hosts ul, .pr-blind { margin: 0; padding-left: 18px; color: #94a3b8; }
+.pr-hosts li { font-family: 'DM Mono', monospace; font-size: 11px; }
+.pr-blind li { margin-bottom: 2px; }
+
+.pr-export {
+  font-size: 11px;
+  color: #94a3b8;
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.pr-export:hover { color: #e2e8f0; border-color: rgba(255, 255, 255, 0.25); }

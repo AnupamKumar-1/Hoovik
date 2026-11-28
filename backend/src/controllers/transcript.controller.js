@@ -5,6 +5,7 @@ import {
   listTranscriptsService,
   updateAiSummaryService,
   generateAiSummaryService,
+  updateTranscriptPrivacyService,
 } from "../services/transcript.service.js";
 
 const log = makeLogger("transcript");
@@ -68,6 +69,18 @@ export async function generateAiSummary(req, res) {
     return res.status(status).json(body);
   } catch (err) {
     log.error("generateAiSummary error", { err: err.message });
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+}
+
+export async function updateTranscriptPrivacy(req, res) {
+  const requestStart = Date.now();
+  try {
+    const { status, body } = await updateTranscriptPrivacyService(req);
+    log.info("updateTranscriptPrivacy complete", { totalMs: Date.now() - requestStart });
+    return res.status(status).json(body);
+  } catch (err) {
+    log.error("updateTranscriptPrivacy error", { err: err.message });
     return res.status(500).json({ success: false, message: "Server error" });
   }
 }

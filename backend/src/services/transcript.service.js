@@ -11,8 +11,18 @@ import {
     findTranscriptById,
     findTranscriptByCode,
     listTranscriptDocs,
+    updateTranscriptPrivacy,
+    updateTranscriptAiSummary,
 } from "../data-access/transcript.repository.js";
 import { TranscriptRequest } from "../models/transcriptRequest.model.js";
+import { sanitizeClientSummary } from "../utils/clientSummary.utils.js";
+import {
+    CONFIDENTIAL_REFUSAL,
+    isConfidential,
+    isValidPrivacy,
+    privacyOf,
+    withPrivacy,
+} from "../utils/privacy.utils.js";
 
 const TRANSCRIPT_MAX_TEXT_LENGTH = parseInt(process.env.TRANSCRIPT_MAX_TEXT_LENGTH || "500000", 10);
 const TRANSCRIPT_CACHE_TTL_SEC = parseInt(process.env.TRANSCRIPT_CACHE_TTL_SEC || "300", 10);
@@ -21,6 +31,9 @@ const TRANSCRIPT_RATE_LIMIT_WIN_SEC = parseInt(process.env.TRANSCRIPT_RATE_LIMIT
 
 const AI_SUMMARY_RATE_LIMIT_MAX = parseInt(process.env.AI_SUMMARY_RATE_LIMIT_MAX || "2", 10);
 const AI_SUMMARY_RATE_LIMIT_WIN_SEC = parseInt(process.env.AI_SUMMARY_RATE_LIMIT_WIN_SEC || "7200", 10);
+
+const CLIENT_SUMMARY_RATE_LIMIT_MAX = parseInt(process.env.CLIENT_SUMMARY_RATE_LIMIT_MAX || "30", 10);
+const CLIENT_SUMMARY_RATE_LIMIT_WIN_SEC = parseInt(process.env.CLIENT_SUMMARY_RATE_LIMIT_WIN_SEC || "3600", 10);
 
 const NOISE_MIN_WORDS = parseInt(process.env.TRANSCRIPT_NOISE_MIN_WORDS || "4", 10);
 const NOISE_MIN_UNIQUE_RATIO = parseFloat(process.env.TRANSCRIPT_NOISE_MIN_UNIQUE_RATIO || "0.4");
@@ -43,6 +56,7 @@ export const RKEYS = {
     metricCached: () => "transcript:requests:cached",
     metricFailed: () => "transcript:requests:failed",
     aiSummaryRate: (uid) => `transcript:aisummary:rate:${uid}`,
+    clientSummaryRate: (uid) => `transcript:clientsummary:rate:${uid}`,
 };
 
 const log = makeLogger("transcript");
@@ -103,6 +117,31 @@ async function isAiSummaryRateLimited(userId) {
     const count = await safeRedisIncr(key);
     if (count === 1) await safeRedisExpire(key, AI_SUMMARY_RATE_LIMIT_WIN_SEC);
     return count > AI_SUMMARY_RATE_LIMIT_MAX;
+}
+
+// Separate from the Groq limit: saving a summary made on the device must not use up the
+// quota for the (costly) cloud analysis, and the reverse.
+async function isClientSummaryRateLimited(userId) {
+    if (!userId) return false;
+    const key = RKEYS.clientSummaryRate(userId);
+    const count = await safeRedisIncr(key);
+    if (count === 1) await safeRedisExpire(key, CLIENT_SUMMARY_RATE_LIMIT_WIN_SEC);
+    return count > CLIENT_SUMMARY_RATE_LIMIT_MAX;
+}
+
+async function findDocByIdOrCode(idOrCode) {
+    const isMongoId = /^[a-f\d]{24}$/i.test(idOrCode);
+    let doc = null;
+    if (isMongoId) doc = await findTranscriptById(idOrCode);
+    if (!doc) doc = await findTranscriptByCode(idOrCode.toUpperCase());
+    return doc;
+}
+
+async function invalidateTranscriptCache(doc) {
+    await Promise.all([
+        safeRedisDel(RKEYS.cacheById(String(doc._id))),
+        safeRedisDel(RKEYS.cacheByCode(String(doc.meetingCode))),
+    ]);
 }
 
 function hasExcessiveCharRepeat(word) {
@@ -292,6 +331,19 @@ export async function generateAiSummaryService(req) {
     const { secret, userId, secretHash } = resolveAuth(req);
     if (!secret && !userId) return { status: 403, body: { success: false, message: "Not authorized" } };
 
+    const doc = await findDocByIdOrCode(idOrCode);
+    if (!doc) return { status: 404, body: { success: false, message: "Transcript not found" } };
+
+    if (!isAuthorized(doc, userId, secretHash)) {
+        return { status: 403, body: { success: false, message: "Not authorized" } };
+    }
+
+    // Confidential transcripts never go to Groq. Checked before the rate limit so a refused
+    // request does not use up the caller's quota.
+    if (isConfidential(doc)) {
+        return { status: 403, body: { success: false, code: "CONFIDENTIAL_TRANSCRIPT", message: CONFIDENTIAL_REFUSAL.groq } };
+    }
+
     if (await isAiSummaryRateLimited(userId)) {
         return { status: 429, body: { success: false, message: "AI summary rate limit reached. Max 2 per 2 hours." } };
     }
@@ -299,16 +351,6 @@ export async function generateAiSummaryService(req) {
     if (!GROQ_API_KEY) {
         log.error("generateAiSummary: GROQ_API_KEY not configured");
         return { status: 500, body: { success: false, message: "AI summary service not configured" } };
-    }
-
-    const isMongoId = /^[a-f\d]{24}$/i.test(idOrCode);
-    let doc = null;
-    if (isMongoId) doc = await findTranscriptById(idOrCode);
-    if (!doc) doc = await findTranscriptByCode(idOrCode.toUpperCase());
-    if (!doc) return { status: 404, body: { success: false, message: "Transcript not found" } };
-
-    if (!isAuthorized(doc, userId, secretHash)) {
-        return { status: 403, body: { success: false, message: "Not authorized" } };
     }
 
     const segments = doc.metadata?.segments;
@@ -352,20 +394,12 @@ export async function generateAiSummaryService(req) {
             return { status: 502, body: { success: false, message: "AI provider returned invalid response" } };
         }
 
-        const { default: Transcript } = await import("../models/transcript.model.js");
-        const updated = await Transcript.findByIdAndUpdate(
-            doc._id,
-            { $set: { aiSummary } },
-            { new: true }
-        ).lean();
+        const updated = await updateTranscriptAiSummary(doc._id, aiSummary);
 
-        await Promise.all([
-            safeRedisDel(RKEYS.cacheById(String(doc._id))),
-            safeRedisDel(RKEYS.cacheByCode(String(doc.meetingCode))),
-        ]);
+        await invalidateTranscriptCache(doc);
 
         log.info("aiSummary generated and saved", { code: doc.meetingCode });
-        return { status: 200, body: { success: true, aiSummary, transcript: updated } };
+        return { status: 200, body: { success: true, aiSummary, transcript: withPrivacy(updated) } };
     } catch (err) {
         log.error("generateAiSummary error", { err: err.message });
         return { status: 500, body: { success: false, message: "Failed to generate AI summary" } };
@@ -379,42 +413,71 @@ export async function updateAiSummaryService(req) {
     const { secret, userId, secretHash } = resolveAuth(req);
     if (!secret && !userId) return { status: 403, body: { success: false, message: "Not authorized" } };
 
-    const aiSummary = req.body?.aiSummary;
-    if (!aiSummary || typeof aiSummary !== "object") {
-        return { status: 400, body: { success: false, message: "aiSummary object required" } };
+    // The client is untrusted: store a rebuilt, size-capped copy, never the raw body.
+    const clean = sanitizeClientSummary(req.body?.aiSummary);
+    if (!clean.ok) {
+        return { status: clean.status, body: { success: false, code: clean.code, message: clean.message } };
     }
 
-    if (await isAiSummaryRateLimited(userId)) {
-        return { status: 429, body: { success: false, message: "AI summary rate limit reached. Max 2 per 2 hours." } };
+    if (await isClientSummaryRateLimited(userId)) {
+        return { status: 429, body: { success: false, message: "Too many summary saves. Try again later." } };
     }
 
     try {
-        const isMongoId = /^[a-f\d]{24}$/i.test(idOrCode);
-        let doc = null;
-        if (isMongoId) doc = await findTranscriptById(idOrCode);
-        if (!doc) doc = await findTranscriptByCode(idOrCode.toUpperCase());
+        const doc = await findDocByIdOrCode(idOrCode);
         if (!doc) return { status: 404, body: { success: false, message: "Transcript not found" } };
 
         if (!isAuthorized(doc, userId, secretHash)) {
             return { status: 403, body: { success: false, message: "Not authorized" } };
         }
 
-        const { default: Transcript } = await import("../models/transcript.model.js");
-        const updated = await Transcript.findByIdAndUpdate(
-            doc._id,
-            { $set: { aiSummary } },
-            { new: true }
-        ).lean();
+        // A summary made on the device is allowed for confidential transcripts.
+        const updated = await updateTranscriptAiSummary(doc._id, clean.value);
 
-        await Promise.all([
-            safeRedisDel(RKEYS.cacheById(String(doc._id))),
-            safeRedisDel(RKEYS.cacheByCode(String(doc.meetingCode))),
-        ]);
+        await invalidateTranscriptCache(doc);
 
-        log.info("aiSummary saved", { code: doc.meetingCode });
-        return { status: 200, body: { success: true, transcript: updated } };
+        log.info("aiSummary saved", { code: doc.meetingCode, source: clean.value.provenance.source });
+        return { status: 200, body: { success: true, transcript: withPrivacy(updated) } };
     } catch (err) {
         log.error("updateAiSummary error", { err: err.message });
+        return { status: 500, body: { success: false, message: "Server error" } };
+    }
+}
+
+export async function updateTranscriptPrivacyService(req) {
+    const idOrCode = String(req.params.id || "").trim();
+    if (!idOrCode) return { status: 400, body: { success: false, message: "id or meetingCode required" } };
+
+    const { secret, userId, secretHash } = resolveAuth(req);
+    if (!secret && !userId) return { status: 403, body: { success: false, message: "Not authorized" } };
+
+    const privacy = req.body?.privacy;
+    if (!isValidPrivacy(privacy)) {
+        return { status: 400, body: { success: false, message: 'privacy must be "standard" or "confidential"' } };
+    }
+
+    try {
+        const doc = await findDocByIdOrCode(idOrCode);
+        if (!doc) return { status: 404, body: { success: false, message: "Transcript not found" } };
+
+        // Owner (account) or the host secret that created the transcript. Readers who were only
+        // granted access through an approved request cannot change it.
+        if (!isAuthorized(doc, userId, secretHash)) {
+            return { status: 403, body: { success: false, message: "Not authorized" } };
+        }
+
+        if (privacyOf(doc) !== privacy) {
+            await updateTranscriptPrivacy(doc._id, privacy);
+            await invalidateTranscriptCache(doc);
+            log.info("privacy updated", { code: doc.meetingCode, privacy });
+        }
+
+        return {
+            status: 200,
+            body: { success: true, privacy, transcriptId: String(doc._id), meetingCode: doc.meetingCode },
+        };
+    } catch (err) {
+        log.error("updateTranscriptPrivacy error", { err: err.message });
         return { status: 500, body: { success: false, message: "Server error" } };
     }
 }
@@ -584,7 +647,7 @@ export async function getTranscriptService(req) {
                 status: 200,
                 body: {
                     success: true,
-                    transcript: doc
+                    transcript: withPrivacy(doc)
                 }
             };
         }
@@ -638,7 +701,7 @@ export async function getTranscriptService(req) {
         return {
             status: 200,
             body: {
-                success: true, transcript: doc
+                success: true, transcript: withPrivacy(doc)
             }
         };
     } catch (err) {
@@ -737,7 +800,7 @@ export async function listTranscriptsService(req) {
         log.info("listTranscripts complete", { count: docs.length, dbMs: Date.now() - dbStart });
         return {
             status: 200, body: {
-                success: true, transcripts: docs
+                success: true, transcripts: docs.map(withPrivacy)
             }
         };
     } catch (err) {

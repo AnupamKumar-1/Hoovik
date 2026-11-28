@@ -1,0 +1,52 @@
+.rp-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  color: #cbd5e1;
+  font-size: 12px;
+}
+.rp-sensitivity { --rp-accent: #34d399; border-left: 3px solid var(--rp-accent); padding: 4px 0 4px 10px; margin: 8px 0; }
+.rp-sensitivity--medium { --rp-accent: #f59e0b; }
+.rp-sensitivity--high { --rp-accent: #f87171; }
+.rp-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-weight: 600;
+  color: var(--rp-accent);
+  border: 1px solid var(--rp-accent);
+}
+.rp-glyph { font-weight: 700; }
+.rp-warning { margin: 6px 0 2px; line-height: 1.5; color: #e2e8f0; }
+.rp-summary { margin: 8px 0 4px; font-size: 13px; color: #e2e8f0; }
+.rp-note { margin: 4px 0; font-size: 11px; color: #64748b; }
+.rp-empty { color: #94a3b8; }
+
+.rp-counts { list-style: none; margin: 6px 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 4px 16px; }
+.rp-counts li { display: flex; justify-content: space-between; gap: 8px; }
+.rp-count { font-family: 'DM Mono', monospace; color: #e2e8f0; }
+
+.rp-controls { margin: 8px 0; }
+.rp-toggle {
+  font-size: 11px;
+  color: #94a3b8;
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.rp-toggle:hover { color: #e2e8f0; border-color: rgba(255, 255, 255, 0.25); }
+.rp-toggle:focus-visible { outline: 2px solid #38bdf8; outline-offset: 2px; }
+
+.rp-table { display: flex; flex-direction: column; gap: 4px; max-height: 320px; overflow: auto; }
+.rp-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.rp-row--head { position: sticky; top: 0; background: #0f172a; font-size: 11px; font-weight: 600; color: #94a3b8; padding: 2px 0; }
+.rp-cell { line-height: 1.5; word-break: break-word; padding: 4px 6px; border-radius: 6px; background: rgba(255, 255, 255, 0.03); }
+.rp-row--changed .rp-cell:last-child { background: rgba(56, 189, 248, 0.08); }
+.rp-time { font-family: 'DM Mono', monospace; color: #64748b; }
+@media (max-width: 640px) { .rp-row { grid-template-columns: 1fr; } }
