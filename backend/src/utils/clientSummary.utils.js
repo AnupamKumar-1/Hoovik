@@ -236,6 +236,20 @@ function cleanReceipt(v) {
     return clean;
 }
 
+const REDACTION_CATEGORIES = ["email", "url", "money", "phone", "id", "person", "term"];
+
+// Counts only: how many items were redacted before a cloud call. No text, no placeholders.
+function cleanRedaction(v) {
+    if (v === undefined || v === null) return null;
+    if (!isObj(v)) throw new SummaryRejected("INVALID_FIELD", "provenance.redaction must be an object or null");
+    const count = (n) => (Number.isInteger(n) && n >= 0 ? Math.min(n, 100000) : 0);
+    const byCategory = {};
+    if (isObj(v.byCategory)) {
+        for (const c of REDACTION_CATEGORIES) if (Number.isInteger(v.byCategory[c]) && v.byCategory[c] > 0) byCategory[c] = count(v.byCategory[c]);
+    }
+    return { applied: v.applied === true, entities: count(v.entities), total: count(v.total), byCategory };
+}
+
 function cleanProvenance(p) {
     if (!isObj(p)) throw new SummaryRejected("MISSING_PROVENANCE", "provenance is required");
     if (typeof p.source !== "string" || !CLIENT_SOURCES.includes(p.source)) {
@@ -259,6 +273,7 @@ function cleanProvenance(p) {
         .filter((c) => typeof c === "string" && ISSUE_CODE_RE.test(c))
         .slice(0, L.issueCodes);
     out.receipt = cleanReceipt(p.receipt);
+    out.redaction = cleanRedaction(p.redaction);
     return out;
 }
 

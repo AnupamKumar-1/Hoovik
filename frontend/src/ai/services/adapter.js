@@ -16,7 +16,7 @@ export class AdapterError extends Error {
 
 /**
  * validated: value from validateSummary. insights: from computeInsights (or merged with model topics).
- * provenance: { source, policy, mode, chunkCount?, receipt? }. `issues` are reduced to codes only.
+ * provenance: { source, policy, mode, chunkCount?, receipt?, redaction? }. `redaction` is counts only. `issues` are reduced to codes only.
  */
 export function toStoredSummary({ validated, insights, provenance, issues = [], now = () => new Date() }) {
   if (!validated || typeof validated.summary !== "string" || !validated.summary) throw new AdapterError("INVALID_SUMMARY", "A validated summary is required");
@@ -39,6 +39,7 @@ export function toStoredSummary({ validated, insights, provenance, issues = [], 
       generatedAt: now().toISOString(),
       validationIssues: [...new Set(issues.map((i) => i.code))],
       receipt: provenance.receipt ?? null,
+      redaction: provenance.redaction ?? null,
     },
   };
 }

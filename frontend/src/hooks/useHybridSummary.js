@@ -1,13 +1,17 @@
-import { useCallback, useEffect, useReducer, useRef } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
 import { getHybridService } from "../ai/services/hybrid.js";
 import { SUMMARY_STATES, initialSummaryState, summaryReducer } from "../ai/services/summaryMachine.js";
+import { buildCloudPreview } from "../ai/services/cloudPreview.js";
 
 const UNKNOWN = { status: "failed", error: { code: "UNKNOWN", message: "Something went wrong while analysing the meeting." } };
 
 /**
  * React binding for the hybrid summary service.
  *
- *   run({ segments, policy })  start (call from a click: the on-device model may need a user gesture)
+ *   run({ segments, policy, redaction })  start (call from a click: the on-device model may need a user gesture);
+ *                              redaction is optional: { names, terms } to always redact
+ *   cloudPreview               while consent is required: what would leave the device (redacted rows,
+ *                              counts, sensitivity); null otherwise. Built locally and kept in memory.
  *   approveCloud()             the ONLY way cloudConsent becomes true; valid only while consent is required
  *   declineCloud() / retry() / reset()
  *
@@ -57,9 +61,9 @@ export function useHybridSummary({ service } = {}) {
   );
 
   const run = useCallback(
-    ({ segments, policy }) => {
-      lastArgs.current = { segments, policy };
-      return execute({ segments, policy, phase: "local", cloudConsent: false });
+    ({ segments, policy, redaction }) => {
+      lastArgs.current = { segments, policy, redaction };
+      return execute({ segments, policy, redaction, phase: "local", cloudConsent: false });
     },
     [execute]
   );
@@ -81,5 +85,15 @@ export function useHybridSummary({ service } = {}) {
     dispatch({ type: "RESET" });
   }, []);
 
-  return { state, run, retry, approveCloud, declineCloud, reset };
+  const consentRequired = state.status === SUMMARY_STATES.CONSENT_REQUIRED;
+  const cloudPreview = useMemo(() => {
+    if (!consentRequired || !lastArgs.current) return null;
+    try {
+      return buildCloudPreview(lastArgs.current.segments, lastArgs.current.redaction);
+    } catch {
+      return null;
+    }
+  }, [consentRequired]);
+
+  return { state, cloudPreview, run, retry, approveCloud, declineCloud, reset };
 }

@@ -94,6 +94,38 @@ describe("sanitizeClientSummary: provenance", () => {
     });
 });
 
+describe("sanitizeClientSummary: provenance.redaction", () => {
+    it("defaults to null for summaries made before redaction existed", () => {
+        const r = sanitizeClientSummary(good());
+        expect(r.ok).toBe(true);
+        expect(r.value.provenance.redaction).toBeNull();
+    });
+
+    it("keeps counts only for known categories", () => {
+        const r = sanitizeClientSummary(good({
+            provenance: goodProvenance({
+                source: "cloud",
+                policy: "cloud-only",
+                mode: "only_in_cloud",
+                redaction: { applied: true, entities: 3, total: 5, byCategory: { email: 2, person: 1, bogus: 9, url: 0 }, text: "maria@x.example", mapping: { "<EMAIL_1>": "maria@x.example" } },
+            }),
+        }));
+        expect(r.ok).toBe(true);
+        expect(r.value.provenance.redaction).toEqual({ applied: true, entities: 3, total: 5, byCategory: { email: 2, person: 1 } });
+        expect(JSON.stringify(r.value)).not.toContain("maria@x.example");
+    });
+
+    it("coerces bad counts to zero and caps huge ones", () => {
+        const r = sanitizeClientSummary(good({ provenance: goodProvenance({ redaction: { applied: "yes", entities: -4, total: 9999999, byCategory: "x" } }) }));
+        expect(r.ok).toBe(true);
+        expect(r.value.provenance.redaction).toEqual({ applied: false, entities: 0, total: 100000, byCategory: {} });
+    });
+
+    it("rejects a redaction value that is not an object", () => {
+        reject(good({ provenance: goodProvenance({ redaction: "lots" }) }), "INVALID_FIELD");
+    });
+});
+
 describe("sanitizeClientSummary: shape and types", () => {
     it("accepts and returns a well formed summary", () => {
         const r = sanitizeClientSummary(good());

@@ -43,8 +43,13 @@ describe("adapter: output contract", () => {
     for (const k of PANEL_INSIGHT_FIELDS) expect(out.insights).toHaveProperty(k);
     expect(out.provenance).toEqual({
       schemaVersion: SCHEMA_VERSION, source: "on-device", policy: "local-only", mode: "only_on_device",
-      chunkCount: 1, generatedAt: "2026-11-27T10:00:00.000Z", validationIssues: [], receipt: null,
+      chunkCount: 1, generatedAt: "2026-11-27T10:00:00.000Z", validationIssues: [], receipt: null, redaction: null,
     });
+  });
+  it("carries a counts-only redaction summary in provenance when one is given", () => {
+    const redaction = { applied: true, entities: 2, total: 3, byCategory: { email: 1, person: 1 } };
+    const out = build({ provenance: { source: "cloud", policy: POLICIES.CLOUD_ONLY, mode: MODES.ONLY_IN_CLOUD, redaction } });
+    expect(out.provenance.redaction).toEqual(redaction);
   });
   it("normalises the source, keeps only issue codes (never text) and defaults chunkCount", () => {
     const out = build({ provenance: { source: "IN_CLOUD", policy: POLICIES.CLOUD_ONLY, mode: MODES.ONLY_IN_CLOUD }, issues: [{ code: "OWNER_UNGROUNDED", message: "Owner Zebediah is secret" }, { code: "OWNER_UNGROUNDED", message: "x" }] });

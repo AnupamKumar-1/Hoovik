@@ -148,4 +148,37 @@ describe("useHybridSummary", () => {
     expect(spy).toHaveBeenCalledTimes(1);
     spy.mockRestore();
   });
+
+  it("passes the optional redaction settings through to the service", async () => {
+    const summarize = vi.fn(async () => done);
+    const { result } = renderHook(() => useHybridSummary({ service: { summarize } }));
+    await act(async () => { await result.current.run({ segments, policy: "cloud-only", redaction: { terms: ["Hartwell"] } }); });
+    expect(summarize.mock.calls[0][0]).toMatchObject({ redaction: { terms: ["Hartwell"] } });
+  });
+
+  it("exposes a local cloud preview only while consent is required", async () => {
+    const pii = [{ speaker: "Priya", start: 0, end: 2, text: "Mail maria@x.example today." }];
+    const summarize = vi.fn()
+      .mockResolvedValueOnce({ status: "consent-required", reason: "local-unavailable", error: { code: "LOCAL_UNAVAILABLE", message: "m" } })
+      .mockResolvedValueOnce(done);
+    const { result } = renderHook(() => useHybridSummary({ service: { summarize } }));
+    expect(result.current.cloudPreview).toBeNull();
+    await act(async () => { await result.current.run({ segments: pii, policy: "ask-before-cloud" }); });
+    expect(result.current.state.status).toBe("consent-required");
+    const preview = result.current.cloudPreview;
+    expect(preview.rows[0].original.text).toContain("maria@x.example");
+    expect(preview.rows[0].redacted.text).toContain("<EMAIL_1>");
+    expect(summarize).toHaveBeenCalledTimes(1); // building the preview sends nothing
+    await act(async () => { await result.current.approveCloud(); });
+    expect(result.current.cloudPreview).toBeNull();
+  });
+
+  it("declining consent clears the preview", async () => {
+    const summarize = vi.fn().mockResolvedValueOnce({ status: "consent-required", reason: "local-unavailable", error: null });
+    const { result } = renderHook(() => useHybridSummary({ service: { summarize } }));
+    await act(async () => { await result.current.run({ segments, policy: "ask-before-cloud" }); });
+    expect(result.current.cloudPreview).not.toBeNull();
+    act(() => result.current.declineCloud());
+    expect(result.current.cloudPreview).toBeNull();
+  });
 });

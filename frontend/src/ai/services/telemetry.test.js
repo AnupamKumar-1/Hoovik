@@ -23,6 +23,11 @@ describe("telemetry sanitiser", () => {
     expect(sanitizeRecord({ errorCode: "OK_CODE" })).toEqual({ errorCode: "OK_CODE" });
   });
 
+  it("keeps redaction metrics as numbers and booleans only", () => {
+    expect(sanitizeRecord({ redacted: true, redactedItems: 7.4 })).toEqual({ redacted: true, redactedItems: 7 });
+    expect(sanitizeRecord({ redacted: CANARY, redactedItems: CANARY })).toEqual({});
+  });
+
   it("handles non-objects", () => {
     expect(sanitizeRecord(null)).toEqual({});
     expect(sanitizeRecord("x")).toEqual({});

@@ -24,3 +24,10 @@ _Status: validation rules (Part 2), server-side confidential enforcement (Part 4
 - Only host names and counts are kept: no URLs, query strings, request bodies, transcript text or speaker names.
 - A local run with zero observed requests to AI services is reported as stayed on this device. Any AI request during a run that was expected to be local is reported as a failed check. A cloud result with no observed AI request is reported as inconclusive, never as local.
 - The server stores the receipt as sent by the client and cannot verify it.
+
+## Redaction before cloud calls
+- Any run that can reach the cloud sends redacted text: emails, links, money amounts, phone numbers, ids and long numbers, speaker names and runs of two or more capitalised words become placeholders. The model sees only placeholders; they are restored in the result on this device, from a mapping that lives in memory for one run.
+- Local-only runs are never redacted because nothing leaves the device. If redaction fails, the run is refused rather than sent unredacted.
+- **Best effort, not anonymisation.** A lone name that is not a speaker, amounts written in words and indirectly identifying facts are not caught. See `hybrid-part6-notes.md`.
+- A rule-based sensitivity estimate (low, medium, high) preselects local-only for high-sensitivity transcripts and warns before cloud is offered. It is a heuristic and can be wrong in both directions.
+- Only counts of redacted items are stored (`provenance.redaction`).

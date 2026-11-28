@@ -16,19 +16,25 @@
 //    initialisation, every chunk, the merge). Its receipt goes into provenance.receipt for a
 //    finished summary and onto result.receipt for every other outcome. A receipt is a measurement,
 //    not a guarantee, and it never changes the outcome of a run.
+//  - any mode that can reach the cloud sends REDACTED text: the transcript is redacted locally before
+//    it is prepared, the model only ever sees placeholders, and the placeholders are restored in the
+//    result on this device. The mapping lives in memory for the length of one run. Local-only runs
+//    never redact (nothing leaves the device). Redaction is best effort, not anonymisation.
 // Nothing here stores or logs transcript text; telemetry accepts metrics only.
 
 import { prepareTranscript } from "./prepare.js";
 import { validateSummary } from "./validator.js";
 import { computeInsights } from "./insights.js";
 import { toStoredSummary } from "./adapter.js";
-import { MODES, POLICIES, assertModeAllowed, auditSource, combineSources, modeFor } from "./policy.js";
+import { MODES, POLICIES, assertModeAllowed, auditSource, canReachCloud, combineSources, modeFor } from "./policy.js";
 import { ERROR_CODES, USER_MESSAGES, classifyError } from "./errors.js";
 import { createSerialQueue } from "./queue.js";
 import { telemetry as defaultTelemetry } from "./telemetry.js";
 import { buildChunkPrompt, buildMergePrompt, deterministicMerge, splitChunkText } from "./prompt.js";
 import { getModel as defaultGetModel } from "./model.js";
 import { buildReceipt, createWitness } from "./witness.js";
+import { redactTranscript } from "./cloudPreview.js";
+import { safeRedactionSummary } from "./redact.js";
 
 // Chunk budgets are judgements, not measurements. On-device: about half of the 50,000 characters
 // that succeeded in Part 1 (docs/hybrid-part1-findings.md), leaving room for instructions, the
@@ -70,7 +76,7 @@ export function createHybridService({
 } = {}) {
   let busy = false;
 
-  async function runOnce({ segments, policy, phase, cloudConsent, onEvent }) {
+  async function runOnce({ segments, policy, phase, cloudConsent, redaction, onEvent }) {
     const startedAt = now();
     const requestId = telemetry.newRequestId();
     const stats = { calls: 0, outputChars: 0, inputChars: 0, chunkCount: 0, failedChunks: 0 };
@@ -148,15 +154,34 @@ export function createHybridService({
         return terminal(classify(e).code);
       }
 
-      // 2. Prepare.
+      // 2. Redact (only when this mode can reach the cloud), then prepare.
       const lim = mode === MODES.ONLY_IN_CLOUD ? limits.cloud : limits.onDevice;
+      let redactor = null;
+      let modelInput = segments;
+      let originalSegments = null;
+      if (canReachCloud(mode)) {
+        try {
+          const r = redactTranscript(segments, redaction);
+          redactor = r.redactor;
+          modelInput = r.redacted;
+          originalSegments = r.original;
+        } catch {
+          // If redaction fails nothing may be sent. Never fall through with the original text.
+          return terminal(ERROR_CODES.INVALID_INPUT);
+        }
+      }
       let prepared;
       try {
-        prepared = prepareTranscript(segments, { maxChunkChars: lim.chunkChars });
+        prepared = prepareTranscript(modelInput, { maxChunkChars: lim.chunkChars });
       } catch (e) {
         return terminal(classify(e).code);
       }
       stats.inputChars = prepared.charCount;
+      const redactionSummary = redactor ? safeRedactionSummary(redactor.summary()) : null;
+      if (redactionSummary) {
+        stats.redacted = true;
+        stats.redactedItems = redactionSummary.total;
+      }
       stats.chunkCount = prepared.chunks.length;
       if (prepared.chunks.length > lim.maxChunks) return terminal(ERROR_CODES.TOO_LONG);
 
@@ -284,10 +309,12 @@ export function createHybridService({
         return finish({ status: RESULT_STATUS.FAILED, error });
       }
 
+      // Placeholders go back to the original text here, on this device. Insights and speaker
+      // statistics are computed from the original segments and never leave the device.
       const analysis = toStoredSummary({
-        validated: validated.value,
-        insights: computeInsights(prepared.segments),
-        provenance: { source: audit.source, policy, mode, chunkCount: leaves.length, receipt: sealReceipt(RESULT_STATUS.DONE) },
+        validated: redactor ? redactor.restoreDeep(validated.value) : validated.value,
+        insights: computeInsights(redactor ? originalSegments : prepared.segments),
+        provenance: { source: audit.source, policy, mode, chunkCount: leaves.length, receipt: sealReceipt(RESULT_STATUS.DONE), redaction: redactionSummary },
         issues,
       });
       return finish({
@@ -300,13 +327,13 @@ export function createHybridService({
     }
   }
 
-  async function summarize({ segments, policy, phase = "local", cloudConsent = false, onEvent } = {}) {
+  async function summarize({ segments, policy, phase = "local", cloudConsent = false, redaction, onEvent } = {}) {
     if (busy) {
       return { status: RESULT_STATUS.FAILED, error: { code: ERROR_CODES.BUSY, message: USER_MESSAGES.BUSY } };
     }
     busy = true;
     try {
-      return await runOnce({ segments, policy, phase, cloudConsent, onEvent });
+      return await runOnce({ segments, policy, phase, cloudConsent, redaction, onEvent });
     } finally {
       busy = false;
     }
