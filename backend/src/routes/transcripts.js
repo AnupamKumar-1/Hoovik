@@ -27,6 +27,7 @@ router.post("/", aAuth, ctrl.createTranscript);
 router.get("/", aAuth, ctrl.listTranscripts);
 router.post("/:id/summary", aAuth, ctrl.generateAiSummary);
 router.patch("/:id/summary", aAuth, ctrl.updateAiSummary);
+router.patch("/:id/privacy", aAuth, ctrl.updateTranscriptPrivacy);
 router.get("/:id", aAuth, ctrl.getTranscript);
 
 export default router;

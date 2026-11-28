@@ -121,6 +121,16 @@ describe("indexTranscriptService", () => {
 
     it("returns 429 when index rate limit exceeded", async () => {
         resolveAuth.mockReturnValue({ secret: null, userId: "user1", secretHash: null });
+        findTranscriptByCode.mockResolvedValue({
+            _id: "aaaaaaaaaaaaaaaaaaaaaaaa",
+            ownerId: "user1",
+            hostSecretHash: "h",
+            meetingCode: "MEET1",
+            metadata: { segments: [] },
+            transcriptText: "hello",
+            aiSummary: null,
+        });
+        isAuthorized.mockReturnValue(true);
         safeRedisIncr.mockResolvedValue(999);
         const req = { params: { id: "MEET1" } };
         const result = await ragService.indexTranscriptService(req);

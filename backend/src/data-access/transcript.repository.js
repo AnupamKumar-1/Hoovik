@@ -61,9 +61,18 @@ export async function listTranscriptDocs({ query, meetingCode, limit }) {
             createdAt: 1,
             ownerId: 1,
             aiSummary: 1,
+            privacy: 1,
         }
     )
         .sort({ createdAt: -1 })
         .limit(limit)
         .lean();
+}
+
+export async function updateTranscriptPrivacy(id, privacy) {
+    return Transcript.findByIdAndUpdate(id, { $set: { privacy } }, { new: true }).lean();
+}
+
+export async function updateTranscriptAiSummary(id, aiSummary) {
+    return Transcript.findByIdAndUpdate(id, { $set: { aiSummary } }, { new: true }).lean();
 }

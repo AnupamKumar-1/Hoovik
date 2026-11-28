@@ -9,6 +9,7 @@ const TranscriptSchema = new mongoose.Schema(
     fileName: { type: String, default: null },
     metadata: { type: mongoose.Schema.Types.Mixed, default: {} },
     aiSummary: { type: mongoose.Schema.Types.Mixed, default: null },
+    privacy: { type: String, enum: ["standard", "confidential"], default: "standard" },
     version: { type: Number, default: 1 },
   },
   {
