@@ -24,6 +24,7 @@ export const ERROR_CODES = Object.freeze({
   EMPTY_TRANSCRIPT: "EMPTY_TRANSCRIPT",
   INVALID_INPUT: "INVALID_INPUT",
   BUSY: "BUSY",
+  CONFIDENTIAL_BLOCKED: "CONFIDENTIAL_BLOCKED",
   UNKNOWN: "UNKNOWN",
 });
 
@@ -43,6 +44,7 @@ export const USER_MESSAGES = Object.freeze({
   EMPTY_TRANSCRIPT: "There is no transcript text to analyse.",
   INVALID_INPUT: "The transcript could not be read.",
   BUSY: "An analysis is already running.",
+  CONFIDENTIAL_BLOCKED: "This meeting is confidential, so it can only be analysed on this device.",
   UNKNOWN: "Something went wrong while analysing the meeting.",
 });
 

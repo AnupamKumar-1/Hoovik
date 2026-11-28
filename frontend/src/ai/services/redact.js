@@ -21,7 +21,15 @@ const PREFIX = Object.freeze({ email: "EMAIL", url: "URL", money: "AMOUNT", phon
 
 const EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}/g;
 const URL_RE = /\b(?:https?:\/\/|www\.)[^\s<>"'`]+/gi;
-const MONEY_RE = /[$€£₹]\s?\d[\d,]*(?:\.\d+)?(?:\s?(?:k|m|bn|million|billion|thousand|lakh|crore)\b)?|\b\d[\d,]*(?:\.\d+)?\s?(?:dollars|usd|eur|euros|gbp|inr|rupees)\b/gi;
+const MONEY_RE = /[$€£₹]\s?\d[\d,]*(?:\.\d+)?(?:\s?(?:k|m|bn|million|billion|thousand|lakh|crore)\b)?|\b(?:rs\.?|inr)\s?\d[\d,]*(?:\.\d+)?(?:\s?(?:k|m|bn|million|billion|thousand|lakhs?|lacs?|crores?)\b)?|\b\d[\d,]*(?:\.\d+)?\s?(?:lakhs?|lacs?|crores?)\b(?:\s+(?:rupees|rs|inr)\b)?|\b\d[\d,]*(?:\.\d+)?\s?(?:k|m|mn|bn|million|billion|thousand)\s+(?:dollars|usd|eur|euros|gbp|inr|rupees)\b|\b\d[\d,]*(?:\.\d+)?\s?(?:dollars|usd|eur|euros|gbp|inr|rupees)\b/gi;
+// Payment-style handle such as name@bank (UPI); real emails were replaced before this runs.
+const HANDLE_RE = /(?<![\w.%+-])[A-Za-z0-9._-]{2,}@[A-Za-z]{2,}(?![\w.@-])/g;
+// A link written without a scheme but with a path, e.g. intranet.example.com/cases/22.
+const BARE_URL_RE = /(?<![\w@.-])(?:[a-z0-9-]+\.)+[a-z]{2,}\/[^\s<>"'`]+/gi;
+// Card-style numbers: 13 to 19 digits, optionally grouped by spaces or dashes (checked by digit count below).
+const CARD_CANDIDATE_RE = /(?<![\w-])\d(?:[ -]?\d){12,21}(?![\w-])/g;
+// Indian PAN: five letters, four digits, one letter.
+const PAN_RE = /(?<![\w-])[A-Z]{5}\d{4}[A-Z](?![\w-])/g;
 // US-style national id: 3-2-4.
 const SSN_RE = /(?<![\w-])\d{3}-\d{2}-\d{4}(?![\w-])/g;
 // A digit-led run with separators; classified by digit count below.
@@ -92,6 +100,14 @@ export function createRedactor({ names = [], terms = [] } = {}) {
       if (!core) return m;
       hits[category] += 1;
       return placeholderFor(category, core) + tail;
+    });
+
+  const replaceCards = (text) =>
+    text.replace(CARD_CANDIDATE_RE, (m) => {
+      const digits = m.replace(/\D/g, "").length;
+      if (digits < 13 || digits > 19) return m;
+      hits.id += 1;
+      return placeholderFor("id", m);
     });
 
   const replacePhones = (text) =>
@@ -174,8 +190,12 @@ export function createRedactor({ names = [], terms = [] } = {}) {
 
     text = replace(text, "email", EMAIL_RE);
     text = replace(text, "url", URL_RE);
+    text = replace(text, "url", BARE_URL_RE);
+    text = replace(text, "email", HANDLE_RE);
     text = replace(text, "money", MONEY_RE);
     text = replace(text, "id", SSN_RE);
+    text = replaceCards(text);
+    text = replace(text, "id", PAN_RE);
     text = replacePhones(text);
     text = replace(text, "id", LONG_DIGITS_RE);
     for (const t of termList) {

@@ -76,7 +76,7 @@ export function createHybridService({
 } = {}) {
   let busy = false;
 
-  async function runOnce({ segments, policy, phase, cloudConsent, redaction, onEvent }) {
+  async function runOnce({ segments, policy, phase, cloudConsent, redaction, confidential, onEvent }) {
     const startedAt = now();
     const requestId = telemetry.newRequestId();
     const stats = { calls: 0, outputChars: 0, inputChars: 0, chunkCount: 0, failedChunks: 0 };
@@ -135,7 +135,8 @@ export function createHybridService({
     // Map a terminal error code to the result the caller should show.
     const terminal = (code, { reason } = {}) => {
       const error = { code, message: USER_MESSAGES[code] ?? USER_MESSAGES.UNKNOWN };
-      const askLocal = policy === POLICIES.ASK_BEFORE_CLOUD && phase === "local";
+      // A confidential meeting is never offered the cloud, so there is nothing to ask consent for.
+      const askLocal = policy === POLICIES.ASK_BEFORE_CLOUD && phase === "local" && !confidential;
       if (code === ERROR_CODES.CONSENT_REQUIRED || (askLocal && (code === ERROR_CODES.LOCAL_UNAVAILABLE || code === ERROR_CODES.TOO_LONG))) {
         return finish({ status: RESULT_STATUS.CONSENT_REQUIRED, error, reason: reason ?? (code === ERROR_CODES.TOO_LONG ? "too-long" : "local-unavailable") });
       }
@@ -153,6 +154,10 @@ export function createHybridService({
       } catch (e) {
         return terminal(classify(e).code);
       }
+
+      // 1b. Confidential meetings: no cloud-capable mode, whatever the policy or consent. Checked before
+      // anything is redacted, observed or created, so nothing is prepared for a cloud call.
+      if (confidential && canReachCloud(mode)) return terminal(ERROR_CODES.CONFIDENTIAL_BLOCKED);
 
       // 2. Redact (only when this mode can reach the cloud), then prepare.
       const lim = mode === MODES.ONLY_IN_CLOUD ? limits.cloud : limits.onDevice;
@@ -327,13 +332,16 @@ export function createHybridService({
     }
   }
 
-  async function summarize({ segments, policy, phase = "local", cloudConsent = false, redaction, onEvent } = {}) {
+  // `privacy` is the transcript's privacy setting ("standard" | "confidential"). Fail-safe: anything other
+  // than an explicit "standard" (or nothing at all) is treated as confidential. `confidential: true` also works.
+  async function summarize({ segments, policy, phase = "local", cloudConsent = false, redaction, privacy, confidential: confidentialFlag, onEvent } = {}) {
+    const confidential = confidentialFlag === true || (privacy !== undefined && privacy !== null && privacy !== "standard");
     if (busy) {
       return { status: RESULT_STATUS.FAILED, error: { code: ERROR_CODES.BUSY, message: USER_MESSAGES.BUSY } };
     }
     busy = true;
     try {
-      return await runOnce({ segments, policy, phase, cloudConsent, redaction, onEvent });
+      return await runOnce({ segments, policy, phase, cloudConsent, redaction, confidential, onEvent });
     } finally {
       busy = false;
     }

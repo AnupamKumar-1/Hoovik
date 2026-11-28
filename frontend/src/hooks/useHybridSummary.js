@@ -8,8 +8,9 @@ const UNKNOWN = { status: "failed", error: { code: "UNKNOWN", message: "Somethin
 /**
  * React binding for the hybrid summary service.
  *
- *   run({ segments, policy, redaction })  start (call from a click: the on-device model may need a user gesture);
- *                              redaction is optional: { names, terms } to always redact
+ *   run({ segments, policy, redaction, privacy })  start (call from a click: the on-device model may need a user gesture);
+ *                              redaction is optional: { names, terms } to always redact;
+ *                              privacy is the transcript setting ("standard" | "confidential"); confidential never uses the cloud
  *   cloudPreview               while consent is required: what would leave the device (redacted rows,
  *                              counts, sensitivity); null otherwise. Built locally and kept in memory.
  *   approveCloud()             the ONLY way cloudConsent becomes true; valid only while consent is required
@@ -61,9 +62,9 @@ export function useHybridSummary({ service } = {}) {
   );
 
   const run = useCallback(
-    ({ segments, policy, redaction }) => {
-      lastArgs.current = { segments, policy, redaction };
-      return execute({ segments, policy, redaction, phase: "local", cloudConsent: false });
+    ({ segments, policy, redaction, privacy }) => {
+      lastArgs.current = { segments, policy, redaction, privacy };
+      return execute({ segments, policy, redaction, privacy, phase: "local", cloudConsent: false });
     },
     [execute]
   );
