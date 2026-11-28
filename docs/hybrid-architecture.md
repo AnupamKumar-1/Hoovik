@@ -7,7 +7,7 @@ Pure functions with no Firebase or network dependency, unit-tested with vitest.
 
 | Module | Responsibility |
 |---|---|
-| `policy.js` | Four named policies mapped to SDK modes; `enforcePolicy` is the only gate before any model call; `auditSource` checks the source observed in the response; `combineSources` (any cloud call makes the result cloud). |
+| `policy.js` | Four named policies mapped to SDK modes; `assertModeAllowed` (with `modeFor`) is the only gate before any model call; `auditSource` checks the source observed in the response; `combineSources` (any cloud call makes the result cloud). |
 | `prepare.js` | Normalise speakers and whitespace, drop empty and duplicate segments, merge same-speaker turns, time-stamped line format, character count, chunking on turn boundaries and sentences, never dropping text. |
 | `validator.js` | Tolerant JSON parse, type checks and caps, owner and deadline grounding, issues list. Owners are checked by presence and, when turns are supplied, labelled `anchored` or `present`; `strictOwners` drops unanchored owners. |
 | `insights.js` | Deterministic dominant emotion, integer distribution summing to 100, speaker stats, totals, pace, duration, in the shape the summary panel reads. |
@@ -16,3 +16,17 @@ Pure functions with no Firebase or network dependency, unit-tested with vitest.
 ### Known limits
 - Owner and deadline grounding is heuristic (token overlap and phrase presence). It will sometimes drop or mislabel a valid owner; dropping is the intended failure direction.
 - Anchoring treats a bare mention as not ownership ("after Marcus changes the screen" does not anchor Marcus), but a task whose wording does not overlap the transcript cannot be anchored.
+
+## Hybrid service (Part 3): `frontend/src/ai/services/` and `frontend/src/hooks/`
+| Module | Responsibility |
+|---|---|
+| `model.js` | The only module that calls the SDK's model API. One model per inference mode, created lazily and reused; only the configuration that applies to a mode is passed. |
+| `hybrid.js` | `createHybridService().summarize(...)`: policy gate, prepare, chunk, one independent single-turn call per chunk, merge, validate, source taken from every response, audit against the policy, telemetry, adapt. Returns `done`, `consent-required`, `unsupported`, `too-long` or `failed`; it does not throw for expected states. Refuses overlapping runs (`BUSY`). |
+| `prompt.js` | Prompts, on-device JSON schema, cloud schema builder, deterministic merge, chunk splitting. |
+| `errors.js` | Maps SDK and browser errors to fixed codes with fixed user-safe messages. |
+| `queue.js` | Strict serial execution for model calls. |
+| `telemetry.js` | Metrics-only records rebuilt from a whitelist; text cannot be stored. |
+| `summaryMachine.js` | Pure reducer for the UI states. |
+| `useHybridSummary.js` | React binding. `approveCloud()` is the only way consent becomes `true`. |
+
+Details, the SDK behaviour this relies on and the Chrome checks: `docs/hybrid-part3-notes.md`.
